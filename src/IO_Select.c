@@ -1,4 +1,4 @@
-/*	$Id: IO_Select.c,v 1.3 2000/11/24 08:46:54 mva Exp $	*/
+/*	$Id: IO_Select.c,v 1.4 2000/12/08 21:37:08 mva Exp $	*/
 /*  Wrapper around the select() function.
     Copyright (C) 2000  Michael van Acken
 
@@ -129,10 +129,10 @@ void IO_Select__FileDescrSetDesc_Copy(IO_Select__FileDescrSet fdSet, IO_Select__
   *(fd_set*)(dest->fd_set) = *(fd_set*)(fdSet->fd_set);
 }
 
-int IO_Select__Select(IO_Select__FileDescrSet read,
-                      IO_Select__FileDescrSet write,
-                      IO_Select__FileDescrSet except,
-		      int sec, int usec) {
+LONGINT IO_Select__Select(IO_Select__FileDescrSet read,
+			  IO_Select__FileDescrSet write,
+			  IO_Select__FileDescrSet except,
+			  LONGINT sec, LONGINT usec) {
   struct timeval tv;
   struct timeval* tvptr;
   int res;

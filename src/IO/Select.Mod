@@ -1,7 +1,7 @@
-(*	$Id: Select.Mod,v 1.1 2000/08/27 15:13:27 mva Exp $	*)
+(*	$Id: Select.Mod,v 1.2 2000/11/24 08:47:00 mva Exp $	*)
 MODULE IO:Select [FOREIGN "C"; LINK FILE "IO_Select.c" END];
 (*  Wrapper around the select() function.
-    Copyright (C) 2000  Michael van Acken
+    Copyright (C) 2000, 2002  Michael van Acken
 
     This module is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License
@@ -63,7 +63,7 @@ PROCEDURE (fdSet: FileDescrSet) Copy* (dest: FileDescrSet);
 
 
 PROCEDURE Select* (read, write, except: FileDescrSet;
-                   sec, usec: C.longint): C.int;
+                   sec, usec: LONGINT): LONGINT;
 (**This function is a simple wrapper around the C function @samp{select}.  See
    the manual page select(2) for the details.  The parameters @oparam{sec} and
    @oparam{usec} determine the timeout value.  If both are zero, the function
