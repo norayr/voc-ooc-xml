@@ -18,9 +18,11 @@ AC_PROG_INSTALL
 dnl Required and optional base libraries.
 OOC_CHECK_LIB(xnet,socket,,)
 
-dnl Make sure that $(MAKE) is valid, and enable program name transformation.
+dnl Make sure that $(MAKE) is valid, enable program name transformation,
+dnl and find out which extension executables have.
 AC_PROG_MAKE_SET
 AC_ARG_PROGRAM
+AC_EXEEXT
 
 dnl Create output file.
 AC_OUTPUT(Makefile)

@@ -17,6 +17,9 @@ package=XML
 ### Transformation applied to program names when installing.
 transform=@program_transform_name@
 
+### File name extension of executables.
+exeext=@EXEEXT@
+
 # ==================== Where To Install Things ====================
 
 # The default location for installation.  Everything is placed in
@@ -53,13 +56,13 @@ INSTALL_DATA = @INSTALL_DATA@
 
 .PHONY: all clean test
 
-all: libxml
+all: libxml$(exeext)
 
-libxml: oo2crc localdirs
+libxml$(exeext): oo2crc localdirs
 	if test $(ooc_have_libs) = yes; then \
-	  $(OOC) --config oo2crc --make-lib $(OFLAGS) --lib-path $(libdir) libxml && touch libxml; \
+	  $(OOC) --config oo2crc --make-lib $(OFLAGS) --lib-path $(libdir) libxml && touch libxml$(exeext); \
 	else \
-	  $(OOC) --config oo2crc -Mv $(OFLAGS) libxml && touch libxml; \
+	  $(OOC) --config oo2crc -Mv $(OFLAGS) libxml && touch libxml$(exeext); \
 	fi
 
 install: all mkdir config.ooc
@@ -142,7 +145,7 @@ dist: distclean
 ###      by building, but normally aren't because the distribution comes
 ###      with them.
 clean: FRC
-	rm -Rf sym obj doc .libs TestCodecs TestParser TestURI TestGet TestServer oo2crc oo2crc.tmp.orig libxml
+	rm -Rf sym obj doc .libs TestCodecs TestParser TestURI TestGet TestServer oo2crc oo2crc.tmp.orig libxml$(exeext)
 	cd tests && ${MAKE} clean
 
 ### `distclean'
