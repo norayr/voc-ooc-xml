@@ -1,0 +1,3 @@
+In file invalid/006.ent: 
+line=1, column=14
+42: While expanding entity `e': Nesting violation: Opening and closing parenthesis not in same entity
