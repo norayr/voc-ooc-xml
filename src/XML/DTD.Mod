@@ -70,7 +70,7 @@ TYPE
 TYPE
   Fragment* = POINTER TO FragmentDesc;
   FragmentDesc = RECORD
-  (**Abstract base type for @otype{DTD.Characters} and @otype{EntityRef}.  *)
+  (**Abstract base type for @otype{Characters} and @otype{EntityRef}.  *)
     next-: Fragment;
     (**Refers to the next fragment in the list @ofield{AttValue.fragmentList}.  *)
   END;
@@ -81,8 +81,8 @@ TYPE
   (**A sequence of characters appearing in an attribute value.  *)
     (FragmentDesc)
     source-: String;
-    (**The array slice @samp{@oparam{source}[@oparam{sourceStart},
-       @oparam{sourceEnd}[} holds the fragment's character data.  *)
+    (**The array slice @samp{@ofield{source}[@ofield{sourceStart},
+       @ofield{sourceEnd}[} holds the fragment's character data.  *)
     sourceStart-, sourceEnd-: CharPos;
   END;
 
@@ -105,7 +105,7 @@ TYPE
   (**An attribute value is stored as a list of character data and general
      entity references.  That is, the internal structure of the value string is
      not resolved at first.  Character data is stored as
-     @otype{DTD.Characters}, and entity references as @otype{EntityRef}.  *)
+     @otype{Characters}, and entity references as @otype{EntityRef}.  *)
     fragmentList-, fragmentTail: Fragment;
     (**The head of the list of attribute value fragments.  For an empty
        attribute, this is @code{NIL}.  *)
@@ -244,7 +244,7 @@ TYPE
        unparsed entity, it holds the name of the @code{NDATA}.  *)
     baseURI-: URI.URI;
     (**The base URI of the external entity.  For a document entity, this 
-       is the URI passed to @oproc{XML:Parser.NewChannel}, and therefore may
+       is the URI passed to @oproc{*XML:Parser.NewChannel}, and therefore may
        be @code{NIL}.  For other entities, it is either derived from the
        public or system identifier, and always present.  *)
     
@@ -273,7 +273,7 @@ TYPE
     (**System identifier.  May be @code{NIL}.  *)
     baseURI-: URI.URI;
     (**The base URI of the external entity.  For a document entity, this 
-       is the URI passed to @oproc{XML:Parser.NewChannel}, and therefore may
+       is the URI passed to @oproc{*XML:Parser.NewChannel}, and therefore may
        be @code{NIL}.  For other entities, it is either derived from the
        public or system identifier, and always present.  *)
   END;

@@ -1,4 +1,4 @@
-(*      $Id: Builder.Mod,v 1.7 2000/07/23 17:41:11 mva Exp $   *)
+(*      $Id: Builder.Mod,v 1.8 2000/07/31 18:37:07 mva Exp $   *)
 MODULE XML:Builder [OOC_EXTENSIONS];
 (*  Low-level builder interface to the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -27,7 +27,7 @@ TYPE
   BuilderDesc* = RECORD
   (**This abstract class defines the interface of the XML parser to the
      application.  It is based on the W3C Working Draft @samp{XML Information
-     Set}, dated December 20 1999.  It can be obtained at
+     Set}, dated July 26 1999.  It can be obtained at
      @url{http://www.w3.org/TR/2000/WD-xml-infoset-20000726}.
 
      The low-level interface to the parser is governed by two requirements: It
@@ -40,8 +40,8 @@ TYPE
 
      The parser itself is @emph{not} namespace aware, even if this interface
      has the necessary hooks to provide namespace information.  Namespaces are
-     implemented by a special builder, @omodule{XML:Builder:Namespaces}, that
-     translates between the parser and a namespace-aware application.
+     implemented by a special builder, @otype{*XML:Builder:Namespaces.Builder},
+     that translates between the parser and a namespace-aware application.
 
      The parser calls the type-bound procedures of the builder while traversing
      the document.  The string arguments passed to the procedures should not be
@@ -67,8 +67,8 @@ TYPE
      @oproc{Builder.Attribute}.  It is provided as a service to builders and
      applications that need to store attribute values before they can process
      them.  An example for this is the namespace-aware builder
-     @otype{XML:Builder:Namespaces}.  The parser does @emph{not} create
-     instances of this class.  *)
+     @otype{*XML:Builder:Namespaces.Builder}.  The parser does @emph{not}
+     create instances of this class.  *)
     namespaceDecl*: DTD.NamespaceDeclaration; 
     localName*: DTD.String;
     attrDecl-: DTD.AttrDecl;
@@ -106,19 +106,20 @@ PROCEDURE (b: Builder) SetLocator* (locator: Locator.Locator);
   END SetLocator;
 
 PROCEDURE (b: Builder) SetErrorListener* (el: Locator.ErrorListener);
-(**Indicates the parser object that the builder should use for error
-   signalling.  Any errors will subsequently be reported through 
-   @oproc{Parser.Parser.Error}.  This method is called by the parser before
-   it begins processing of the document.  *)
+(**Indicates the object @oparam{el} that the builder should use for
+   error signalling.  Any errors will subsequently be reported through
+   @oproc{el.Error}.  This method is called by the parser before it
+   begins processing of the document.  *)
   END SetErrorListener;
 
 
 
 PROCEDURE (b: Builder) StartDocument* (documentEntity: DTD.ExternalEntity);
-(**Marks the start of the document.  This method is called just before 
-   parsing begins.  The base URI of the document can be obtained from 
-   @oparam{documentEntity}, if it has been passed to @oproc{XML:Parser.New}.
-   The locator is positioned at the very beginning of the file.  *)
+(**Marks the start of the document.  This method is called just before parsing
+   begins.  The base URI of the document can be obtained from
+   @oparam{documentEntity}, if it has been passed to
+   @oproc{*XML:Parser.NewChannel}.  The locator is positioned at the very
+   beginning of the file.  *)
   END StartDocument;
 
 PROCEDURE (b: Builder) EndDocument*;
@@ -162,7 +163,7 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
 
    @strong{Note}: Namespaces are only partially supported in the parser itself.
    For full namespace support, the special builder class
-   @otype{XML:Builder:Namespaces.Builder} must be put between the parser and
+   @otype{*XML:Builder:Namespaces.Builder} must be put between the parser and
    the application.  *)
   END StartElement;
 
@@ -209,9 +210,9 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
 
 PROCEDURE (b: Builder) NamespaceDeclaration* (namespaceDecl: DTD.NamespaceDeclaration);
 (**Called for namespace declarations in an attribute list.  Note: The parser
-   implementation @otype{XML:Parser.Parser} does not know about namespaces and
+   implementation @otype{*XML:Parser.Parser} does not know about namespaces and
    never calls this method.  Use the adapter builder
-   @otype{XML:Builder:Namespaces.Builder} to introduce namespace information
+   @otype{*XML:Builder:Namespaces.Builder} to introduce namespace information
    into the event stream.  The locator position is undefined.  *)
   END NamespaceDeclaration;
 

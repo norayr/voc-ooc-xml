@@ -21,7 +21,7 @@ CONST
      buffer.  It is the first non-input character after the last valid document
      character in the buffer.  Because this character code is never produced
      by the Unicode decoders, testing against this character code gives
-     a definitive answer.  Calling @oproc{Input.NextBuffer} will replace
+     a definitive answer.  Calling @oproc{Input.NextBlock} will replace
      the character with a valid character from the input document, or with
      @oconst{markerEOD}.  *)
   markerEOD* = 0FFFFX;
@@ -52,7 +52,7 @@ TYPE
     discardable*: CharPos;
     (**The client can define here how many bytes that have been read into
        the buffer will not be inspected again later, and can therefore be
-       discarded by @oproc{Buffer.NextBlock}.  Possible values for this field
+       discarded by @oproc{Input.NextBlock}.  Possible values for this field
        are [0..@ofield{endOfBuffer}].  *)
     errList-: Msg.MsgList;
     (**Error messages are appended to this list.  *)
@@ -63,7 +63,7 @@ CONST
   (* always read a multiple of @oconst{charsPerRead} characters from the input
      channel, >= Codec.maxUCS2EncodingLength *)
   offsetSizeOfBuffer = 32;
-  sizeOfInputBuffer = 4*charsPerRead-offsetSizeOfBuffer; (* must not be zero *)
+  sizeOfInputBuffer* = 4*charsPerRead-offsetSizeOfBuffer;(* must not be zero *)
   (* initial size of input buffer; the buffer will be extended when
      required; minumum is 4 bytes *)
   
@@ -203,15 +203,15 @@ PROCEDURE AutodetectEnc (input: Input; VAR enc: ARRAY OF CHAR): LONGINT;
   END WriteBuffer;*)
 
 PROCEDURE (in: Input) NextBlock* (): BOOLEAN;
-(**Tries to read additional data from @oparam{b}'s channel.  If at least one
-   character could be read, result is @oconst{TRUE}.  @oconst{FALSE} means
+(**Tries to read additional data from @oparam{in}'s channel.  If at least one
+   character could be read, result is @code{TRUE}.  @code{FALSE} means
    that not a single character was added to the buffer, either because the end
    of the file was reached, or because of a read error.  In the latter case,
-   an message is added to @oparam{b}'s error list.
+   an message is added to @oparam{in}'s error list.
    
-   A call to this buffer may change the fields @ofield{Buffer.chars},
-   @ofield{Buffer.offsetFromPos0}, and @ofield{Buffer.endOfBuffer}.  If
-   part of the buffer is discarded, @ofield{Buffer.discardable} is 
+   A call to this buffer may change the fields @ofield{Input.chars},
+   @ofield{Input.offsetFromPos0}, and @ofield{Input.endOfBuffer}.  If
+   part of the buffer is discarded, @ofield{Input.discardable} is 
    set to zero.  *)
   VAR
     len: CharPos;
@@ -273,9 +273,9 @@ PROCEDURE (in: Input) NextBlock* (): BOOLEAN;
   END NextBlock;
 
 PROCEDURE (in: Input) Close*;
-(**Closes the channel associated with buffer @oparam{b}.  Afterwards, no
-   further operations are permitted on @oparam{b}, except for reading the
-   field @ofield{Buffer.errList}.  *)
+(**Closes the channel associated with buffer @oparam{in}.  Afterwards, no
+   further operations are permitted on @oparam{in}, except for reading the
+   field @ofield{Input.errList}.  *)
   BEGIN
     in. byteBuffer. Close;
     in. byteBuffer := NIL;
@@ -303,7 +303,7 @@ PROCEDURE (in: Input) SetCodec* (cf: Codec.Factory; autoDetect: BOOLEAN);
 PROCEDURE NewInput* (ch: Channel.Channel; codecFactory: Codec.Factory;
                      errList: Msg.MsgList): Input;
 (**Create new input buffer for channel @oparam{ch} and try to read the first
-   block of data from it.  If this fails, return @oconst{NIL} as result.
+   block of data from it.  If this fails, return @code{NIL} as result.
    Otherwise, return an initialized input buffer with up to 
    @oconst{sizeOfInputBuffer} characters of input.  *)
   VAR

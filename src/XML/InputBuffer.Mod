@@ -1,4 +1,4 @@
-(* 	$Id: InputBuffer.Mod,v 1.1.1.1 2000/07/10 15:24:30 mva Exp $	 *)
+(* 	$Id: InputBuffer.Mod,v 1.1.1.2 2000/07/10 20:31:56 mva Exp $	 *)
 MODULE XML:InputBuffer;
 (*  Defines input buffer for OOC's scanner.
     Copyright (C) 2000  Michael van Acken
@@ -48,14 +48,14 @@ CONST
   bytesPerRead = 4*1024;
   (* always read a multiple of @oconst{bytesPerRead} from the input
      channel *)
-  sizeOfBuffer = 4*bytesPerRead-32;      (* must not be zero *)
+  sizeOfBuffer* = 4*bytesPerRead-32;      (* must not be zero *)
   (* initial size of input buffer; the buffer will be extended when
      required *)
   
 
 PROCEDURE (b: Buffer) NextBlock* (): BOOLEAN;
 (**Tries to read additional data from @oparam{b}'s channel.  If at least one
-   byte could be read, result is @oconst{TRUE}.  @oconst{FALSE} means that not
+   byte could be read, result is @code{TRUE}.  @code{FALSE} means that not
    a single byte was added to the buffer, either because the end of the file
    was reached, or because of a read error.  In the latter case, an message
    is added to @oparam{b}'s error list.
@@ -153,7 +153,7 @@ PROCEDURE (b: Buffer) Close*;
 PROCEDURE New* (ch: Channel.Channel; errList: Msg.MsgList): Buffer;
 (**Creates a new input buffer for channel @oparam{ch} and tries to read the
    first block of data from it.  If the reader cannot be attached, return
-   @oconst{NIL} as result.  Otherwise, return an initialized input buffer with
+   @code{NIL} as result.  Otherwise, return an initialized input buffer with
    up to @oconst{sizeOfBuffer} characters of input.  *)
   VAR
     b: Buffer;

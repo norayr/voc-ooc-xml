@@ -1,4 +1,4 @@
-(*      $Id: Namespaces.Mod,v 1.2 2000/07/31 12:30:39 mva Exp $   *)
+(*      $Id: Namespaces.Mod,v 1.3 2000/07/31 18:38:31 mva Exp $   *)
 MODULE XML:Builder:Namespaces;
 (*  Provides namespace support for XML:Parser.
     Copyright (C) 2000  Michael van Acken
@@ -47,7 +47,7 @@ TYPE
      other callbacks are propagated without changes.
 
      Assuming that @samp{builder} is an instance of
-     @otype{XML:Builder.Builder}, the following commands create a
+     @otype{B.Builder}, the following commands create a
      namespace-aware parser:
 
      @example
