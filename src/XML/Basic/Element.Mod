@@ -1,7 +1,7 @@
 MODULE XML:Basic:Element [OOC_EXTENSIONS];
 
 IMPORT
-  LongStrings, XML:DTD, XML:Writer;
+  LongStrings, XML:DTD, XML:Locator, XML:Writer;
 
 
 TYPE
@@ -11,15 +11,29 @@ TYPE
   AttValue* = DTD.AttValue;
   
 TYPE
+  StringBuffer* = POINTER TO StringBufferDesc;
+  StringBufferDesc = RECORD
+    length-: LONGINT;
+    array-: String;
+  END;
+
+TYPE
   Element* = POINTER TO ElementDesc;
   ElementDesc* = RECORD [ABSTRACT]
     next-: Element;
   END;
 
 TYPE
+  PCData* = POINTER TO PCDataDesc;
+  PCDataDesc = RECORD
+    (ElementDesc)
+    chars-: StringBuffer;
+  END;
+
+TYPE
   List* = POINTER TO ListDesc;
   ListDesc = RECORD
-    head-, tail: Element;
+    head-, tail-: Element;
   END;
 
 
@@ -38,13 +52,6 @@ TYPE
     list: ElementFactory;
   END;
 
-
-TYPE
-  StringBuffer* = POINTER TO StringBufferDesc;
-  StringBufferDesc = RECORD
-    length-: LONGINT;
-    array-: String;
-  END;
 
 CONST
   stringBufferSlack = 8;
@@ -101,6 +108,14 @@ PROCEDURE InitElement* (elem: Element);
   BEGIN
     elem. next := NIL;
   END InitElement;
+
+PROCEDURE (elem: Element) SetLocator* (l: Locator.Locator);
+(**Using the locator @oparam{l}, the context of the element and its attributes
+   can be determined.  This can be used to get the base URI relative to which
+   an URI attribute value should be expanded.  This method is called after an
+   element has been created, and before any attribute or content data is passed
+   on to it.  *)
+  END SetLocator;
 
 PROCEDURE (elem: Element) IsChildName* (localName: String): BOOLEAN;
 (**Determines if @oparam{localName} is a valid name for a child element of
@@ -286,5 +301,63 @@ PROCEDURE (sb: StringBuffer) AddCharacters* (VAR chars: StringVar;
     INC (sb. length, charsEnd-charsStart);
     sb. array[sb. length] := 0X
   END AddCharacters;
+
+(* ------------------------------------------------------------------------ *)
+
+PROCEDURE InitPCData* (pcdata: PCData);
+  BEGIN
+    InitElement (pcdata);
+    pcdata. chars := NewStringBuffer("")
+  END InitPCData;
+
+PROCEDURE NewPCData*(): PCData;
+  VAR
+    pcdata: PCData;
+  BEGIN
+    NEW (pcdata);
+    InitPCData (pcdata);
+    RETURN pcdata
+  END NewPCData;
+
+PROCEDURE (pcdata: PCData) AddCharacters* (VAR chars: StringVar;
+                                           charsStart, charsEnd: CharPos);
+  BEGIN
+    pcdata. chars. AddCharacters (chars, charsStart, charsEnd)
+  END AddCharacters;
+
+PROCEDURE (pcdata: PCData) Write* (writer: Writer.Writer);
+  BEGIN
+    writer. WriteI (pcdata. chars. array^, 0, pcdata. chars. length)
+  END Write;
+
+PROCEDURE (pcdata: PCData) Normalize* (stripLeadingWS, stripTrailingWS: BOOLEAN);
+  VAR
+    i, d, l: LONGINT;
+    s: String;
+  BEGIN
+    i := 0; l := pcdata. chars. length; s := pcdata. chars. array;
+    IF stripLeadingWS THEN
+      WHILE (i < l) & (s[i] <= " ") DO
+        INC (i)
+      END
+    END;
+    d := i;
+    WHILE (i < l) DO
+      IF (s[i] <= " ") THEN
+        s[i-d] := " ";
+        INC (i);
+        WHILE (i < l) & (s[i] <= " ") DO
+          INC (i); INC (d)
+        END
+      ELSE
+        s[i-d] := s[i]; INC (i)
+      END
+    END;
+    IF stripTrailingWS & (i # d) & (s[i-d-1] = " ") THEN
+      INC (d)
+    END;
+    s[i-d] := 0X;
+    pcdata. chars. length := i-d
+  END Normalize;
 
 END XML:Basic:Element.
