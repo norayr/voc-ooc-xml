@@ -1,4 +1,4 @@
-subdirs=uri codecs xmltest sun oasis miscxml bulk protocol namespaces
+subdirs=uri codecs xmltest ibm sun oasis miscxml bulk protocol namespaces
 
 export DIFF=diff -c
 
