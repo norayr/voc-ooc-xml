@@ -1,11 +1,11 @@
-(*	$Id: Socket.Mod,v 1.8 2000/11/24 08:49:52 mva Exp $	*)
+(*	$Id: Socket.Mod,v 1.9 2000/12/08 21:39:00 mva Exp $	*)
 MODULE IO:Socket [FOREIGN "C"; 
                   LINK
                     FILE "IO_Socket.c"
                     <*IF LIB_HAVE_LIBXNET THEN*>; LIB "xnet"<*END*>
                   END];
 (*  Interface to socket facilities.
-    Copyright (C) 2000  Michael van Acken
+    Copyright (C) 2000, 2002  Michael van Acken
 
     This module is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License
@@ -86,7 +86,7 @@ CONST
 TYPE
   sa_family_t* = C.shortint;
   socklen_t* = C.int;
-  ssize_t* = C.size_t;
+  ssize_t* = LONGINT;  (**Obsolete.  Don't use this type. *)
   
 VAR
   AF_INET-: C.int;
@@ -305,8 +305,8 @@ PROCEDURE (s: Socket) Listen* (backlog: C.int);
    Depending on the result of the operation, @ofield{s.res} is changed.  *)
 
 PROCEDURE (s: Socket) Recv* (VAR buff: ARRAY OF SYSTEM.BYTE;
-                             start: LONGINT; nbytes: C.size_t;
-                             flags: C.set): ssize_t;
+                             start: LONGINT; nbytes: LONGINT;
+                             flags: C.set): LONGINT;
 (**Receives data from the socket.  Depending on the result of the operation,
    @ofield{s.res} is updated.  See the Unix manual page recv(2) for the
    details.
@@ -318,8 +318,8 @@ PROCEDURE (s: Socket) Recv* (VAR buff: ARRAY OF SYSTEM.BYTE;
    same error message @ovar{errorWouldBlock} in @ofield{s.res}.  *)
 
 PROCEDURE (s: Socket) Send* (VAR buff: ARRAY OF SYSTEM.BYTE;
-                             start: LONGINT; nbytes: C.size_t;
-                             flags: C.set): ssize_t;
+                             start: LONGINT; nbytes: LONGINT;
+                             flags: C.set): LONGINT;
 (**Sends data to the socket.  Depending on the result of the operation,
    @ofield{s.res} is updated.  See the Unix manual page send(2) for the
    details.
@@ -331,10 +331,10 @@ PROCEDURE (s: Socket) Send* (VAR buff: ARRAY OF SYSTEM.BYTE;
    same error message @ovar{errorWouldBlock} in @ofield{s.res}.  *)
 
 PROCEDURE (s: Socket) RecvFrom* (VAR buff: ARRAY OF SYSTEM.BYTE;
-                                 start: LONGINT; nbytes: C.size_t;
+                                 start: LONGINT; nbytes: LONGINT;
                                  flags: C.set;
                                  VAR from: SockAddrParam;
-                                 VAR addrlen: socklen_t): ssize_t;
+                                 VAR addrlen: socklen_t): LONGINT;
 (**Receives data from the socket.  Depending on the result of the operation,
    @ofield{s.res} is updated.  See the Unix manual page recvfrom(2) for the
    details.
@@ -346,10 +346,10 @@ PROCEDURE (s: Socket) RecvFrom* (VAR buff: ARRAY OF SYSTEM.BYTE;
    same error message @ovar{errorWouldBlock} in @ofield{s.res}.  *)
 
 PROCEDURE (s: Socket) SendTo* (VAR buff: ARRAY OF SYSTEM.BYTE;
-                               start: LONGINT; nbytes: C.size_t;
+                               start: LONGINT; nbytes: LONGINT;
                                flags: C.set;
                                VAR to: SockAddrParam;
-                               addrlen: socklen_t): ssize_t;
+                               addrlen: socklen_t): LONGINT;
 (**Sends data to the socket.  Depending on the result of the operation,
    @ofield{s.res} is updated.  See the Unix manual page sendto(2) for the
    details.

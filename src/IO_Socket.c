@@ -1,6 +1,6 @@
-/*	$Id: IO_Socket.c,v 1.8 2000/12/08 21:38:10 mva Exp $	*/
+/*	$Id: IO_Socket.c,v 1.9 2002/07/08 08:38:38 sgreenhill Exp $	*/
 /*  Interface to socket facilities.
-    Copyright (C) 2000  Michael van Acken
+    Copyright (C) 2000, 2002  Michael van Acken
 
     This module is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License
@@ -596,7 +596,7 @@ void IO_Socket__SocketDesc_Listen(IO_Socket__Socket s, int backlog) {
   s->res = get_error(listen(s->fd, backlog));
 }
 
-int IO_Socket__SocketDesc_Recv(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, LONGINT nbytes, unsigned int flags) {
+LONGINT IO_Socket__SocketDesc_Recv(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, LONGINT nbytes, unsigned int flags) {
   int res;
   
   do {
@@ -606,7 +606,7 @@ int IO_Socket__SocketDesc_Recv(IO_Socket__Socket s, unsigned char* buff, int buf
   return res;
 }
 
-int IO_Socket__SocketDesc_Send(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, LONGINT nbytes, unsigned int flags) {
+LONGINT IO_Socket__SocketDesc_Send(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, LONGINT nbytes, unsigned int flags) {
   int res;
   
   do {
@@ -616,7 +616,7 @@ int IO_Socket__SocketDesc_Send(IO_Socket__Socket s, unsigned char* buff, int buf
   return res;
 }
 
-int IO_Socket__SocketDesc_RecvFrom(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, LONGINT nbytes, unsigned int flags, IO_Socket__SockAddrParam from, int from_0d, int *addrlen) {
+LONGINT IO_Socket__SocketDesc_RecvFrom(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, LONGINT nbytes, unsigned int flags, IO_Socket__SockAddrParam from, int from_0d, int *addrlen) {
   int res;
   
   do {
@@ -627,7 +627,7 @@ int IO_Socket__SocketDesc_RecvFrom(IO_Socket__Socket s, unsigned char* buff, int
   return res;
 }
 
-int IO_Socket__SocketDesc_SendTo(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, LONGINT nbytes, unsigned int flags, IO_Socket__SockAddrParam to, int to_0d, int addrlen) {
+LONGINT IO_Socket__SocketDesc_SendTo(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, LONGINT nbytes, unsigned int flags, IO_Socket__SockAddrParam to, int to_0d, int addrlen) {
   int res;
   
   do {
