@@ -1,4 +1,4 @@
-(*	$Id: Socket.Mod,v 1.4 2000/08/30 08:11:39 mva Exp $	*)
+(*	$Id: Socket.Mod,v 1.5 2000/09/04 09:28:27 mva Exp $	*)
 MODULE IO:Socket [FOREIGN "C"; 
                   LINK
                     FILE "IO_Socket.c"
@@ -96,6 +96,9 @@ VAR
   MSG_OOB-: C.set;
   MSG_PEEK-: C.set;
   MSG_WAITALL-: C.set;
+  (**Note: Not all of the @samp{MSG_*} flags are supported on all systems.
+     If a flag @samp{MSG_X} is not available, then the variable @samp{MSG_X}
+     holds the empty set.  *)
 
 VAR
   SHUT_RD-: C.int;
