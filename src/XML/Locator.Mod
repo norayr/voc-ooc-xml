@@ -1,4 +1,4 @@
-(*      $Id: Locator.Mod,v 1.2 2000/07/17 07:44:41 mva Exp $   *)
+(*      $Id: Locator.Mod,v 1.3 2000/07/22 16:18:08 mva Exp $   *)
 MODULE XML:Locator [OOC_EXTENSIONS];
 (*  Provides access to position information for XML parser callbacks.
     Copyright (C) 2000  Michael van Acken
@@ -19,11 +19,11 @@ MODULE XML:Locator [OOC_EXTENSIONS];
 *)
 
 IMPORT
-  Buffer := XML:UnicodeBuffer, XML:DTD;
+  Buffer := XML:UnicodeBuffer, XML:Error, XML:DTD;
 
 TYPE
-  Locator* = POINTER TO LocatorDesc;
-  LocatorDesc* = RECORD [ABSTRACT]
+  Locator* = POINTER TO Position;
+  Position* = RECORD
     charIndex*: Buffer.CharPos;
     (**The character index of the starting position associated with a callback
        event, based on the UCS-2 character encoding.  This position is relative
@@ -42,30 +42,21 @@ TYPE
     (**The current file entity (document entity, external DTD subset, or
        external entity).  Using this reference, the public identifier, the
        system identifier, and the base URI can be determined.  *)
+    inInternalEntity*: DTD.InternalEntity;
+    (**If the parsing is within the replacement text of an internal entity,
+       this field refers to the innermost entity.  It is @code{NIL} as long
+       as the parser is working on the top-most file level.  *)
   END;
 
 TYPE
-  Position* = RECORD
-    charIndex-: Buffer.CharPos;
-    line-: Buffer.CharPos;
-    column-: Buffer.CharPos;
-    entity-: DTD.ExternalEntity;
-    inInternalEntity-: DTD.InternalEntity;
+  ErrorListener* = POINTER TO ErrorListenerDesc;
+  ErrorListenerDesc* = RECORD [ABSTRACT]
   END;
 
-
-PROCEDURE (l: Locator) [ABSTRACT] InInternalEntity*(): DTD.InternalEntity;
-(**Returns the internal entity currently expanded by the parser.  If it is
-   on the top level of an external entity, this function returns @code{NIL}. *)
-  END InInternalEntity;
-
-PROCEDURE (l: Locator) StorePosition* (VAR pos: Position);
-  BEGIN
-    pos. charIndex := l. charIndex;
-    pos. line := l. line;
-    pos. column := l. column;
-    pos. entity := l. entity;
-    pos. inInternalEntity := l. InInternalEntity()
-  END StorePosition;
-
+PROCEDURE (el: ErrorListener) [ABSTRACT] Error* (context: Error.Context;
+                                                 code: Error.Code;
+                                                 fatalError: BOOLEAN;
+                                                 pos: Position): Error.Msg;
+  END Error;
+  
 END XML:Locator.
