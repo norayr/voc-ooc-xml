@@ -52,6 +52,8 @@ INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_PROGRAM@
 INSTALL_DATA = @INSTALL_DATA@
 
+version=3.0
+
 # ============================= Targets ==============================
 
 
@@ -143,7 +145,9 @@ test: localdirs
 
 dist: distclean
 	autoconf
-	f="ooc-libxml-`date +%Y%m%d`.tar"; cd .. && tar -c -v -f $$f libxml && bzip2 -9 $$f
+	(d="ooc-libxml-${version}"; f="$$d.tar"; \
+	  cd .. && ln -s libxml $$d && \
+	  tar -c -h -v -f $$f $$d && bzip2 -9 $$f && rm -f $$d)
 
 # ==================== Cleaning up and miscellanea ====================
 
