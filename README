@@ -37,9 +37,9 @@ do the implementation.
 Compared to the old XML parser, this implementation's design is
 simpler and the new parser is much faster (2-4 times faster, depending
 on the type of input).  Besides the speed improvement, it is much more
-widely tested and should be compliant to the XML 1.0 spec and the
-current errata list in all points.  Another point some people will
-like: the sources are published under the LGPL, _not_ GPL.
+widely tested and should be compliant to the XML 1.0 spec (Second
+Edition).  Another point some people will like: the sources are
+published under the LGPL, _not_ GPL.
 
 
 To get at the latest and greatest sources, use the CVS repository at
@@ -63,6 +63,8 @@ oo2c compiler.  Then, do "make test" in the root directory.  (I'm not
 sure what happens if your make is not of the GNU persuasion.  I've
 tried this setup under both Linux and SunOS 5.6.  Under CygWin, there
 seems to be a problem with patching the Sun tests.  Ignore it.)
+
+"make test" requires GNU patch to modify the Sun tests.
 
 The C compiler emits some warnings about missing type casts for
 `XML_Parser.c'.  They can be safely ignored.
