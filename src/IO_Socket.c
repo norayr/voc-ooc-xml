@@ -1,4 +1,4 @@
-/*	$Id: IO_Socket.c,v 1.5 2000/10/09 19:36:51 mva Exp $	*/
+/*	$Id: IO_Socket.c,v 1.6 2000/10/24 21:49:40 mva Exp $	*/
 /*  Interface to socket facilities.
     Copyright (C) 2000  Michael van Acken
 
@@ -385,6 +385,8 @@ void IO_Socket__ErrorContextDesc_GetTemplate(IO_Socket__ErrorContext context, Ms
     str = "Non-blocking socket could not establish connection immediately";
   } else if (res == IO_Socket__connectAlreadyInProgress) {
     str = "Non-blocking socket has a pending connection in progress";
+  } else if (res == IO_Socket__connectionTerminated) {
+    str = "Connection terminated";
   } else {
     str = NULL;
   } 
@@ -475,6 +477,22 @@ static Msg__Msg get_error (int res) {
 	(msg, (const Msg__String)"errno", 6, (LONGINT)errno));
 
     return msg;
+  }
+}
+static Msg__Msg get_error_bytes (int res, LONGINT nbytes) {
+  if ((res == 0) && (nbytes != 0)) {
+    Msg__Msg msg;
+    
+    msg = Msg__New((Msg__Context)IO_Socket__errorContext, 
+		   IO_Socket__connectionTerminated);
+#if HAVE_STRERROR
+    add_msg_attribute(msg, "errstr", "Connection terminated");
+#endif
+    return msg;
+  } else if (res != -1) {
+    return IO_Socket__done;
+  } else {
+    return get_error(res);
   }
 }
 
@@ -578,45 +596,45 @@ void IO_Socket__SocketDesc_Listen(IO_Socket__Socket s, int backlog) {
   s->res = get_error(listen(s->fd, backlog));
 }
 
-int IO_Socket__SocketDesc_Recv(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, int nbytes, unsigned int flags) {
+int IO_Socket__SocketDesc_Recv(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, LONGINT nbytes, unsigned int flags) {
   int res;
   
   do {
     res = recv(s->fd, buff+start, nbytes, flags);
   } while ((res == -1) && (errno == EINTR));
-  s->res = get_error(res);
+  s->res = get_error_bytes(res, nbytes);
   return res;
 }
 
-int IO_Socket__SocketDesc_Send(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, int nbytes, unsigned int flags) {
+int IO_Socket__SocketDesc_Send(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, LONGINT nbytes, unsigned int flags) {
   int res;
   
   do {
     res = send(s->fd, buff+start, nbytes, flags);
   } while ((res == -1) && (errno == EINTR));
-  s->res = get_error(res);
+  s->res = get_error_bytes(res, nbytes);
   return res;
 }
 
-int IO_Socket__SocketDesc_RecvFrom(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, int nbytes, unsigned int flags, IO_Socket__SockAddrParam from, int from_0d, int *addrlen) {
+int IO_Socket__SocketDesc_RecvFrom(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, LONGINT nbytes, unsigned int flags, IO_Socket__SockAddrParam from, int from_0d, int *addrlen) {
   int res;
   
   do {
     res = recvfrom(s->fd, buff+start, nbytes, flags,
                    (struct sockaddr*)from, addrlen);
   } while ((res == -1) && (errno == EINTR));
-  s->res = get_error(res);
+  s->res = get_error_bytes(res, nbytes);
   return res;
 }
 
-int IO_Socket__SocketDesc_SendTo(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, int nbytes, unsigned int flags, IO_Socket__SockAddrParam to, int to_0d, int addrlen) {
+int IO_Socket__SocketDesc_SendTo(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, LONGINT nbytes, unsigned int flags, IO_Socket__SockAddrParam to, int to_0d, int addrlen) {
   int res;
   
   do {
     res = sendto(s->fd, buff+start, nbytes, flags,
                  (struct sockaddr*)to, addrlen);
   } while ((res == -1) && (errno == EINTR));
-  s->res = get_error(res);
+  s->res = get_error_bytes(res, nbytes);
   return res;
 }
 

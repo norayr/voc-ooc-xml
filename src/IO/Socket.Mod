@@ -1,4 +1,4 @@
-(*	$Id: Socket.Mod,v 1.6 2000/09/16 08:10:29 mva Exp $	*)
+(*	$Id: Socket.Mod,v 1.7 2000/10/09 19:37:25 mva Exp $	*)
 MODULE IO:Socket [FOREIGN "C"; 
                   LINK
                     FILE "IO_Socket.c"
@@ -77,6 +77,9 @@ CONST
   wouldBlock* = 18;
   (**Nonblocking mode has been set on the socket, and the write or read
      operation would block.  *)
+  connectionTerminated* = 19;
+  (**A read or write operation for a non-zero number of bytes was done,
+     but there is no data available and the connection has been terminated.  *)
   
   
       
@@ -308,6 +311,9 @@ PROCEDURE (s: Socket) Recv* (VAR buff: ARRAY OF SYSTEM.BYTE;
    @ofield{s.res} is updated.  See the Unix manual page recv(2) for the
    details.
    
+   If @oparam{nbytes} is non-zero, but no data is available and the connection
+   has been terminated, the error @oconst{connectionTerminated} is reported.
+   
    For performace reasons, the error code @code{EWOULDBLOCK} always returns the
    same error message @ovar{errorWouldBlock} in @ofield{s.res}.  *)
 
@@ -318,6 +324,9 @@ PROCEDURE (s: Socket) Send* (VAR buff: ARRAY OF SYSTEM.BYTE;
    @ofield{s.res} is updated.  See the Unix manual page send(2) for the
    details.
 
+   If @oparam{nbytes} is non-zero, but no data is available and the connection
+   has been terminated, the error @oconst{connectionTerminated} is reported.
+   
    For performace reasons, the error code @code{EWOULDBLOCK} always returns the
    same error message @ovar{errorWouldBlock} in @ofield{s.res}.  *)
 
@@ -329,6 +338,9 @@ PROCEDURE (s: Socket) RecvFrom* (VAR buff: ARRAY OF SYSTEM.BYTE;
 (**Receives data from the socket.  Depending on the result of the operation,
    @ofield{s.res} is updated.  See the Unix manual page recvfrom(2) for the
    details.
+   
+   If @oparam{nbytes} is non-zero, but no data is available and the connection
+   has been terminated, the error @oconst{connectionTerminated} is reported.
    
    For performace reasons, the error code @code{EWOULDBLOCK} always returns the
    same error message @ovar{errorWouldBlock} in @ofield{s.res}.  *)
@@ -342,6 +354,9 @@ PROCEDURE (s: Socket) SendTo* (VAR buff: ARRAY OF SYSTEM.BYTE;
    @ofield{s.res} is updated.  See the Unix manual page sendto(2) for the
    details.
 
+   If @oparam{nbytes} is non-zero, but no data is available and the connection
+   has been terminated, the error @oconst{connectionTerminated} is reported.
+   
    For performace reasons, the error code @code{EWOULDBLOCK} always returns the
    same error message @ovar{errorWouldBlock} in @ofield{s.res}.  *)
 
