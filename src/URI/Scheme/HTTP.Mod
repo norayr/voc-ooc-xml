@@ -1,4 +1,4 @@
-(* 	$Id: HTTP.Mod,v 1.3 2000/07/31 18:36:10 mva Exp $	 *)
+(* 	$Id: HTTP.Mod,v 1.4 2000/08/27 15:14:04 mva Exp $	 *)
 MODULE URI:Scheme:HTTP;
 (*  Implementation of the "file" URI scheme.
     Copyright (C) 2000  Michael van Acken
@@ -20,7 +20,7 @@ MODULE URI:Scheme:HTTP;
 
 
 IMPORT
-  Ascii, Channel, Msg, Strings, TextRider, IO:Socket,
+  Ascii, Channel, IntStr, Msg, Strings, TextRider, IO:Socket,
   URI0 := URI, URI:Error, URI:String,
   URI:Scheme:Hierarchical, URI:Authority:ServerBased,
   Query := URI:Query:Unparsed;
@@ -94,6 +94,7 @@ PROCEDURE (uri: URI) GetChannel* (mode: URI0.ChannelMode;
     addr: Socket.sockaddr_in;
     auth: ServerBased.Authority;
     req: ARRAY 4*1024 OF CHAR;
+    number: ARRAY 32 OF CHAR;
     ch: Channel.Channel;
     writer: Channel.Writer;
     textReader: TextRider.Reader;
@@ -159,6 +160,11 @@ PROCEDURE (uri: URI) GetChannel* (mode: URI0.ChannelMode;
       auth := uri. authority(ServerBased.Authority);
       Strings.Append ("Host: ", req);
       Strings.Append (auth. host^, req);
+      IF (auth. port # auth. defaultPort) THEN
+        Strings.Append (":", req);
+        IntStr.IntToStr (auth. port, number);
+        Strings.Append (number, req)
+      END;
       Strings.Append (crlf, req);
       Strings.Append (crlf, req);
       writer := ch. NewWriter();
