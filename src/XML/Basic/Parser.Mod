@@ -246,9 +246,10 @@ PROCEDURE Parse* (byteReader: Ch.Reader;
                   rootFactory: Element.RootFactory;
                   maxNestingDepth: LONGINT;
                   flags: SET;
-                  VAR res: Msg.Msg): Element.Element;
-(**Parses a @samp{start} request.  In case of an error, @oparam{res} refers to
-   the error message and result is @code{NIL}.  *)
+                  VAR errList: Msg.MsgList): Element.Element;
+(**Parses a @samp{start} request.  In case of an error, @oparam{errList} refers
+   to the error list and result is @code{NIL}.  Otherwise, @oparam{errList}
+   is @code{NIL} and an instance of the root element is returned.  *)
   VAR
     b: Build;
     parser: Parser.Parser;
@@ -261,12 +262,11 @@ PROCEDURE Parse* (byteReader: Ch.Reader;
     
     parser. ParseDocument();
     IF (parser. errList. msgCount = 0) THEN
-      res := NIL;
+      errList := NIL;
       ASSERT (b. root # NIL);
       RETURN b. root
     ELSE
-      res := parser. errList. msgList;
-      ASSERT (res # NIL);
+      errList := parser. errList;
       RETURN NIL
     END
   END Parse;
