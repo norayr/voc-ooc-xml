@@ -4,7 +4,7 @@ mkdirs:
 	for i in sym obj; do if test ! -d $$i; then mkdir $$i; fi; done
 
 clean:
-	rm -Rf sym obj TestCodecs TestParser TestURI
+	rm -Rf sym obj doc TestCodecs TestParser TestURI
 	cd tests && ${MAKE} clean
 
 test: mkdirs
