@@ -1,4 +1,4 @@
-(* 	$Id: Memory.Mod,v 1.1 2000/07/17 07:43:12 mva Exp $	 *)
+(* 	$Id: Memory.Mod,v 1.2 2000/07/31 14:25:23 mva Exp $	 *)
 MODULE URI:Scheme:Memory;
 (*  Implementation of the "memory" URI scheme.
     Copyright (C) 2000  Michael van Acken
@@ -88,14 +88,17 @@ PROCEDURE (file: URI) GetPath* (VAR filePath: ARRAY OF CHAR);
     END
   END GetPath;
 
-PROCEDURE (file: URI) GetChannel* (new: BOOLEAN; VAR res: Error.Msg): Memory.Channel;
+PROCEDURE (file: URI) GetChannel* (mode: URI0.ChannelMode; VAR res: Error.Msg): Memory.Channel;
   VAR
     filePath: ARRAY 2*1024 OF CHAR;
   BEGIN
     file. GetPath (filePath);
-    IF new THEN
+    CASE mode OF
+    | URI0.channelNew:
       RETURN Memory.New (filePath, {Memory.read, Memory.write}, res)
-    ELSE
+    | URI0.channelTmp:
+      RETURN Memory.Tmp (filePath, {Memory.read, Memory.write}, res)
+    | URI0.channelOld:
       RETURN Memory.Old (filePath, {Memory.read}, res)
     END
   END GetChannel;
