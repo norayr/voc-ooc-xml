@@ -1,4 +1,4 @@
-(* 	$Id: URI.Mod,v 1.1.1.2 2000/07/10 20:31:52 mva Exp $	 *)
+(* 	$Id: URI.Mod,v 1.2 2000/07/28 15:11:19 mva Exp $	 *)
 MODULE URI [OOC_EXTENSIONS];
 (*  Implements RFC2396 "Uniform Resource Identifiers: Generic Syntax"
     Copyright (C) 2000  Michael van Acken
@@ -24,15 +24,22 @@ IMPORT
 
 TYPE
   String* = Str.String;
+  (**An open array type to hold an URI string.  This type is typically used for
+     parameters.  *)
   StringPtr* = Str.StringPtr;
+  (**A pointer type with @otype{String} as its base.  *)
   Offset* = Str.Offset;
-
+  (**A character offset into an instance of @otype{String} or
+     @otype{StringPtr}.  This is an integer type.  *)
+  
 TYPE
   URI* = POINTER TO URIDesc;
   URIDesc* = RECORD [ABSTRACT]
   (**Abstract base type of all URI variants.  This class has one concrete
      (@otype{URI:Scheme:CurrentDoc.CurrentDoc}) and two abstract
-     specializations (@otype{HierarchicalURI} and @otype{OpaqueURI}).  *)
+     specializations (@otype{HierarchicalURI} and @otype{OpaqueURI}) in this
+     module.  All concrete specializations should be in modules with the name
+     prefix @samp{URI:Scheme:*}.  *)
     schemeId-: StringPtr;
     (**Scheme part of the URI.  For a relative URI (and all instances of
        @otype{URI:Scheme:CurrentDoc.CurrentDoc}), this field is @code{NIL}.  *)
@@ -85,9 +92,12 @@ TYPE
 TYPE
   Reference* = POINTER TO ReferenceDesc;
   ReferenceDesc = RECORD
-  (**A URI reference is a URI plus an optional fragment identifier.  *)
+  (**A URI reference is an URI plus an optional fragment identifier.  *)
     uri-: URI;
+    (**The URI part of the URI reference.  This field is never @code{NIL}.  *)
     fragment-: Fragment;
+    (**The fragment identifier of the URI reference.  If the reference has no
+       fragment identifier, then this field is @code{NIL}.  *)
   END;
 
 
@@ -104,17 +114,19 @@ TYPE
 
 CONST
   channelNew* = 0;
-  (**Open the channel on a new file, truncating any existing file of the
-     same name.  Both read and write access is enabled.  *)
+  (**Open the channel on a new resource, truncating any existing resource of
+     the same name.  Both read and write access is enabled.  *)
   channelTmp* = 1;
-  (**Open the channel on a new file, but do not register the file yet.
+  (**Open the channel on a new resource, but do not register the resource yet.
      Both read and write access is enabled.  *)
   channelOld* = 2;
-  (**Open the channel on an old file.  Only read access is enabled.  *)
+  (**Open the channel on an old resource.  Only read access is enabled.  *)
 
 TYPE
   ChannelMode* = SHORTINT;
-  (**One of @oconst{channelNew}, @oconst{channelTmp}, or @oconst{channelOld}.*)
+  (**This type is used to signal how @oproc{URI.GetChannel} should open a
+     channel.  It must be one of @oconst{channelNew}, @oconst{channelTmp}, or
+     @oconst{channelOld}.  *)
 
 TYPE
   List = POINTER TO ListDesc;
@@ -161,7 +173,8 @@ PROCEDURE InitURI* (uri: URI; schemeId: StringPtr);
   END InitURI;
 
 PROCEDURE (uri: URI) [ABSTRACT] Clone* (): URI;
-(**Creates a deep copy of the URI referenced by @oparam{uri}.  *)
+(**Creates a deep copy of the URI referenced by @oparam{uri}.  That is, it
+   creates a new instance of @oparam{uri} and calls @oproc{URI.Copy} on it.  *)
   END Clone;
 
 PROCEDURE (uri: URI) Copy* (dest: URI);
@@ -180,7 +193,8 @@ PROCEDURE (uri: URI) Copy* (dest: URI);
   END Copy;
 
 PROCEDURE (uri: URI) SetSchemeId* (schemeId: StringPtr);
-(**Sets the scheme identifier of @oparam{uri}.  *)
+(**Sets the scheme identifier of @oparam{uri}.  If @oparam{schemeId} is
+   @code{NIL}, then @oparam{uri} is a relative URI.  *)
   BEGIN
     uri. schemeId := schemeId
   END SetSchemeId;
@@ -192,8 +206,9 @@ PROCEDURE (uri: URI) [ABSTRACT] WriteXML* (w: TextRider.Writer);
 
 PROCEDURE (uri: URI) [ABSTRACT] GetString* (VAR str: ARRAY OF CHAR);
 (**Converts the URI @oparam{uri} to its string representation @oparam{str}.
-   Reserved characters in the URI are escaped where necessary.  If @oparam{str}
-   is not large enough to hold the string, the result is truncated.  *)
+   Reserved characters in the URI and characters that may not appear in a valid
+   URI are escaped where necessary.  If @oparam{str} is not large enough to
+   hold the string, the result is truncated.  *)
   END GetString;
 
 PROCEDURE (uri: URI) AppendScheme* (VAR str: ARRAY OF CHAR);
@@ -206,27 +221,52 @@ PROCEDURE (uri: URI) AppendScheme* (VAR str: ARRAY OF CHAR);
   END AppendScheme;
 
 PROCEDURE (uri: URI) MakeRelative* (baseURI: HierarchicalURI): URI;
-(**Converts @oparam{uri} into an URI relative to @oparam{baseURI}.  If the
-   given URI is not hierarchical or @code{NIL}, or if @oparam{uri} and
-   @oparam{baseURI} have
-   no common base, then the result is @oparam{uri} itself.  Otherwise, a
-   new URI is constructed that holds only those parts of @oparam{uri}, that
-   cannot be derived from @oparam{baseURI}.  The inverse transformation is
-   done by @oproc{HierarchicalURI.ResolveRelative}.  *)
+(**Converts @oparam{uri} into an URI relative to @oparam{baseURI}.  The result
+   is @oparam{uri} itself, if
+
+   @itemize @bullet
+   @item
+   @oparam{baseURI} is @code{NIL},
+   @item
+   @oparam{baseURI} is not an extension of @oparam{URI.HierarchicalURI}, or
+   @item
+   @oparam{uri} and @oparam{baseURI} have no common base
+   @end itemize
+
+   Otherwise, a new URI is constructed that holds only those parts of
+   @oparam{uri}, that cannot be derived from @oparam{baseURI}.  The inverse
+   transformation is done by @oproc{HierarchicalURI.ResolveRelative}.  *)
   BEGIN
     (* if we walk in here, then `uri' is not hierarchical *)
     RETURN uri
   END MakeRelative;
 
 PROCEDURE (uri: URI) GetChannel* (mode: ChannelMode; VAR res: Msg.Msg): Channel.Channel;
-(**Opens a channel to the resource indicated by URI @oparam{uri}.  If
-   @oparam{new} is TRUE, a new resource is created with read and write access,
-   e.g. by calling @oproc{Files.New}.  Otherwise, a read only channel is
-   opened for an existing resource, e.g. by calling @oproc{Files.Old}.
+(**Opens a channel to the resource indicated by URI @oparam{uri}.  Depending on
+   @oparam{mode}, one of these operations is performed:
+
+   @table @oconst
+   @item channelNew
+   Opens a channel to a new instance of the resource.  If the resource exists,
+   it is truncated.  The channel is opened for both read and write access.
+   Example: @oproc{Files.New}.
+
+   @item channelTmp
+   Opens a channel to a new instance of the resource, but does not register the
+   resource within its naming service.  The channel is opened for both read and
+   write access.  Example: @oproc{Files.Tmp}.  Please note that some channel
+   operations do not support this operation.  For those that do, registration
+   of the resource in the naming service depends on the channel implementation.
+
+   @item channelOld
+   Opens a channel to an existing resource.  Only read access is enabled.
+   Example: @oproc{Files.Old}.
+   @end table
+
    On success, a channel instance is returned and @oparam{res} is set to
-   @code{NIL}.  On failure, result is @code{NIL} and @oparam{res} indicates
-   the error.  
-   
+   @code{NIL}.  On failure, result is @code{NIL} and @oparam{res} indicates the
+   error.
+
    Note: Currently, only the @samp{file} URI (@omodule{URI:Scheme:File})
    supports this method.  *)
   VAR
@@ -374,7 +414,8 @@ PROCEDURE (uri: HierarchicalURI) [ABSTRACT] NewAuthority*(): Authority;
   END NewAuthority;
 
 PROCEDURE (uri: HierarchicalURI) SetAuthority* (auth: Authority);
-(**Sets the authority component of @oparam{uri}.  *)
+(**Sets the authority component of @oparam{uri}.  A value of @code{NIL} means
+   that the URI has no authority component.  *)
   BEGIN
     uri. authority := auth
   END SetAuthority;
@@ -386,7 +427,8 @@ PROCEDURE (uri: HierarchicalURI) [ABSTRACT] NewQuery*(): Query;
   END NewQuery;
 
 PROCEDURE (uri: HierarchicalURI) SetQuery* (query: Query);
-(**Sets the query component of @oparam{uri}.  *)
+(**Sets the query component of @oparam{uri}.  A value of @code{NIL} means that
+   the URI has no query component.  *)
   BEGIN
     uri. query := query
   END SetQuery;
@@ -405,7 +447,8 @@ PROCEDURE (uri: HierarchicalURI) ResolveRelative* (baseURI: HierarchicalURI);
   END ResolveRelative;
 
 PROCEDURE (uri: HierarchicalURI) [ABSTRACT] ClearPath*;
-(**Sets the path component of @oparam{uri} to the empty path.  *)
+(**Sets the path component of @oparam{uri} to the empty path.  Unlike the
+   authority or query component, an URI always includes a path component.  *)
   END ClearPath;
 
 PROCEDURE (uri: HierarchicalURI) [ABSTRACT] ParsePath* (str: StringPtr; absolute: BOOLEAN; offset: Offset): Error.Msg;

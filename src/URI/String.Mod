@@ -1,4 +1,4 @@
-(* 	$Id: String.Mod,v 1.1.1.1 2000/07/10 15:24:40 mva Exp $	 *)
+(* 	$Id: String.Mod,v 1.1.1.2 2000/07/10 20:31:52 mva Exp $	 *)
 MODULE URI:String;
 (*  Auxiliary string functions for URI parser.
     Copyright (C) 2000  Michael van Acken
@@ -30,7 +30,7 @@ TYPE
 
 
 PROCEDURE Extract* (str: String; start, end: INTEGER): StringPtr;
-(**Creates copy of character sequence @samp{str[start,end[}.  *)
+(**Creates a copy of the character sequence @samp{str[start,end[}.  *)
   VAR
     i: INTEGER;
     ptr: StringPtr;
@@ -45,7 +45,7 @@ PROCEDURE Extract* (str: String; start, end: INTEGER): StringPtr;
   END Extract;
 
 PROCEDURE Copy* (str: String): StringPtr;
-(**Creates copy of @oparam{str}.  *)
+(**Creates a copy of @oparam{str}.  *)
   BEGIN
     RETURN Extract (str, 0, Strings.Length (str))
   END Copy;
