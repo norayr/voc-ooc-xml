@@ -1,7 +1,7 @@
-(* 	$Id: Hierarchical.Mod,v 1.2 2000/07/31 14:25:23 mva Exp $	 *)
+(* 	$Id: Hierarchical.Mod,v 1.3 2000/08/27 15:14:04 mva Exp $	 *)
 MODULE URI:Scheme:Hierarchical;
 (*  Implementation of the generic hierarchical URI.
-    Copyright (C) 2000  Michael van Acken
+    Copyright (C) 2000, 2001  Michael van Acken
 
     This module is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License
@@ -249,6 +249,55 @@ PROCEDURE (uri: Generic) AppendSegment* (segm: Segment);
     segm. next := NIL;
     Append (uri. pathList)
   END AppendSegment;
+
+PROCEDURE (uri: Generic) RemoveSegment* (segm: Segment);
+(**Removes the segment @oparam{segm} from the list of path segments of
+   @oparam{uri}.
+
+   @precond
+   @oparam{segm} is part of @oparam{uri}
+   @end precond  *)
+  VAR
+    ptr: Segment;
+  BEGIN
+    IF (uri. pathList = segm) THEN
+      uri. pathList := segm. next
+    ELSE
+      ptr := uri. pathList;
+      WHILE (ptr. next # segm) DO
+        ptr := ptr. next
+      END;
+      ptr. next := segm. next
+    END
+  END RemoveSegment;
+  
+PROCEDURE (uri: Generic) StripSegments* (n: LONGINT);
+(**Strips the last @oparam{n} segments from the hierarchical URI @oparam{uri}.
+
+   @precond
+   @oparam{n} >= 0
+   @end precond  *)
+  VAR
+    dummy: LONGINT;
+  
+  PROCEDURE Strip (VAR list: Segment; n: LONGINT): LONGINT;
+    VAR
+      i: LONGINT;
+    BEGIN
+      IF (list = NIL) THEN
+        RETURN n
+      ELSE
+        i := Strip (list. next, n);
+        IF (i > 0) THEN
+          list := NIL
+        END;
+        RETURN i-1
+      END
+    END Strip;
+  
+  BEGIN
+    dummy := Strip (uri. pathList, n)
+  END StripSegments;
 
 PROCEDURE (uri: Generic) Clone* (): Generic;
   VAR
