@@ -17,7 +17,7 @@ IMPORTANT: You'll need oo2c-1.5.4 or later to compile the sources.
 --------
 
 At the moment, the XML parser succeeds for all well-formedness and
-validation tests I can lay may hands on (which are approx. 2580
+validation tests I can lay may hands on (which are approx. 2600
 different test cases).  With regard to the XML Information Set, the
 parser passes all core information items and almost all periphereal
 items to the application.  Support for XML Namespaces is implemented
