@@ -1,4 +1,4 @@
-(* 	$Id: URI.Mod,v 1.3 2000/07/31 12:32:02 mva Exp $	 *)
+(* 	$Id: URI.Mod,v 1.4 2000/07/31 14:23:55 mva Exp $	 *)
 MODULE URI [OOC_EXTENSIONS];
 (*  Implements RFC2396 "Uniform Resource Identifiers: Generic Syntax"
     Copyright (C) 2000  Michael van Acken
@@ -18,9 +18,27 @@ MODULE URI [OOC_EXTENSIONS];
     59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 *)
 
+(**This module provides the framework for an implementation of RFC 2396,
+   @cite{Uniform Resource Locators (URI): Generic Syntax}.  It defined the
+   abstract types @otype{URI}, @otype{OpaqueURI}, and @otype{HierarchicalURI},
+   together with the abstract base types that represent the authority, query,
+   and fragment component of an URI.  Handling of the path part of a
+   hierarchical URI is delegated to the implementation of
+   @otype{*URI:Scheme:Hierarchical.Generic}.  Additionally, this module defines
+   the type @otype{Reference}, which represents an URI reference.
+
+   Conversion of an URI string into an instance of the data type @otype{URI} is
+   done by @oproc{*URI:Parser.NewURI}.  Likewise,
+   @oproc{*URI:Parser.NewReference} translates a string into an instance of
+   @otype{Reference}.
+
+   The modules @samp{URI:Scheme:*} implement concrete specializations of
+   @otype{URI} for various URI scheme identifiers.  Modules named
+   @samp{URI:Authority:*}, @samp{URI:Query:*}, and @samp{URI:Fragment:*}
+   implement concrete authority, query, and fragment instances.  *)
+
 IMPORT
   Strings, Msg, Channel, CharClass, TextRider, Str := URI:String, URI:Error;
-
 
 TYPE
   String* = Str.String;
@@ -36,34 +54,34 @@ TYPE
   URI* = POINTER TO URIDesc;
   URIDesc* = RECORD [ABSTRACT]
   (**Abstract base type of all URI variants.  This class has one concrete
-     (@otype{URI:Scheme:CurrentDoc.CurrentDoc}) and two abstract
+     (@otype{*URI:Scheme:CurrentDoc.CurrentDoc}) and two abstract
      specializations (@otype{HierarchicalURI} and @otype{OpaqueURI}) in this
      module.  All concrete specializations should be in modules with the name
      prefix @samp{URI:Scheme:*}.  *)
     schemeId-: StringPtr;
     (**Scheme part of the URI.  For a relative URI (and all instances of
-       @otype{URI:Scheme:CurrentDoc.CurrentDoc}), this field is @code{NIL}.  *)
+       @otype{*URI:Scheme:CurrentDoc.CurrentDoc}), this field is @code{NIL}. *)
   END;
 
 TYPE
   Authority* = POINTER TO AuthorityDesc;
   AuthorityDesc* = RECORD [ABSTRACT]
-  (**Authority component of an URI.  See @omodule{URI:Authority:Unparsed},
-     @omodule{URI:Authority:ServerBased}, or
-     @omodule{URI:Authority:RegistryBased} for concrete examples.  *)
+  (**Authority component of an URI.  See @omodule{*URI:Authority:Unparsed},
+     @omodule{*URI:Authority:ServerBased}, or
+     @omodule{*URI:Authority:RegistryBased} for concrete examples.  *)
   END;
 
 TYPE
   Query* = POINTER TO QueryDesc;
   QueryDesc* = RECORD [ABSTRACT]
-  (**Query component of an URI.  See @omodule{URI:Query:Unparsed} for a
+  (**Query component of an URI.  See @omodule{*URI:Query:Unparsed} for a
      concrete example.  *)
   END;
 
 TYPE
   Fragment* = POINTER TO FragmentDesc;
   FragmentDesc* = RECORD [ABSTRACT]
-  (**Fragment identifier of an URI.  See @omodule{URI:Fragment:Unparsed} for a
+  (**Fragment identifier of an URI.  See @omodule{*URI:Fragment:Unparsed} for a
      concrete example.  *)
   END;
 
@@ -84,7 +102,7 @@ TYPE
 TYPE
   OpaqueURI* = POINTER TO OpaqueURIDesc;
   OpaqueURIDesc* = RECORD [ABSTRACT]
-  (**Holds a opaque URI.  *)
+  (**Holds an opaque URI.  *)
     (URIDesc)
   END;
 
@@ -228,9 +246,9 @@ PROCEDURE (uri: URI) MakeRelative* (baseURI: HierarchicalURI): URI;
    @item
    @oparam{baseURI} is @code{NIL},
    @item
-   @oparam{baseURI} is not an extension of @oparam{URI.HierarchicalURI}, or
+   @oparam{uri} is not an extension of @otype{HierarchicalURI}, or
    @item
-   @oparam{uri} and @oparam{baseURI} have no common base
+   @oparam{uri} and @oparam{baseURI} have no common base.
    @end itemize
 
    Otherwise, a new URI is constructed that holds only those parts of
@@ -249,25 +267,25 @@ PROCEDURE (uri: URI) GetChannel* (mode: ChannelMode; VAR res: Msg.Msg): Channel.
    @item channelNew
    Opens a channel to a new instance of the resource.  If the resource exists,
    it is truncated.  The channel is opened for both read and write access.
-   Example: @oproc{Files.New}.
+   Example: @oproc{*Files.New}.
 
    @item channelTmp
    Opens a channel to a new instance of the resource, but does not register the
    resource within its naming service.  The channel is opened for both read and
-   write access.  Example: @oproc{Files.Tmp}.  Please note that some channel
+   write access.  Example: @oproc{*Files.Tmp}.  Please note that some channel
    operations do not support this operation.  For those that do, registration
    of the resource in the naming service depends on the channel implementation.
 
    @item channelOld
    Opens a channel to an existing resource.  Only read access is enabled.
-   Example: @oproc{Files.Old}.
+   Example: @oproc{*Files.Old}.
    @end table
 
    On success, a channel instance is returned and @oparam{res} is set to
    @code{NIL}.  On failure, result is @code{NIL} and @oparam{res} indicates the
    error.
 
-   Note: Currently, only the @samp{file} URI (@omodule{URI:Scheme:File})
+   Note: Currently, only the @samp{file} URI (@omodule{*URI:Scheme:File})
    supports this method.  *)
   VAR
     uriStr: ARRAY 1024 OF CHAR;
@@ -375,7 +393,7 @@ PROCEDURE (query: Query) [ABSTRACT] WriteXML* (w: TextRider.Writer);
 
 PROCEDURE (query: Query) [ABSTRACT] Append* (VAR str: ARRAY OF CHAR);
 (**Appends the textual representation of the query component
-   @oparam{auth} to the string @oparam{str}.  *)
+   @oparam{query} to the string @oparam{str}.  *)
   END Append;
 
 
@@ -410,7 +428,7 @@ PROCEDURE (uri: HierarchicalURI) Copy* (dest: URI);
 PROCEDURE (uri: HierarchicalURI) [ABSTRACT] NewAuthority*(): Authority;
 (**Creates a new instance of the authority component of URI @oparam{uri}.
    The new object is subsequently filled in by parsing the authority component
-   of the URI string (see @oproc{URI.Authority.ParseAuthority}).  *)
+   of the URI string (see @oproc{*URI:Authority.ParseAuthority}).  *)
   END NewAuthority;
 
 PROCEDURE (uri: HierarchicalURI) SetAuthority* (auth: Authority);
@@ -423,7 +441,7 @@ PROCEDURE (uri: HierarchicalURI) SetAuthority* (auth: Authority);
 PROCEDURE (uri: HierarchicalURI) [ABSTRACT] NewQuery*(): Query;
 (**Creates a new instance of the query component of URI @oparam{uri}.
    The new object is subsequently filled in by parsing the query component
-   of the URI string (see @oproc{URI.Query.ParseQuery}).  *)
+   of the URI string (see @oproc{*URI:Query.ParseQuery}).  *)
   END NewQuery;
 
 PROCEDURE (uri: HierarchicalURI) SetQuery* (query: Query);

@@ -1,4 +1,4 @@
-(* 	$Id: Memory.Mod,v 1.2 2000/07/31 14:25:23 mva Exp $	 *)
+(* 	$Id: Memory.Mod,v 1.3 2000/07/31 18:20:01 mva Exp $	 *)
 MODULE URI:Scheme:Memory;
 (*  Implementation of the "memory" URI scheme.
     Copyright (C) 2000  Michael van Acken
@@ -29,7 +29,7 @@ TYPE
   URIDesc = RECORD
   (**This class implements the @samp{memory:} URI scheme.  This is not
      an official URI scheme.  It is used by OOC to access resouces defined by
-     the module @omodule{IO:Memory}.  Similar to the @samp{file:} scheme,
+     the module @omodule{*IO:Memory}.  Similar to the @samp{file:} scheme,
      this one uses @otype{ServerBased.Authority} for its authority component,
      and does not support a query part.  *)
     (Hierarchical.GenericDesc)

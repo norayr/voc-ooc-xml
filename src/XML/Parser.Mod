@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.12 2000/08/08 13:59:34 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.13 2000/08/08 16:28:33 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -45,7 +45,11 @@ TYPE
   ErrorListener = POINTER TO ErrorListenerDesc;
   Parser* = POINTER TO ParserDesc;
   ParserDesc = RECORD
-    errList-: Error.List;
+  (**This class implements the actual XML parser.  It depends on
+     @otype{DTD.Builder} to store and maintain the information gathered from a
+     document's DTD, and on an instance of @otype{Builder.Builder} to pass on
+     any data retrieved from the document content.  *)
+  errList-: Error.List;
     (**Holds all error messages related to the currently parsed XML document.
        After an error occured, @samp{errList.msgCount} is no longer zero.  *)
     
@@ -82,7 +86,7 @@ TYPE
     (**If @code{TRUE}, then the parser checks that element and attribute names
        also match the production @samp{QName}, and that entity names, PI
        targets, and notation names contain no colon.  This enables parts of the
-       checks required from namespace aware parser.  The default is
+       checks required from namespace aware parsers.  The default is
        @code{FALSE}.  *)
     processDeclarations: BOOLEAN;
     (* if FALSE, then entity declarations and attribute declarations must no
@@ -2933,7 +2937,7 @@ PROCEDURE NewChannel* (ch: Channel.Channel; baseURI: URI.URI;
                        codecFactory: Codec.Factory;
                        entityResolver: EntityResolver.Resolver;
                        builder: Builder.Builder): Parser;
-(**Creates new parser for the input channel @oparam{ch}.  @oparam{baseURI} is
+(**Creates a new parser for the input channel @oparam{ch}.  @oparam{baseURI} is
    the absolute URI of the document entity, as computed by the method of
    RFC 2396, if that is known.  If this value is @code{NIL}, or refers to an
    opaque URI, then relative URIs in the document cannot be resolved.

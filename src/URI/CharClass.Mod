@@ -1,4 +1,4 @@
-(* 	$Id: CharClass.Mod,v 1.2 2000/07/23 17:36:27 mva Exp $	 *)
+(* 	$Id: CharClass.Mod,v 1.3 2000/08/08 16:22:41 mva Exp $	 *)
 MODULE URI:CharClass;
 (*  Predicates and auxiliary functions for URI character classes.
     Copyright (C) 2000  Michael van Acken
@@ -32,7 +32,7 @@ CONST
      allowed within a particular component of the generic URI syntax.  Note:
      RFC 2732, @cite{Format for Literal IPv6 Addresses in URL's}, adds the
      characters @samp{[} and @samp{]} to the set of reserved characters.  Until
-     @omodule{URI:Authority:ServerBased} implements literal IPv6 addresses,
+     @omodule{*URI:Authority:ServerBased} implements literal IPv6 addresses,
      extending @oconst{reserved} only prevents other modules (e.g., the XML
      parser) from escaping these characters.  *)
 

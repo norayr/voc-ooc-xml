@@ -1,4 +1,4 @@
-(*	$Id: Memory.Mod,v 1.1 2000/07/17 07:43:00 mva Exp $	*)
+(*	$Id: Memory.Mod,v 1.2 2000/07/28 15:12:29 mva Exp $	*)
 MODULE IO:Memory;
 (*  Implementation of a simple file system in memory.
     Copyright (C) 1999, 2000  Michael van Acken
@@ -61,7 +61,7 @@ TYPE
   FileDesc = RECORD
   (**A file instance in memory.  This module does not implement a hierarchical
      file system.  Names are unstructured character sequences, as far as this
-     module is concerned.  To use the URI module @omodule{URI:Scheme:Memory},
+     module is concerned.  To use the URI module @omodule{*URI:Scheme:Memory},
      which interprets names as path components separated by slash characters
      @samp{/}, all file names must begin with a slash @samp{/}.  *)
     next: File;
