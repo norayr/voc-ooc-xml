@@ -1,4 +1,4 @@
-(*      $Id: EntityResolver.Mod,v 1.2 2000/07/22 16:18:08 mva Exp $   *)
+(*      $Id: Namespaces.Mod,v 1.1 2000/07/23 17:48:35 mva Exp $   *)
 MODULE XML:Builder:Namespaces;
 (*  Provides namespace support for XML:Parser.
     Copyright (C) 2000  Michael van Acken
@@ -167,7 +167,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
       err: Error.Msg;
       fragm: Unparsed.Fragment;
     BEGIN
-      str8 := EntityResolver.URItoASCII (str);
+      str8 := EntityResolver.NormalizeURI (str);
       baseURI := b. parserLocator. entity. baseURI;
       fragm := Unparsed.New (String.Copy (""));
       IF (baseURI # NIL) & (baseURI IS URI.HierarchicalURI) THEN
