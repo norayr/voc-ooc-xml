@@ -6,12 +6,21 @@ IMPORT
 
 TYPE
   Char* = UnicodeBuffer.Char;
+  (**Character type used to store names and character data from an XML
+     document.  *)
   String* = UnicodeBuffer.CharArray;
+  (**A pointer to an array of @otype{Char}.  *)
   StringVar* = ARRAY OF Char;
+  (**An open array with @otype{Char} as element type.  *)
   CharPos* = UnicodeBuffer.CharPos;
+  (**This integer type is used to store the position of a character in the
+     input buffer or in a string.  *)
   
 TYPE
   StandaloneType* = SHORTINT;
+  (**Used to store information about the @samp{standalone} of an XML
+     declaration.  One of @oconst{standaloneYes}, @oconst{standaloneNo},
+     @oconst{standaloneNotPresent}, or @oconst{standaloneNotApplicable}.  *)
 
 CONST
   standaloneYes* = 0;
@@ -25,8 +34,11 @@ TYPE
   Builder* = POINTER TO BuilderDesc;
   BuilderDesc* = RECORD
     geNamespace-: Namespace;
+    (**Namespace with general entity declarations.  *)
     peNamespace-: Namespace;
+    (**Namespace with parameter entity declarations.  *)
     elementNamespace-: Namespace;
+    (**Namespace with element declarations.  *)
     
     attributeList, attributeTail: Declaration;
   END;
@@ -38,12 +50,17 @@ TYPE
 TYPE
   DeclarationDesc = RECORD [ABSTRACT]
     next-: Declaration;
+    (**Next declaration in namespace.  *)
     name-: String;
+    (**Name of the declared object.  *)
   END;
 
 TYPE
   NamespaceDesc = RECORD
     declList-: Declaration;
+    (**Refers to the first element of the list of declarations.  The other
+       declarations can be reached through @ofield{Declaration.next}.  *)
+    
   END;
 
 
@@ -53,40 +70,45 @@ TYPE
 TYPE
   Fragment* = POINTER TO FragmentDesc;
   FragmentDesc = RECORD
+  (**Abstract base type for @otype{DTD.Characters} and @otype{EntityRef}.  *)
     next-: Fragment;
+    (**Refers to the next fragment in the list @ofield{AttValue.fragmentList}.  *)
   END;
 
 TYPE
   Characters* = POINTER TO CharactersDesc;
   CharactersDesc = RECORD
+  (**A sequence of characters appearing in an attribute value.  *)
     (FragmentDesc)
     source-: String;
+    (**The array slice @samp{@oparam{source}[@oparam{sourceStart},
+       @oparam{sourceEnd}[} holds the fragment's character data.  *)
     sourceStart-, sourceEnd-: CharPos;
   END;
 
 TYPE
-  Entity* = POINTER TO EntityDesc;
   EntityRef* = POINTER TO EntityRefDesc;
+  Entity* = POINTER TO EntityDesc;
   EntityRefDesc = RECORD
-    (FragmentDesc)
+  (**A general entity reference appearing in an attribute value.  *)
+  (FragmentDesc)
     name-: String;
+    (**The name of the reference.  *)
     entity*: Entity;
-    source-: String;
-    sourceStart-, sourceEnd-: CharPos;
+    (**After the name has been resolved successfully, this field refers to the
+       internal entity declaration that is being referenced.  *)
   END;
-
-TYPE
-  PEntityRef* = POINTER TO PEntityRefDesc;
-  PEntityRefDesc = RECORD
-    (FragmentDesc)
-    source-: String;
-    sourceStart-, sourceEnd-: CharPos;
-  END;  (* ... obsolete? *)
 
 TYPE
   AttValue* = POINTER TO AttValueDesc;
   AttValueDesc = RECORD
+  (**An attribute value is stored as a list of character data and general
+     entity references.  That is, the internal structure of the value string is
+     not resolved at first.  Character data is stored as
+     @otype{DTD.Characters}, and entity references as @otype{EntityRef}.  *)
     fragmentList-, fragmentTail: Fragment;
+    (**The head of the list of attribute value fragments.  For an empty
+       attribute, this is @code{NIL}.  *)
   END;
 
 
@@ -96,18 +118,25 @@ TYPE
 TYPE
   NameNode* = POINTER TO NameNodeDesc;
   NameNodeDesc = RECORD
-    next: NameNode;
-    name: String;
+  (**A name in an @otype{Enumeration}.  *)
+    next-: NameNode;
+    name-: String;
   END;
 
 TYPE
   Enumeration* = POINTER TO EnumerationDesc;
   EnumerationDesc = RECORD
-    nameList, nameTail: NameNode;
+  (**Used to store an attribute value enumeration.  *)
+    nameList-, nameTail: NameNode;
+    (**A list of names.  Used for both @oconst{attrENUMERATED} and
+       @oconst{attrNOTATION}.  @ofield{NameNode.next} refers to the next
+       element in the list.  *)
   END;
+
 
 TYPE
   AttributeType* = SHORTINT;
+  (**Indicates the type of an attribute.  See @oconst{attrCDATA} et al.  *)
 
 CONST
   attrID* = 0;
@@ -123,7 +152,10 @@ CONST
 
 TYPE
   DefaultType* = SHORTINT;
-
+  (**Indicates the defaulting mode of an attribute declaration.  One of
+     @oconst{attrRequired}, @oconst{attrImplied}, @oconst{attrDefault}, or
+     @oconst{attrFixed}.  *)
+  
 CONST
   attrRequired* = 0;
   attrImplied* = 1;
@@ -133,7 +165,8 @@ CONST
 TYPE
   AttrDecl* = POINTER TO AttrDeclDesc;
   AttrDeclDesc = RECORD
-    (DeclarationDesc)
+  (**An attribute declaration from a DTD.  *)
+  (DeclarationDesc)
     elementName-: String;
     type-: AttributeType;
     enumeration-: Enumeration;
@@ -147,21 +180,35 @@ TYPE
 
 TYPE
   EntityType* = SHORTINT;
+  (**Values of this type indicate the type of an entity.  See
+     @oconst{entityInternalGeneral} et al.  *)
   
 CONST
-  entityInternalGeneral* = 0;            (* parsed *)
-  entityInternalParameter* = 1;          (* parsed, not in XML Infoset *)
-  entityExternalGeneral* = 2;            (* parsed *)
-  entityExternalParameter* = 3;          (* parsed, not in XML Infoset *)
-  entityUnparsed* = 4;                   (* unparsed, external, general *)
+  entityInternalGeneral* = 0;
+  (**Internal general entity.  *)
+  entityInternalParameter* = 1;
+  (**Internal parameter entity.  Such entities do not appear in the XML
+     infoset.  *)
+  entityExternalGeneral* = 2;
+  (**External general entity.  *)
+  entityExternalParameter* = 3;
+  (**External parameter entity.  Such entities do not appear in the XML
+     infoset.  *)
+  entityUnparsed* = 4;
+  (**Unparsed external general entity.  *)
   entityDocument* = 5;
+  (**Document entity.  It represents the top-level entity of a document,
+     the one that holds the internal DTD subset and the root element.  *)
   entityExternalDTDSubset* = 6;
-  (* side note: internal/unparsed and parameter/unparsed can never happen *)
+  (**Entity representing the external DTD subset.  *)
 
 TYPE
   EntityDesc = RECORD [ABSTRACT]
+  (**Abstract base type for both internal and external entities.  *)
     (DeclarationDesc)
     type-: EntityType;
+    (**This field indicates the kind of entity.  It distinguishes between
+       general/parameter, internal/external, and parsed/unparsed.  *)
     entityValue-: String;
     (**This is either the value of an internal entity, or the internalized
        version of an external entity.  For an internal entity, this field
@@ -177,24 +224,38 @@ TYPE
        text before non-CDATA normalization.  *)
   END;
 
-
 TYPE
   InternalEntity* = POINTER TO InternalEntityDesc;
   InternalEntityDesc = RECORD
     (EntityDesc)
-    predefined-: BOOLEAN;
   END;
 
 TYPE
   ExternalEntity* = POINTER TO ExternalEntityDesc;
   ExternalEntityDesc = RECORD
     (EntityDesc)
-    public-, system-, ndata-: String;
+    public-: String;
+    (**Public identifier of the external entity.  May be @code{NIL}.  *)
+    system-: String;
+    (**System identifier of the external entity.  This field is never
+       @code{NIL}.  *)
+    ndata-: String;
+    (**For a parsed entity declaration, this field is @code{NIL}.  For an
+       unparsed entity, it holds the name of the @code{NDATA}.  *)
     baseURI-: URI.URI;
+    (**The base URI of the external entity.  For a document entity, this 
+       is the URI passed to @oproc{XML:Parser.NewChannel}, and therefore may
+       be @code{NIL}.  For other entities, it is either derived from the
+       public or system identifier, and always present.  *)
     
     version-: String;
+    (**The version string from the XML or text declaration.  @code{NIL}, if
+       the version is omitted.  *)
     encoding-: String;
+    (**The encoding string from the XML or text declaration.  @code{NIL}, if
+       no encoding is given.  *)
     standalone-: StandaloneType;
+    (**The standalone declaration.  Only applicable to the document entity.  *)
   END;
 
 
@@ -204,9 +265,17 @@ TYPE
 TYPE
   Notation* = POINTER TO NotationDesc;
   NotationDesc = RECORD
+  (**This class represent notation declarations  *)
     (DeclarationDesc)
-    public-, system-: String;
+    public-:String;
+    (**Public identifier.  May be @code{NIL}.  *)
+    system-: String;
+    (**System identifier.  May be @code{NIL}.  *)
     baseURI-: URI.URI;
+    (**The base URI of the external entity.  For a document entity, this 
+       is the URI passed to @oproc{XML:Parser.NewChannel}, and therefore may
+       be @code{NIL}.  For other entities, it is either derived from the
+       public or system identifier, and always present.  *)
   END;
 
 
@@ -249,9 +318,12 @@ TYPE
 TYPE
   ElementDecl* = POINTER TO ElementDeclDesc;
   ElementDeclDesc = RECORD
+  (**Instances of this class represent element declarations.  *)
     (DeclarationDesc)
     contentModel-: CP;
+    (**The content model of the element.  *)
     attrNamespace-: Namespace;
+    (**The attribute namespace of the element.  *)
   END;
 
 (* ------------------------------------------------------------------------ *)
@@ -380,44 +452,22 @@ PROCEDURE (b: Builder) NewCharacters* (source: String; start, end: CharPos;
   END NewCharacters;
 
 
-PROCEDURE InitEntityRef* (entRef: EntityRef; name: String; entity: Entity;
-                          source: String; start, end: CharPos);
+PROCEDURE InitEntityRef* (entRef: EntityRef; name: String; entity: Entity);
   BEGIN
     InitFragment (entRef);
     entRef. name := name;
-    entRef. source := source;
-    entRef. sourceStart := start;
-    entRef. sourceEnd := end
+    entRef. entity := entity
   END InitEntityRef;
 
-PROCEDURE (b: Builder) NewEntityRef* (name: String; entity: Entity; 
-                                      source: String; start, end: CharPos): EntityRef;
+PROCEDURE (b: Builder) NewEntityRef* (name: String;
+                                      entity: Entity): EntityRef;
   VAR
     entRef: EntityRef;
   BEGIN
     NEW (entRef);
-    InitEntityRef (entRef, name, entity, source, start, end);
+    InitEntityRef (entRef, name, entity);
     RETURN entRef
   END NewEntityRef;
-
-
-PROCEDURE InitPEntityRef* (entRef: PEntityRef;
-                           source: String; start, end: CharPos);
-  BEGIN
-    InitFragment (entRef);
-    entRef. source := source;
-    entRef. sourceStart := start;
-    entRef. sourceEnd := end
-  END InitPEntityRef;
-
-PROCEDURE (b: Builder) NewPEntityRef* (source: String; start, end: CharPos): PEntityRef;
-  VAR
-    entRef: PEntityRef;
-  BEGIN
-    NEW (entRef);
-    InitPEntityRef (entRef, source, start, end);
-    RETURN entRef
-  END NewPEntityRef;
 
 
 PROCEDURE InitAttValue* (attValue: AttValue);
@@ -466,7 +516,7 @@ PROCEDURE (attValue: AttValue) Length* (): LONGINT;
         IF (fragment. entity # NIL) THEN
           INC (len, fragment. entity. attValue. Length())
         ELSE
-          INC (len, fragment. sourceEnd-fragment. sourceStart)
+          INC (len, LongStrings.Length (fragment. name^)+2)
         END
       | fragment: Characters DO
         INC (len, fragment. sourceEnd-fragment. sourceStart)
@@ -487,7 +537,7 @@ PROCEDURE (attValue: AttValue) Flatten* (attrDecl: AttrDecl): String;
     VAR
       f: Fragment;
     
-    PROCEDURE Copy (VAR source: StringVar; start, end: CharPos);
+    PROCEDURE Copy (source[NO_COPY]: StringVar; start, end: CharPos);
       VAR
         i: LONGINT;
       BEGIN
@@ -495,13 +545,11 @@ PROCEDURE (attValue: AttValue) Flatten* (attrDecl: AttrDecl): String;
         WHILE (i # end) DO
           IF (source[i] = " ") THEN
             IF ~skipSpace THEN
-(*Log.Hex("copy",32);*)
               str[pos] := " ";
               INC (pos);
               skipSpace := normalizeWhitespace
             END;
           ELSE
-(*Log.Hex("copy",ORD(source[i]));*)
             skipSpace := FALSE;
             str[pos] := source[i];
             INC (pos)
@@ -517,7 +565,9 @@ PROCEDURE (attValue: AttValue) Flatten* (attrDecl: AttrDecl): String;
           IF (f. entity # NIL) THEN
             Append (f. entity. attValue)
           ELSE
-            Copy (f. source^, f. sourceStart, f. sourceEnd)
+            Copy ("&", 0, 1);
+            Copy (f. name^, 0, LongStrings.Length (f. name^));
+            Copy (";", 0, 1)
           END
         | f: Characters DO
           Copy (f. source^, f. sourceStart, f. sourceEnd)
@@ -645,6 +695,7 @@ PROCEDURE (entity: Entity) SetEntityValue* (entityValue: String);
   END SetEntityValue;
 
 PROCEDURE (entity: Entity) LengthValue*(): LONGINT;
+(**Returns the length of the entity's value.  *)
   BEGIN
     RETURN LEN (entity. entityValue^)-2
   END LengthValue;
@@ -652,20 +703,18 @@ PROCEDURE (entity: Entity) LengthValue*(): LONGINT;
 
 PROCEDURE InitInternalEntity (ent: InternalEntity;
                               name: String; type: EntityType;
-                              entityValue: String; predefined: BOOLEAN);
+                              entityValue: String);
   BEGIN
     InitEntity (ent, name, type, entityValue);
-    ent. predefined := predefined
   END InitInternalEntity;
 
 PROCEDURE (b: Builder) NewInternalEntity* (name: String; type: EntityType;
-                                          entityValue: String;
-                                          predefined: BOOLEAN): InternalEntity;
+                                          entityValue: String): InternalEntity;
   VAR
     ent: InternalEntity;
   BEGIN
     NEW (ent);
-    InitInternalEntity (ent, name, type, entityValue, predefined);
+    InitInternalEntity (ent, name, type, entityValue);
     RETURN ent
   END NewInternalEntity;
 
@@ -886,6 +935,8 @@ PROCEDURE GetStringURI* (VAR string: ARRAY OF CHAR; start, end: LONGINT): String
   END GetStringURI;
 
 PROCEDURE Init* (b: Builder);
+(**Initializes the DTD builder.  Also registers the predefined general entities
+   @samp{lt}, @samp{gt}, @samp{amp}, @samp{apos}, and @samp{quot}.  *)
   PROCEDURE PredefEntity (name, replacement: ARRAY OF LONGCHAR);
     VAR
       nameString, replString: String;
@@ -899,7 +950,7 @@ PROCEDURE Init* (b: Builder);
       replString[LEN (replString^)-2] := UnicodeBuffer.markerEOD;
       
       entity := b. NewInternalEntity (nameString, entityInternalGeneral, 
-                                      replString, TRUE);
+                                      replString);
       dummy := b. geNamespace. Add (entity)
     END PredefEntity;
   

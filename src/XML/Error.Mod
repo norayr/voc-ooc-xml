@@ -1,4 +1,4 @@
-(* 	$Id: Error.Mod,v 1.2 2000/07/13 21:04:29 mva Exp $	 *)
+(* 	$Id: Error.Mod,v 1.3 2000/07/17 07:44:41 mva Exp $	 *)
 MODULE XML:Error;
 (*  Creates lists of error messages and converts them to text.
     Copyright (C) 2000  Michael van Acken
@@ -64,6 +64,8 @@ PROCEDURE InitContext* (c: Context; id: M.String);
   END InitContext;
 
 PROCEDURE NewContext* (id: M.String): Context;
+(**Creates a new error context, using the id @oparam{id}.  @oparam{id} should
+   be a module name.  *)
   VAR
     c: Context;
   BEGIN
@@ -108,6 +110,8 @@ PROCEDURE (context: Context) GetTemplate* (msg: Msg; VAR templ: LString);
   END GetTemplate;
 
 PROCEDURE (context: Context) SetString* (code: Code; str: String);
+(**Maps the error code @oparam{code} onto the error text @oparam{str}.  If a
+   mapping for @oparam{code} exists, it is replaced with the new one.  *)
   PROCEDURE Append (VAR mlist: Mapping);
     VAR
       str16: ARRAY 1024 OF M.LChar;

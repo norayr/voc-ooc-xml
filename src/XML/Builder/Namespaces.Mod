@@ -1,4 +1,4 @@
-(*      $Id: Namespaces.Mod,v 1.1 2000/07/23 17:48:35 mva Exp $   *)
+(*      $Id: Namespaces.Mod,v 1.2 2000/07/31 12:30:39 mva Exp $   *)
 MODULE XML:Builder:Namespaces;
 (*  Provides namespace support for XML:Parser.
     Copyright (C) 2000  Michael van Acken
@@ -41,6 +41,21 @@ TYPE
 TYPE
   Builder* = POINTER TO BuilderDesc;
   BuilderDesc = RECORD
+  (**This builder adds namespace support to the parser.  It rewrites element
+     and attribute names if they have a namespace prefix.  The rewritten
+     element and attribute data is then passed on to the delegate builder.  All
+     other callbacks are propagated without changes.
+
+     Assuming that @samp{builder} is an instance of
+     @otype{XML:Builder.Builder}, the following commands create a
+     namespace-aware parser:
+
+     @example
+     builder := Namespaces.New (builder);
+     p := Parser.NewFile (arg, NIL, NIL, NIL, builder, res);
+     p. enforceQNames := namespaceSupport;
+     @end example  *)
+  
     (B.BuilderDesc)
     parserLocator: Locator.Locator;
     namespaceLocator: Locator.Locator;
@@ -359,12 +374,12 @@ PROCEDURE (b: Builder) SkippedEntity* (name: DTD.String; referent: DTD.Entity);
   END SkippedEntity;
 
 
-PROCEDURE (b: Builder) Characters* (
-    VAR chars: DTD.StringVar; charsStart, charsEnd: DTD.CharPos;
-    elementWhitespace: DTD.ElementWhitespaceType; predefinedEntity: BOOLEAN);
+PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
+                                    charsStart, charsEnd: DTD.CharPos;
+                                    elementWhitespace: DTD.ElementWhitespaceType);
   BEGIN
     b. delegateBuilder. Characters (chars, charsStart, charsEnd,
-                                    elementWhitespace, predefinedEntity)
+                                    elementWhitespace)
   END Characters;
 
 

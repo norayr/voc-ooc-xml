@@ -249,7 +249,6 @@ PROCEDURE (in: Input) NextBlock* (): BOOLEAN;
       REPEAT
         INC (len, charsPerRead)
       UNTIL (in. endOfBuffer+charsPerRead < len);
-(*Log.LongInt ("GROW", len);*)
       NEW (nChars, len);
       SYSTEM.MOVE (SYSTEM.ADR (in. chars^),
                    SYSTEM.ADR (nChars^),

@@ -1,4 +1,4 @@
-(* 	$Id: HTTP.Mod,v 1.1.1.2 2000/07/10 20:31:53 mva Exp $	 *)
+(* 	$Id: HTTP.Mod,v 1.2 2000/07/31 14:25:23 mva Exp $	 *)
 MODULE URI:Scheme:HTTP;
 (*  Implementation of the "file" URI scheme.
     Copyright (C) 2000  Michael van Acken
@@ -29,7 +29,7 @@ TYPE
   URIDesc = RECORD
   (**This class implements the @samp{http:} URI scheme.  It uses
      @otype{ServerBased.Authority} for its authority component, and 
-     @otape{Query.Query} for a query part.
+     @otype{Query.Query} for a query part.
      Note: @oproc{URI.GetChannel} is not implemented.  *)
     (Hierarchical.GenericDesc)
   END;

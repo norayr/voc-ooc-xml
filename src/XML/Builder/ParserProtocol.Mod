@@ -1,4 +1,4 @@
-(*      $Id: ParserProtocol.Mod,v 1.6 2000/07/23 17:36:34 mva Exp $   *)
+(*      $Id: ParserProtocol.Mod,v 1.7 2000/07/23 18:03:24 mva Exp $   *)
 MODULE XML:Builder:ParserProtocol [OOC_EXTENSIONS];
 (*  Translates XML document to canonical XML.
     Copyright (C) 2000  Michael van Acken
@@ -28,36 +28,13 @@ IMPORT
 TYPE
   Builder* = POINTER TO BuilderDesc;
   BuilderDesc = RECORD
+  (**Writes out the sequence of callbacks initiated by the parser.  Used for
+     debugging purposes.  *)
     (B.BuilderDesc)
     w-: Writer.Writer;
     locator-: Locator.Locator;
   END;
 
-(*PROCEDURE WritePos (writer: Codec.Writer; b: Builder);
-  VAR
-    pos: Locator.DocPos;
-    
-  PROCEDURE WriteInt (i: LONGINT);
-    VAR
-      str: ARRAY 16 OF CHAR;
-      str16: ARRAY 16 OF Config.Char;
-    BEGIN
-      IntStr.IntToStr (i, str);
-      COPY (str, str16);
-      Write (writer, str16)
-    END WriteInt;
-  
-  BEGIN
-    b. locator. GetEndPos (pos);
-    Write (writer, "[pos=");
-    WriteInt (pos. char);
-    Write (writer, ", line=");
-    WriteInt (pos. line);
-    Write (writer, ", col=");
-    WriteInt (pos. column);
-    Write (writer, "]")
-  END WritePos;
-*)
 
 PROCEDURE String (w: Writer.Writer; name: ARRAY OF LONGCHAR; string: DTD.String);
   BEGIN
@@ -157,8 +134,7 @@ PROCEDURE Entity (b: Builder; entity: DTD.Entity; writePos: BOOLEAN);
     | entity: DTD.InternalEntity DO
       w. StartTag ("content");
       w. WriteQuotedI (entity. entityValue^, 0, entity. LengthValue());
-      w. EndTag ("content", FALSE);
-      Boolean (w, "predefined", entity. predefined)
+      w. EndTag ("content", FALSE)
     END;
     
     IF writePos THEN
@@ -195,12 +171,10 @@ PROCEDURE (b: Builder) StartDocument* (documentEntity: DTD.ExternalEntity);
     Entity (b, documentEntity, FALSE);
     WritePos (b);
     b. w. EndTag ("start-document", TRUE);
-    (*IF b. writePosition THEN WritePos (b. writer, b) END*)
   END StartDocument;
 
 PROCEDURE (b: Builder) EndDocument*;
   BEGIN
-    (*IF b. writePosition THEN WritePos (b. writer, b) END;*)
     b. w. NewLine;
     b. w. StartTag ("end-document");
     WritePos (b);
@@ -341,8 +315,7 @@ PROCEDURE (b: Builder) Notation* (notation: DTD.Notation);
 
 PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
                                     charsStart, charsEnd: DTD.CharPos;
-                                    elementWhitespace: DTD.ElementWhitespaceType;
-                                    predefinedEntity: BOOLEAN);
+                                    elementWhitespace: DTD.ElementWhitespaceType);
   BEGIN
     b. w. NewLine;
     b. w. StartTag ("characters");
@@ -356,7 +329,6 @@ PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
     | DTD.elementWhitespaceUnknown: b. w. WriteLatin1 ("unknown")
     END;
     b. w. EndTag ("element-whitespace", FALSE);
-    Boolean (b. w, "predefined-entity", predefinedEntity);
     WritePos (b);
     b. w. EndTag ("characters", TRUE);
   END Characters;

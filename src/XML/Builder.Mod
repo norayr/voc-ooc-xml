@@ -1,4 +1,4 @@
-(*      $Id: Builder.Mod,v 1.6 2000/07/22 16:18:08 mva Exp $   *)
+(*      $Id: Builder.Mod,v 1.7 2000/07/23 17:41:11 mva Exp $   *)
 MODULE XML:Builder [OOC_EXTENSIONS];
 (*  Low-level builder interface to the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -25,41 +25,50 @@ IMPORT
 TYPE
   Builder* = POINTER TO BuilderDesc;
   BuilderDesc* = RECORD
-  (**This interface is based on the W3C Working Draft @samp{XML
-  Information Set}, dated December 20 1999.  It can be obtained at
-  @url{http://www.w3.org/TR/1999/WD-xml-infoset-19991220}.
-  Documentation below refers to sections of this document where
-  appropriate.
+  (**This abstract class defines the interface of the XML parser to the
+     application.  It is based on the W3C Working Draft @samp{XML Information
+     Set}, dated December 20 1999.  It can be obtained at
+     @url{http://www.w3.org/TR/2000/WD-xml-infoset-20000726}.
 
-  The low-level interface to the parser is governed by two requirements:
-  It must make all core properties (and, as far as possible, all
-  peripheral properties) of the XML Infoset available to the application,
-  and the parser must be able to serve it without any overhead.  For
-  this reason, the interface is not an instance of any of the
-  established parser interfaces, like SAX, SAX2, or DOM.
-  Specializations of @otype{Builder} provide these interfaces.
+     The low-level interface to the parser is governed by two requirements: It
+     must make all core properties (and, as far as possible, all peripheral
+     properties) of the XML Infoset available to the application, and the
+     parser must be able to serve it without any overhead.  For this reason,
+     the interface is not an instance of any of the established parser
+     interfaces, like SAX, SAX2, or DOM.  Specializations of @otype{Builder}
+     provide these interfaces.
 
-  The parser itself is @emph{not} namespace aware, even if this
-  interface has the necessary hooks to provide namespace information.
-  Namespaces are implemented by a special builder,
-  @omodule{XML:Builder:Namespaces}, that translates between the parser
-  and a namespace-aware application.
-  
-  The parser calls the type-bound procedures of the builder while
-  traversing the document.  The string arguments passed to the procedures
-  should not be modified by any concrete builder.
-  
-  @strong{Important}: The locator positions always refer to the top level of
-  the processed file.  They do not follow internal entity references.  For
-  example, if a start tag of an element is defined within an internal entity,
-  then the locator position of @oproc{Builder.StartElement} is the position
-  of the entity reference, instead of the position of the markup text.  *)
+     The parser itself is @emph{not} namespace aware, even if this interface
+     has the necessary hooks to provide namespace information.  Namespaces are
+     implemented by a special builder, @omodule{XML:Builder:Namespaces}, that
+     translates between the parser and a namespace-aware application.
+
+     The parser calls the type-bound procedures of the builder while traversing
+     the document.  The string arguments passed to the procedures should not be
+     modified by any concrete builder.
+
+     In case of a fatal error, the parser will stop invoking any builder
+     procedures, with the exception of @oproc{Builder.EndDocument}.
+
+     @strong{Important}: The locator positions always refer to the top level of
+     the processed file.  They do not follow internal entity references.  For
+     example, if a start tag of an element is defined within an internal
+     entity, then the locator position of @oproc{Builder.StartElement} is the
+     position of the entity reference, instead of the position of the markup
+     text.  *)
   END;
 
 
 TYPE
   Attribute* = POINTER TO AttributeDesc;
   AttributeDesc = RECORD
+  (**This class holds all the information passed to @oproc{Builder.Attribute}.
+     The fields corresponds one-to-one to parameters of
+     @oproc{Builder.Attribute}.  It is provided as a service to builders and
+     applications that need to store attribute values before they can process
+     them.  An example for this is the namespace-aware builder
+     @otype{XML:Builder:Namespaces}.  The parser does @emph{not} create
+     instances of this class.  *)
     namespaceDecl*: DTD.NamespaceDeclaration; 
     localName*: DTD.String;
     attrDecl-: DTD.AttrDecl;
@@ -72,8 +81,15 @@ TYPE
   AttributeList* = POINTER TO AttributeListDesc;
   AttributeArray = POINTER TO ARRAY OF Attribute;
   AttributeListDesc = RECORD
+  (**Implements a list of attribute values.  Like @otype{Attribute}, this class
+     is not used by the parser.  *)
     len-: LONGINT;
+    (**The length of the attribute list.  *)
     attr-: AttributeArray;
+    (**The attribute values stored in the list.  The pointers in the range
+       @samp{[0, @ofield{len}-1[} refer to @otype{Attribute} instances.
+
+       The array pointer can change when the list is modified.  *)
   END;
 
 
@@ -139,14 +155,22 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
    @oparam{namespaceDecl} refers to the namespace URI of the element name.  If
    the name has no namespace part, the argument is @code{NIL}.
    @oparam{localName} is the element minus the namespace prefix and the colon.
-   The locator is positioned at the beginning of the start tag's name.  *)
+   The namespace prefix of the attribute name can be obtained from
+   @oparam{namespaceDecl}.
+
+   The locator is positioned at the beginning of the start tag's name.
+
+   @strong{Note}: Namespaces are only partially supported in the parser itself.
+   For full namespace support, the special builder class
+   @otype{XML:Builder:Namespaces.Builder} must be put between the parser and
+   the application.  *)
   END StartElement;
 
 PROCEDURE (b: Builder) EndElement* (namespaceDecl: DTD.NamespaceDeclaration; 
                                     localName: DTD.String);
 (**Called when an end tag is parsed.  See @oproc{Builder.StartElement} for
    a description of the arguments.  The locator is positioned at the beginning
-   of the start tag's name, if an explicit end tag exists.  Otherwise, it is
+   of the end tag's name, if an explicit end tag exists.  Otherwise, it is
    placed after the closing @samp{/>} of the empty element tag.  *)
   END EndElement;
 
@@ -159,25 +183,28 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
    For a namespace aware parser, @oparam{namespaceDecl} refers to the namespace
    URI of the element name.  If the name has no namespace part, the argument is
    @code{NIL}.  @oparam{localName} is the element minus the namespace prefix
-   and the colon.  If an attribute declaration for this attribute is known to
-   the parser, it is passed in @oparam{attrDecl}.  Without a declaration, the
-   application should treat the attribute as if it were of type 
-   @oconst{DTD.attrCDATA}.  If the attribute is specified in the element's
-   attribute list, instead of being defaulted from the attribute's declaration,
-   @oparam{specified} is @code{TRUE}.
-   
+   and the colon.  The namespace prefix of the attribute name can be obtained
+   from @oparam{namespaceDecl}.
+
+   If an attribute declaration for this attribute is known to the parser, it is
+   passed in @oparam{attrDecl}.  Without a declaration, the application should
+   treat the attribute as if it were of type @oconst{DTD.attrCDATA}.
+
+   If the attribute is specified in the element's attribute list, instead of
+   being defaulted from the attribute's declaration, @oparam{specified} is
+   @code{TRUE}.
+
    The attribute's value is passed into the parameter @oparam{value}.  Call
-   @oproc{DTD.AttValue.Flatten} to retrieve the normalized value of the 
-   attribute.  You can also access the data structure @oparam{value}.
-   The string values in the data structure are normalized 
-   for @code{CDATA} values.  When reading @oparam{value} for
-   non-@code{CDATA} attributes, you must collapse sequences of whitespace into
-   a single space, and remove any whitespace from the beginning and the end
-   of the attribute value.
-   
+   @oproc{DTD.AttValue.Flatten} to retrieve the normalized value of the
+   attribute.  You can also access the data structure @oparam{value}.  The
+   string values in the data structure are normalized for @code{CDATA} values.
+   When reading @oparam{value} for non-@code{CDATA} attributes, you must
+   collapse sequences of whitespace into a single space, and remove any
+   whitespace from the beginning and the end of the attribute value.
+
    The locator is at the beginning of the attribute's name, if
-   @oparam{specified} is @code{TRUE}.  For defaulted attributes, the locator
-   is undefined.  *)
+   @oparam{specified} is @code{TRUE}.  For defaulted attributes, the locator is
+   undefined.  *)
   END Attribute;
 
 PROCEDURE (b: Builder) NamespaceDeclaration* (namespaceDecl: DTD.NamespaceDeclaration);
@@ -190,31 +217,47 @@ PROCEDURE (b: Builder) NamespaceDeclaration* (namespaceDecl: DTD.NamespaceDeclar
 
 PROCEDURE (b: Builder) AttributesDone*;
 (**Called when the all attributes of a start tag, specified or defaulted,
-   have been reported to the application.  The locator is positioned at
+   have been reported to the application.  The locator is positioned after
    the closing @samp{>} of the start or empty element tag.  *)
   END AttributesDone;
 
 
-PROCEDURE (b: Builder) SkippedEntity* (name: DTD.String; referent: DTD.Entity);
+PROCEDURE (b: Builder) SkippedEntity* (name: DTD.String; entity: DTD.Entity);
 (**This method is called for every entity skipped by a non-validating parser,
-   if it does not include external parsed entities.  @oparam{name} is the
-   name of the skipped entity and @oparam{referent} its entity declaration,
-   if this information is available.  The locator refers to the beginning of
-   the named of the entity reference.  *)
+   if it configured to ignore references to external parsed entities.
+   @oparam{name} is the name of the skipped entity and @oparam{entity} its
+   entity declaration, if this information is available.  The locator refers to
+   the beginning of the name of the entity reference.  *)
   END SkippedEntity;
 
 
-PROCEDURE (b: Builder) Characters* (
-    VAR chars: DTD.StringVar; charsStart, charsEnd: DTD.CharPos;
-    elementWhitespace: DTD.ElementWhitespaceType; predefinedEntity: BOOLEAN);
+PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
+                                 charsStart, charsEnd: DTD.CharPos;
+                                 elementWhitespace: DTD.ElementWhitespaceType);
 (**Called for non-markup characters that appear within the document element.
-   See 2.7.  The locator refers to the first character.  *)
+   The array slice @samp{@oparam{chars}[@oparam{charsStart},
+   @oparam{charsEnd}[} holds the character data.  @oparam{elementWhitespace}
+   indicates whether the characters are whitespace appearing within element
+   content.
+   
+   The locator refers to the first character.
+   
+   @emph{Note}: It is up to the parser how it partitions character data before
+   reporting it to the application.  For example, the character data of an
+   element may be reported in one call to @oproc{Builder.Characters}, or
+   in multiple chunks, depending on embedded character references, general
+   entity references, CDATA sections, and the size of the character content.
+   It is only guaranteed that this procedure is called with an integral number
+   of ISO 10646 characters (e.g., surrogate pairs are reported in one call). *)
   END Characters;
 
 
 PROCEDURE (b: Builder) StartCDATA*;
-(**Called at the beginning of a CDATA section.  The locator is positioned
-   at @samp{<![CDATA[}.  *)
+(**Called at the beginning of a CDATA section.  The next calls to
+   @oproc{Builder.Characters} before @oproc{Builder.EndCDATA} represent the
+   CDATA's character content.
+
+   The locator is positioned at @samp{<![CDATA[}.  *)
   END StartCDATA;
 
 PROCEDURE (b: Builder) EndCDATA*;
@@ -237,28 +280,37 @@ PROCEDURE (b: Builder) EndEntity* (entity: DTD.Entity);
 
 
 PROCEDURE (b: Builder) EntityDecl* (entity: DTD.Entity);
-(**Called for declarations of general entities.  The document entity is passed
-   to @oproc{Builder.StartDocument}, and the entity for the external DTD subset
-   to @oproc{Builder.EndDTD}, of it exists.  The locator points to the 
-   first character of the declared name.  *)
+(**Called for declarations of general entities.  The locator points to the
+   first character of the declared name.
+
+   Note: The document entity is passed to @oproc{Builder.StartDocument}, and
+   the entity for the external DTD subset to @oproc{Builder.EndDTD}, of it
+   exists.  *)
   END EntityDecl;
 
 PROCEDURE (b: Builder) Notation* (notation: DTD.Notation);
-(**Called for notation declarations, see 2.10.  The locator points to the 
+(**Called for notation declarations.  The locator points to the 
    first character of the declared name.  *)
   END Notation;
 
 PROCEDURE (b: Builder) ProcessingInstruction* (
                      target: DTD.String; VAR content: DTD.StringVar;
                      contentStart, contentEnd: DTD.CharPos; baseURI: URI.URI);
-(**Called for processing instructions, see 2.4.  The locator is positioned
-   at the @samp{<?}.  *)
+(**Called for processing instructions.  @oparam{target} holds the PI's target
+   part.  The array slice @samp{@oparam{content}[@oparam{contentStart},
+   @oparam{contentEnd}[} holds the content data.  @oparam{baseURI} is the
+   absolute URI of the entity in which the PI appears.
+
+   The locator is positioned at the @samp{<?}.  *)
   END ProcessingInstruction;
 
 PROCEDURE (b: Builder) Comment* (VAR chars: DTD.StringVar;
-                                 start, end: DTD.CharPos);
-(**Called for comments, see 2.7.  The locator is positioned
-   at the @samp{<!--}.  *)
+                                 charsStart, charsEnd: DTD.CharPos);
+(**Called for comments.  The array slice
+   @samp{@oparam{chars}[@oparam{charsStart}, @oparam{charsEnd}[} holds the
+   comment's content.
+
+   The locator is positioned at the @samp{<!--}.  *)
   END Comment;
 
 
@@ -277,6 +329,7 @@ PROCEDURE New*(): Builder;
     Init (b);
     RETURN b
   END New;
+
 
 (* Attribute Lists
    ------------------------------------------------------------------------ *)
@@ -303,6 +356,9 @@ PROCEDURE NewAttribute* (namespaceDecl: DTD.NamespaceDeclaration;
                          value: DTD.AttValue;
                          specified: BOOLEAN;
                          locator: Locator.Locator): Attribute;
+(**Creates a new attribute instance.  The instance's field are taken directly
+   from the passed arguments.  The @oparam{locator} is discarded if 
+   @oparam{specified} is @code{FALSE}.  *)
   VAR
     attr: Attribute;
   BEGIN
@@ -323,6 +379,7 @@ PROCEDURE InitAttributeList* (attrList: AttributeList);
   END InitAttributeList;
 
 PROCEDURE NewAttributeList* (): AttributeList;
+(**Creates a new, empty attribute list.  *)
   VAR
     attrList: AttributeList;
   BEGIN
@@ -332,6 +389,7 @@ PROCEDURE NewAttributeList* (): AttributeList;
   END NewAttributeList;
 
 PROCEDURE (attrList: AttributeList) Clear*;
+(**Returns @oparam{attrList} to an empty list.  *)
   VAR
     i: LONGINT;
   BEGIN
@@ -342,6 +400,7 @@ PROCEDURE (attrList: AttributeList) Clear*;
   END Clear;
 
 PROCEDURE (attrList: AttributeList) Append* (attr: Attribute);
+(**Appends the attribute @oparam{attr} to the list.  *)
   VAR
     new: AttributeArray;
     i: LONGINT;

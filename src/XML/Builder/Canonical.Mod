@@ -1,4 +1,4 @@
-(*      $Id: Canonical.Mod,v 1.4 2000/07/22 16:18:31 mva Exp $   *)
+(*      $Id: Canonical.Mod,v 1.5 2000/07/23 17:48:35 mva Exp $   *)
 MODULE XML:Builder:Canonical [OOC_EXTENSIONS];
 (*  Translates XML document to canonical XML.
     Copyright (C) 2000  Michael van Acken
@@ -26,7 +26,7 @@ IMPORT
 CONST
   firstCanonicalForm* = 1;
   secondCanonicalForm* = 2;
-  thirdCanonicalForm* = 3;
+  thirdCanonicalForm* = 3;  (* not supported... *)
 
 TYPE
   Attribute = RECORD
@@ -46,6 +46,8 @@ TYPE
 TYPE
   Builder* = POINTER TO BuilderDesc;
   BuilderDesc = RECORD
+  (**Writes out the canonical form of an XML document.  *)
+  
     (B.BuilderDesc)
     out-: UnicodeBuffer.Output;
     format: SHORTINT;
@@ -58,33 +60,6 @@ TYPE
 CONST
   initAttrList = 8;
   incrAttrList = 8;
-
-
-(*PROCEDURE WritePos (writer: Codec.Writer; b: Builder);
-  VAR
-    pos: Locator.DocPos;
-    
-  PROCEDURE WriteInt (i: LONGINT);
-    VAR
-      str: ARRAY 16 OF CHAR;
-      str16: ARRAY 16 OF Config.Char;
-    BEGIN
-      IntStr.IntToStr (i, str);
-      COPY (str, str16);
-      Write (writer, str16)
-    END WriteInt;
-  
-  BEGIN
-    b. locator. GetEndPos (pos);
-    Write (writer, "[pos=");
-    WriteInt (pos. char);
-    Write (writer, ", line=");
-    WriteInt (pos. line);
-    Write (writer, ", col=");
-    WriteInt (pos. column);
-    Write (writer, "]")
-  END WritePos;
-*)
 
 
 PROCEDURE WriteQuoted (out: UnicodeBuffer.Output; str[NO_COPY]: DTD.StringVar;
@@ -183,13 +158,10 @@ PROCEDURE WriteDTD (b: Builder; root: DTD.String);
 
 
 PROCEDURE (b: Builder) StartDocument* (documentEntity: DTD.ExternalEntity);
-  BEGIN
-    (*IF b. writePosition THEN WritePos (b. writer, b) END*)
   END StartDocument;
 
 PROCEDURE (b: Builder) EndDocument*;
   BEGIN
-    (*IF b. writePosition THEN WritePos (b. writer, b) END;*)
     b. out. Flush
   END EndDocument;
 
@@ -204,7 +176,6 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
     
     b. out. WriteLatin1 ("<");
     b. out. Write (localName^);
-(*    IF b. writePosition THEN WritePos (b. writer, b) END*)
   END StartElement;
 
 PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration; 
@@ -268,7 +239,6 @@ PROCEDURE (b: Builder) EndElement* (namespaceDecl: DTD.NamespaceDeclaration;
     b. out. WriteLatin1 ("</");
     b. out. Write (localName^);
     b. out. WriteLatin1 (">");
-(*    IF b. writePosition THEN WritePos (b. writer, b) END*)
   END EndElement;
 
 PROCEDURE (b: Builder) Notation* (notation: DTD.Notation);
@@ -292,22 +262,22 @@ PROCEDURE (b: Builder) ProcessingInstruction* (
     b. out. WriteLatin1 (" ");
     b. out. WriteI (content, contentStart, contentEnd);
     b. out. WriteLatin1 ("?>");
-(*    IF b. writePosition THEN WritePos (b. writer, b) END*)
   END ProcessingInstruction;
 
 PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
                                     charsStart, charsEnd: DTD.CharPos;
-                                    elementWhitespace: DTD.ElementWhitespaceType;
-                                    predefinedEntity: BOOLEAN);
+                                    elementWhitespace: DTD.ElementWhitespaceType);
   BEGIN
     WriteQuoted (b. out, chars, charsStart, charsEnd);
-(*    IF b. writePosition THEN WritePos (b. writer, b) END*)
   END Characters;
 
 
 PROCEDURE New* (outputChannel: Channel.Channel;
                 codecFactory: Codec.Factory;
                 format: SHORTINT): Builder;
+(**Creates a new writer.  The output is directory to @oparam{outputChannel},
+   using the encoding specified with @oparam{codecFactory}.  @oparam{format}
+   selects between the different canonical forms.  *)
   VAR
     b: Builder;
   BEGIN

@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.9 2000/07/25 12:20:13 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.10 2000/07/28 15:17:39 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -20,7 +20,7 @@ MODULE XML:Parser;
 
 
 IMPORT
-  Log, Out, Ascii, Channel, Msg, LongStrings, URI, URI:Scheme:File,
+  Out, Ascii, Channel, Msg, LongStrings, URI, URI:Scheme:File,
   Codec := XML:UnicodeCodec, XML:UnicodeCodec:UTF8, XML:UnicodeCodec:UTF16,
   XML:Locator, XML:EntityResolver,
   Buffer := XML:UnicodeBuffer, XML:Error, XML:DTD, XML:Builder;
@@ -1548,7 +1548,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           IF LookingAt ("]]>", followedByAny) THEN
             DecLength (p. l^, -9);
             p. builder. Characters (chars^, cstart, cpos-cdelta, (* callback *)
-                                    DTD.elementWhitespaceUnknown, FALSE);
+                                    DTD.elementWhitespaceUnknown);
             INC (cpos, 3);
             StorePosition (p. l^);
             p. builder. EndCDATA;        (* callback *)
@@ -1677,14 +1677,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           name := noName
         END
       END;
-      IF (name = noName) THEN
-        (* the name wasn't taken from the input data *)
-        RETURN dtd. NewEntityRef (name, entity, noName, 0, 
-                                  LongStrings.Length (noName^))
-      ELSE
-        RETURN dtd. NewEntityRef (name, entity, chars, 
-                                  cpos-2-LongStrings.Length (name^), cpos)
-      END
+      RETURN dtd. NewEntityRef (name, entity)
     END EntityRef;
 
   PROCEDURE AttValue (isAttDecl: BOOLEAN): DTD.AttValue;
@@ -1840,7 +1833,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           
           IF (cpos-cdelta # cstart) THEN
             p. builder. Characters (chars^, cstart, cpos-cdelta, (* callback *)
-                                    DTD.elementWhitespaceUnknown, FALSE)
+                                    DTD.elementWhitespaceUnknown)
           END
         END CharData;
 
@@ -2215,9 +2208,9 @@ PROCEDURE (p: Parser) ParseDocument*;
           AddDefaultAttributes (decl(DTD.ElementDecl))
         END;
         StorePosition (p. l^);
+        CheckChar (">");
         p. builder. AttributesDone();    (* callback *)
         
-        CheckChar (">");
         DiscardPreviousInput;
         IF emptyElementTag THEN
           StorePosition (p. l^);
@@ -2694,7 +2687,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           ELSE
             entityType := DTD.entityInternalGeneral
           END;
-          entity := dtd. NewInternalEntity (name, entityType, entityValue, FALSE)
+          entity := dtd. NewInternalEntity (name, entityType, entityValue)
         ELSE
           entityValue := NIL;
           IF isPEntity THEN
@@ -3007,7 +3000,8 @@ PROCEDURE NewChannel* (ch: Channel.Channel; baseURI: URI.URI;
    to @ovar{UTF8.factory}.
    
    The entity resolver @oparam{entityResolver} is used to map public and
-   system identifiers of the document to absolute URIs.
+   system identifiers of the document to absolute URIs.  If it is @code{NIL},
+   entities are exclusively resolved through their system identifier.
    
    The interface to the application is the builder instance @oparam{builder}.
    During parsing, the parser will call the methods of this object.  *)

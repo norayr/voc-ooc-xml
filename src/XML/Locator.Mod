@@ -1,4 +1,4 @@
-(*      $Id: Locator.Mod,v 1.3 2000/07/22 16:18:08 mva Exp $   *)
+(*      $Id: Locator.Mod,v 1.4 2000/07/23 17:45:15 mva Exp $   *)
 MODULE XML:Locator [OOC_EXTENSIONS];
 (*  Provides access to position information for XML parser callbacks.
     Copyright (C) 2000  Michael van Acken
@@ -51,12 +51,19 @@ TYPE
 TYPE
   ErrorListener* = POINTER TO ErrorListenerDesc;
   ErrorListenerDesc* = RECORD [ABSTRACT]
+  (**Using the @otype{ErrorListener} instance provided by the parser, builders
+     and applications can add their own error messages to a document.  *)
   END;
 
 PROCEDURE (el: ErrorListener) [ABSTRACT] Error* (context: Error.Context;
                                                  code: Error.Code;
                                                  fatalError: BOOLEAN;
                                                  pos: Position): Error.Msg;
+(**Adds a new error message to the parser error list.  @oparam{context} and
+   @oparam{code} determine the message text.  If @oparam{fatalError} is
+   @code{TRUE}, then the parser should stop reporting any events to the
+   application.  @oparam{pos} indicates the position of the error.  It should
+   be taken from a locator.  *)
   END Error;
   
 END XML:Locator.
