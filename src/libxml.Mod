@@ -40,6 +40,10 @@ IMPORT
   XML:DTD,
   XML:Locator,
   XML:EntityResolver,
-  ChannelMemory := IO:Memory;
+  
+  ChannelMemory := IO:Memory,
+  IO:PFD,
+  IO:Socket,
+  IO:Select;
   
 END libxml.

@@ -1,4 +1,4 @@
-(* 	$Id: Error.Mod,v 1.1.1.2 2000/07/10 20:31:52 mva Exp $	 *)
+(* 	$Id: Error.Mod,v 1.2 2000/07/31 14:24:18 mva Exp $	 *)
 MODULE URI:Error;
 (*  Error handling for URI parser.
     Copyright (C) 2000  Michael van Acken
@@ -63,7 +63,12 @@ PROCEDURE (context: Context) GetTemplate* (msg: Msg; VAR templ: LString);
       LongStrings.Append (eol+"msg_context=${MSG_CONTEXT}"+
                           eol+"msg_code=${MSG_CODE}", templ)
     END;
-    LongStrings.Append (eol+"uri=${uri}"+eol+"uri_pos=${uri_pos}", templ)
+    IF (msg. GetAttribute ("uri") # NIL) THEN
+      LongStrings.Append (eol+"uri=${uri}", templ)
+    END;
+    IF (msg. GetAttribute ("uri_pos") # NIL) THEN
+      LongStrings.Append (eol+"uri_pos=${uri_pos}", templ)
+    END;
   END GetTemplate;
 
 PROCEDURE (context: Context) SetString* (code: Code; str: String);

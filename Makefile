@@ -4,10 +4,12 @@ mkdirs:
 	for i in sym obj; do if test ! -d $$i; then mkdir $$i; fi; done
 
 clean:
-	rm -Rf sym obj doc TestCodecs TestParser TestURI
+	rm -Rf sym obj doc TestCodecs TestParser TestURI TestGet TestServer
 	cd tests && ${MAKE} clean
 
 test: mkdirs
+	${OOC} -MOv TestGet
+	${OOC} -MOv TestServer
 	cd tests && ${MAKE} test
 
 dist: clean

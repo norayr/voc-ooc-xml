@@ -1,4 +1,4 @@
-(* 	$Id: Hierarchical.Mod,v 1.1.1.2 2000/07/10 20:31:53 mva Exp $	 *)
+(* 	$Id: Hierarchical.Mod,v 1.2 2000/07/31 14:25:23 mva Exp $	 *)
 MODULE URI:Scheme:Hierarchical;
 (*  Implementation of the generic hierarchical URI.
     Copyright (C) 2000  Michael van Acken
@@ -508,15 +508,10 @@ PROCEDURE (uri: Generic) WriteXML* (w: TextRider.Writer);
     w. WriteString (CC.eol+"</hierarchical-uri>");
   END WriteXML;
 
-PROCEDURE (uri: Generic) GetString* (VAR str: ARRAY OF CHAR);
+PROCEDURE (uri: Generic) AppendPath* (VAR str: ARRAY OF CHAR);
   VAR
     segm: Segment;
   BEGIN
-    COPY ("", str);
-    uri. AppendScheme (str);
-    IF (uri. authority # NIL) THEN
-      uri. authority. Append (str)
-    END;
     IF (uri. pathList # NIL) THEN
       IF uri. absolutePath THEN
         Strings.Append ("/", str)
@@ -529,7 +524,17 @@ PROCEDURE (uri: Generic) GetString* (VAR str: ARRAY OF CHAR);
         segm. Append (str);
         segm := segm. next
       END
+    END
+  END AppendPath;
+
+PROCEDURE (uri: Generic) GetString* (VAR str: ARRAY OF CHAR);
+  BEGIN
+    COPY ("", str);
+    uri. AppendScheme (str);
+    IF (uri. authority # NIL) THEN
+      uri. authority. Append (str)
     END;
+    uri. AppendPath (str);
     IF (uri. query # NIL) THEN
       uri. query. Append (str)
     END

@@ -1,4 +1,4 @@
-(* 	$Id: URI.Mod,v 1.4 2000/07/31 14:23:55 mva Exp $	 *)
+(* 	$Id: URI.Mod,v 1.5 2000/08/20 12:59:40 mva Exp $	 *)
 MODULE URI [OOC_EXTENSIONS];
 (*  Implements RFC2396 "Uniform Resource Identifiers: Generic Syntax"
     Copyright (C) 2000  Michael van Acken
@@ -510,6 +510,11 @@ PROCEDURE (uri: HierarchicalURI) MakeRelative* (baseURI: HierarchicalURI): URI;
     copy(HierarchicalURI). authority := NIL;
     RETURN copy(HierarchicalURI)
   END MakeRelative;
+
+PROCEDURE (uri: HierarchicalURI) [ABSTRACT] AppendPath* (VAR str: ARRAY OF CHAR);
+(**Appends the textual representation of the path component of @oparam{uri}
+   to the string @oparam{str}.  *)
+  END AppendPath;
 
 
 (* Fragment

@@ -1,4 +1,4 @@
-(* 	$Id: HTTP.Mod,v 1.2 2000/07/31 14:25:23 mva Exp $	 *)
+(* 	$Id: HTTP.Mod,v 1.3 2000/07/31 18:36:10 mva Exp $	 *)
 MODULE URI:Scheme:HTTP;
 (*  Implementation of the "file" URI scheme.
     Copyright (C) 2000  Michael van Acken
@@ -20,7 +20,9 @@ MODULE URI:Scheme:HTTP;
 
 
 IMPORT
-  URI0 := URI, URI:String, URI:Scheme:Hierarchical, URI:Authority:ServerBased,
+  Ascii, Channel, Msg, Strings, TextRider, IO:Socket,
+  URI0 := URI, URI:Error, URI:String,
+  URI:Scheme:Hierarchical, URI:Authority:ServerBased,
   Query := URI:Query:Unparsed;
 
 
@@ -29,10 +31,19 @@ TYPE
   URIDesc = RECORD
   (**This class implements the @samp{http:} URI scheme.  It uses
      @otype{ServerBased.Authority} for its authority component, and 
-     @otype{Query.Query} for a query part.
-     Note: @oproc{URI.GetChannel} is not implemented.  *)
+     @otype{Query.Query} for a query part.  *)
     (Hierarchical.GenericDesc)
   END;
+
+
+CONST
+  noServerSpecified = 1;
+  unresolvedHostName = 2;
+  malformedStatus = 3;
+  responseError = 4;
+  
+VAR
+  httpContext: Error.Context;
 
 
 PROCEDURE Init* (http: URI; schemeId: URI0.StringPtr;
@@ -70,11 +81,159 @@ PROCEDURE (http: URI) Clone* (): URI;
     RETURN copy
   END Clone;
 
+
+PROCEDURE (uri: URI) GetChannel* (mode: URI0.ChannelMode;
+                                  VAR res: Error.Msg): Channel.Channel;
+(**@precond
+   @oparam{uri} is an absoulte URI of the schema @samp{http}.
+   @end precond  *)
+  CONST
+    crlf = Ascii.cr+Ascii.lf;
+  VAR
+    sock: Socket.Socket;
+    addr: Socket.sockaddr_in;
+    auth: ServerBased.Authority;
+    req: ARRAY 4*1024 OF CHAR;
+    ch: Channel.Channel;
+    writer: Channel.Writer;
+    textReader: TextRider.Reader;
+    i, j: LONGINT;
+  
+  PROCEDURE Err (code: Error.Code);
+    BEGIN
+      res := Msg.New (httpContext, code)
+    END Err;
+  
+  PROCEDURE LookingAt (str: ARRAY OF CHAR): BOOLEAN;
+    VAR
+      j: LONGINT;
+    BEGIN
+      IF (i >= 0) THEN
+        j := 0;
+        WHILE (str[j] # 0X) & (req[i] # 0X) & (str[j] = req[i]) DO
+          INC (j); INC (i)
+        END;
+        DEC (i, j);
+        RETURN (str[j] = 0X)
+      ELSE
+        RETURN FALSE
+      END
+    END LookingAt;
+  
+  PROCEDURE IsDigit (): BOOLEAN;
+    BEGIN
+      RETURN (i >= 0) & ("0" <= req[i]) & (req[i] <= "9")
+    END IsDigit;
+  
+  BEGIN
+    ch := NIL;
+    sock := Socket.New (Socket.AF_INET, Socket.SOCK_STREAM, 0, res);
+    
+    IF (res = Socket.done) THEN
+      IF (uri. authority = NIL) THEN
+        Err (noServerSpecified)
+      ELSE
+        auth := uri. authority(ServerBased.Authority);
+        Socket.InitSockAddrINET (addr, auth. host^, auth. port);
+        IF (addr. sin_family # Socket.AF_INET) THEN
+          Err (unresolvedHostName);
+          res. SetStringAttrib ("host", Msg.GetStringPtr (auth. host^))
+        END
+      END
+    END;
+    
+    IF (res = Socket.done) THEN
+      sock. Connect (addr, SIZE (Socket.sockaddr_in))
+    END;
+    IF (res = Socket.done) THEN
+      ch := sock. GetChannel();
+      sock. Close();                     (* close fd of socket object *)
+      
+      (* create GET request *)
+      req := "GET ";
+      uri. AppendPath (req);
+      IF (req[4] = 0X) THEN              (* path is completely empty *)
+        Strings.Append ("/", req)
+      END;
+      Strings.Append (" HTTP/1.0"+crlf, req);
+      auth := uri. authority(ServerBased.Authority);
+      Strings.Append ("Host: ", req);
+      Strings.Append (auth. host^, req);
+      Strings.Append (crlf, req);
+      Strings.Append (crlf, req);
+      writer := ch. NewWriter();
+      writer. WriteBytes (req, 0, Strings.Length (req));
+      
+      (* read status line and extract code and reason phrase; note:
+         HTTP/0.9 responses are not accepted *)
+      textReader := TextRider.ConnectReader (ch);
+      textReader. SetEol (crlf, 2);
+      textReader. ReadLine (req);
+      IF (textReader. res = TextRider.done) THEN
+        i := 0;
+        IF LookingAt ("HTTP/") THEN
+          i := 5;
+          IF IsDigit() THEN
+            REPEAT INC (i) UNTIL ~IsDigit()
+          ELSE
+            i := -1
+          END;
+          IF LookingAt (".") THEN INC (i) END;
+          IF IsDigit() THEN
+            REPEAT INC (i) UNTIL ~IsDigit()
+          ELSE
+            i := -1
+          END;
+          IF LookingAt (" ") THEN INC (i) END;
+          FOR j := 1 TO 3 DO
+            IF IsDigit() THEN
+              INC (i)
+            ELSE
+              i := -1
+            END
+          END;
+          IF LookingAt (" ") THEN INC (i) END;
+          
+          IF (i = -1) THEN
+            Err (malformedStatus)
+          ELSIF (req[i-4] # "2") THEN  (* non-success response *)
+            Err (responseError);
+            Strings.Extract (req, SHORT (i-4),
+                             Strings.Length (req)-SHORT (i-4), req);
+            res. SetStringAttrib ("status", Msg.GetStringPtr (req))
+          END
+        END
+      END;
+      
+      (* skip header lines *)
+      WHILE (textReader. res = TextRider.done) & (req # "") DO
+        textReader. ReadLine (req)
+      END;
+      
+      IF (textReader. res # TextRider. done) THEN
+        res := textReader. res
+      ELSE
+        RETURN ch
+      END
+    END;
+    RETURN NIL
+  END GetChannel;
+  
 PROCEDURE NewPrototype*(): URI;
   BEGIN
     RETURN New (String.Copy ("http"), NIL, NIL)
   END NewPrototype;
 
 BEGIN
-  URI0.RegisterScheme (NewPrototype())
+  URI0.RegisterScheme (NewPrototype());
+  
+  httpContext := Error.NewContext ("URI:Scheme:HTTP");
+  httpContext. SetString (noServerSpecified,
+    "No server name specified");
+  httpContext. SetString (unresolvedHostName,
+    "Could not resolve host name `${host}'");
+  httpContext. SetString (malformedStatus,
+    "Malformed status line in response");
+  httpContext. SetString (responseError,
+    "HTTP request failed: ${status}");
 END URI:Scheme:HTTP.
