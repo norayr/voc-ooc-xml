@@ -16,6 +16,9 @@ IMPORT
 CONST
   initialNestingDepth = 4;
 
+CONST  (* legal values for `flags' argument of `Parse': *)
+  validate* = 0;
+  
 TYPE
   ElementStack = POINTER TO ARRAY OF Element.Element;
   Build = POINTER TO BuildDesc;
@@ -246,7 +249,6 @@ PROCEDURE (b: Build) EndElement* (namespaceDecl: DTD.NamespaceDeclaration; local
 PROCEDURE Parse* (byteReader: Ch.Reader;
                   baseURI: URI.URI;
                   unicodeFactory: UnicodeCodec.Factory;
-                  validate: BOOLEAN;
                   rootFactory: Element.RootFactory;
                   maxNestingDepth: LONGINT;
                   flags: SET;
@@ -275,7 +277,7 @@ PROCEDURE Parse* (byteReader: Ch.Reader;
     NEW (b);
     InitBuild (b, rootFactory, maxNestingDepth);
     
-    IF validate THEN
+    IF (validate IN flags) THEN
       builder := Validation.New (b)
     ELSE
       builder := b
@@ -283,8 +285,8 @@ PROCEDURE Parse* (byteReader: Ch.Reader;
     
     parser := Parser.NewReader (byteReader, baseURI, unicodeFactory, NIL, builder);
     (* ... should disable XMLDecl and DoctypeDecl if flags are set *)
-    parser. followExternalRef := validate OR (baseURI # NIL);
-    parser. validating := validate;
+    parser. followExternalRef := (validate IN flags) OR (baseURI # NIL);
+    parser. validating := (validate IN flags);
     
     parser. ParseDocument();
     IF (parser. errList. msgCount = 0) THEN
