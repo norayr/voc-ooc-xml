@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.13 2000/08/08 16:28:33 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.14 2000/08/20 13:00:30 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -79,8 +79,9 @@ TYPE
        is never @code{NIL} *)
        
     followExternalRef*: BOOLEAN;
-    (**If @code{TRUE}, then the parser should try to follow external
-       references.  It is an error if the external entity cannot be read.  The
+    (**If @code{TRUE}, then the parser should try to follow external references
+       (references to the external DTD subset or to an external parameter
+       entity).  It is an error if the external entity cannot be read.  The
        default value is @code{TRUE}.  *)
     enforceQNames*: BOOLEAN;
     (**If @code{TRUE}, then the parser checks that element and attribute names
@@ -203,6 +204,7 @@ CONST  (* error codes *)
   nonMarkupDeclPERef = 115;
   expectedEncodingDecl = 116;
   malformedURI = 117;
+  invalidPredefEntityDecl = 118;
   
   (* document errors *)
   expectedElement = 208;
@@ -707,7 +709,7 @@ PROCEDURE (p: Parser) ParseDocument*;
   
   PROCEDURE PushEntity (entity: DTD.Entity; syncEntity: BOOLEAN);
   (* `syncEntity=TRUE' means that the resolved entity is matched against
-     a grammar production (extPE, extParsedPE, externalSubset) and is not
+     a grammar production (extParsedPE, externalSubset) and is not
      inserted at an arbitrary place in the external subset or an entity
      value *)
     VAR
@@ -753,9 +755,9 @@ PROCEDURE (p: Parser) ParseDocument*;
         
         CASE entity. type OF
         | DTD.entityInternalGeneral, DTD.entityExternalGeneral:
-          ASSERT (chars[LEN (chars^)-2] = Buffer.markerEOD)
+          chars[LEN (chars^)-2] := Buffer.markerEOD
         | DTD.entityInternalParameter, DTD.entityExternalParameter:
-          ASSERT (chars[LEN (chars^)-2] = Buffer.markerEOB);
+          chars[LEN (chars^)-2] := Buffer.markerEOB;
           
           (* add a space to the end of the interal entity (or internalized
              external entity), unless we are within
@@ -764,7 +766,11 @@ PROCEDURE (p: Parser) ParseDocument*;
              fall out of an expanded entity reference *)
           IF (p. currEntityValue = NIL) THEN
             chars[LEN (chars^)-2] := " ";
-            chars[LEN (chars^)-1] := Buffer.markerEOB
+            IF syncEntity THEN
+              chars[LEN (chars^)-1] := Buffer.markerEOD
+            ELSE
+              chars[LEN (chars^)-1] := Buffer.markerEOB
+            END
           END
         END;
         
@@ -844,7 +850,6 @@ PROCEDURE (p: Parser) ParseDocument*;
            by PushEntity *)
         IF (p. currEntityValue = NIL) THEN
           ASSERT (chars[LEN (chars^)-2] = " ");
-          ASSERT (chars[LEN (chars^)-1] = Buffer.markerEOB);
           chars[LEN (chars^)-2] := Buffer.markerEOB;
         END;
         
@@ -1116,7 +1121,7 @@ PROCEDURE (p: Parser) ParseDocument*;
   PROCEDURE ^ XMLDecl (entity: DTD.ExternalEntity);
   PROCEDURE ^ extSubsetDecl;
   
-  PROCEDURE PEReference (markupDecl: BOOLEAN);
+  PROCEDURE PEReference (declSep: BOOLEAN);
     VAR
       name: DTD.String;
       decl: DTD.Declaration;
@@ -1124,7 +1129,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       oldCStart: DTD.CharPos;
       oldFlag: BOOLEAN;
     BEGIN  (* pre: (chars[cpos] = "%") *)
-      IF ~markupDecl & 
+      IF ~declSep & 
          (~p. inExternalSubset & ~p. inExternalEntity) THEN
         Err (nonMarkupDeclPERef)
       END;
@@ -1139,34 +1144,41 @@ PROCEDURE (p: Parser) ParseDocument*;
         p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (name^))
       ELSE
         entity := decl(DTD.Entity);
-        IF (entity. type = DTD.entityExternalParameter) THEN
-          (* external references must match extPE; they must not be followed
-             for well-formedness tests *)
-          IF p. followExternalRef THEN
-            IF ~markupDecl THEN
-              IF (entity IS DTD.ExternalEntity) THEN
-                entity. SetEntityValue (Internalize (entity(DTD.ExternalEntity)))
-              END;
-              PushEntity (entity, FALSE)
-            ELSE
-              PushEntity (entity, markupDecl);
+        IF declSep THEN
+          (* this parameter reference is part of the rule DeclSep: if possible,
+             parse the replacement text as a sequence of declarations *)
+          IF p. followExternalRef OR
+             (entity. type = DTD.entityInternalParameter) THEN
+            PushEntity (entity, TRUE);
+            
+            (* an external entity should being with a TextDecl *)
+            IF (entity. type = DTD.entityExternalParameter) THEN
               oldFlag := p. inExternalEntity;
               p. inExternalEntity := TRUE;
               IF LookingAt ("<?xml", followedByNonName) THEN
                 XMLDecl (entity(DTD.ExternalEntity))
-              END;
-              extSubsetDecl;
-              IF (chars[cpos] # Buffer.markerEOD) THEN
-                Err (junkAfterExtSubset)
-              END;
-              p. inExternalEntity := oldFlag;
-              PopEntity
-            END
+              END
+            END;
+            
+            extSubsetDecl;
+            IF (chars[cpos] # Buffer.markerEOD) THEN
+              Err (junkAfterExtSubset)
+            END;
+            
+            IF (entity. type = DTD.entityExternalParameter) THEN
+              p. inExternalEntity := oldFlag
+            END;
+            
+            PopEntity
           ELSIF (p. documentEntity. standalone # DTD.standaloneYes) THEN
             p. processDeclarations := FALSE
           END
         ELSE
-          PushEntity (entity, markupDecl)
+          (* not in DeclSep: must be within entity value definition *)
+          IF (entity IS DTD.ExternalEntity) THEN
+            entity. SetEntityValue (Internalize (entity(DTD.ExternalEntity)))
+          END;
+          PushEntity (entity, FALSE)
         END
       END
     END PEReference;
@@ -2603,11 +2615,6 @@ PROCEDURE (p: Parser) ParseDocument*;
               END
             END;
             string := p. currEntityValue. Flatten (NIL);
-            IF isPEntity THEN
-              string[LEN (string^)-2] := Buffer.markerEOB
-            ELSE
-              string[LEN (string^)-2] := Buffer.markerEOD
-            END;
             p. currEntityValue := NIL
           ELSE
             Err (expectedEntityValue); NextChar
@@ -2634,6 +2641,9 @@ PROCEDURE (p: Parser) ParseDocument*;
             entityType := DTD.entityInternalParameter
           ELSE
             entityType := DTD.entityInternalGeneral
+          END;
+          IF ~isPEntity & ~dtd. IsValidEntityDecl (name, entityValue) THEN
+            ErrPos (invalidPredefEntityDecl, p. l^)
           END;
           entity := dtd. NewInternalEntity (name, entityType, entityValue)
         ELSE
@@ -3121,6 +3131,8 @@ PROCEDURE SetErrorMessages;
         t := "Expected token `encoding'"
       | malformedURI:
         t := "Malformed URI: ${uri_error}"
+      | invalidPredefEntityDecl:
+        t := "Invalid redefinition of a predefined internal entity"
         
       | expectedElement:
         t := "Expected element"
