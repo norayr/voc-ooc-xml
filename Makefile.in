@@ -42,7 +42,7 @@ libdir=@libdir@
 # (symbol files, header files, etc) and the module source code.
 ooc_pkgdir=${OOC_LIBDIR}/${package}
 
-subdirs=IO OS URI URI/Authority URI/Fragment URI/Query URI/Scheme
+subdirs=IO OS URI URI/Authority URI/Fragment URI/Query URI/Scheme XML XML/Basic XML/Builder XML/UnicodeCodec
 
 # ==================== Utility Programs for the Build ====================
 
