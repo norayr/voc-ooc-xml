@@ -717,6 +717,35 @@ ooc_have_libs="$ooc_cv_ooc_have_libs"
 
 
 
+# Extract the first word of "oocn", so it can be a program name with args.
+set dummy oocn; ac_word=$2
+echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
+echo "configure:724: checking for $ac_word" >&5
+if eval "test \"`echo '$''{'ac_cv_prog_OOCN'+set}'`\" = set"; then
+  echo $ac_n "(cached) $ac_c" 1>&6
+else
+  if test -n "$OOCN"; then
+  ac_cv_prog_OOCN="$OOCN" # Let the user override the test.
+else
+  IFS="${IFS= 	}"; ac_save_ifs="$IFS"; IFS=":"
+  ac_dummy="$PATH"
+  for ac_dir in $ac_dummy; do
+    test -z "$ac_dir" && ac_dir=.
+    if test -f $ac_dir/$ac_word; then
+      ac_cv_prog_OOCN="oocn"
+      break
+    fi
+  done
+  IFS="$ac_save_ifs"
+fi
+fi
+OOCN="$ac_cv_prog_OOCN"
+if test -n "$OOCN"; then
+  echo "$ac_t""$OOCN" 1>&6
+else
+  echo "$ac_t""no" 1>&6
+fi
+
 ac_aux_dir=
 for ac_dir in $srcdir $srcdir/.. $srcdir/../..; do
   if test -f $ac_dir/install-sh; then
@@ -748,7 +777,7 @@ ac_configure=$ac_aux_dir/configure # This should be Cygnus configure.
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:752: checking for a BSD compatible install" >&5
+echo "configure:781: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -802,7 +831,7 @@ test -z "$INSTALL_DATA" && INSTALL_DATA='${INSTALL} -m 644'
 
 
 echo $ac_n "checking "for socket in -lxnet"""... $ac_c" 1>&6
-echo "configure:806: checking "for socket in -lxnet"" >&5
+echo "configure:835: checking "for socket in -lxnet"" >&5
 if eval "test \"`echo '$''{'ooc_cv_have_libxnet'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -817,7 +846,7 @@ for i in Strings ; do
 done
 i="$ooc_save_i"
 cat > conftest.$ac_ext <<EOF
-#line 821 "configure"
+#line 850 "configure"
 char socket();
 int test_fct() {
 socket(); return 0; }
@@ -830,7 +859,7 @@ IMPORT $ooc_import;
 END conftest.
 EOF
 
-if { (eval echo configure:834: \"$ooc_link\") 1>&5; (eval $ooc_link) 2>&5; } && test -s conftest; then
+if { (eval echo configure:863: \"$ooc_link\") 1>&5; (eval $ooc_link) 2>&5; } && test -s conftest; then
   rm -rf *conftest* sym/conftest* obj/conftest*
   eval "ooc_lib_$ac_lib_var=yes"
 else
@@ -861,7 +890,7 @@ for i in Strings ; do
 done
 i="$ooc_save_i"
 cat > conftest.$ac_ext <<EOF
-#line 865 "configure"
+#line 894 "configure"
 char socket();
 int test_fct() {
 socket(); return 0; }
@@ -874,7 +903,7 @@ IMPORT $ooc_import;
 END conftest.
 EOF
 
-if { (eval echo configure:878: \"$ooc_link\") 1>&5; (eval $ooc_link) 2>&5; } && test -s conftest; then
+if { (eval echo configure:907: \"$ooc_link\") 1>&5; (eval $ooc_link) 2>&5; } && test -s conftest; then
   rm -rf *conftest* sym/conftest* obj/conftest*
   eval "ooc_lib_$ac_lib_var=yes"
 else
@@ -906,7 +935,7 @@ for i in Strings ; do
 done
 i="$ooc_save_i"
 cat > conftest.$ac_ext <<EOF
-#line 910 "configure"
+#line 939 "configure"
 char socket();
 int test_fct() {
 socket(); return 0; }
@@ -919,7 +948,7 @@ IMPORT $ooc_import;
 END conftest.
 EOF
 
-if { (eval echo configure:923: \"$ooc_link\") 1>&5; (eval $ooc_link) 2>&5; } && test -s conftest; then
+if { (eval echo configure:952: \"$ooc_link\") 1>&5; (eval $ooc_link) 2>&5; } && test -s conftest; then
   rm -rf *conftest* sym/conftest* obj/conftest*
   eval "ooc_lib_$ac_lib_var=yes"
 else
@@ -969,7 +998,7 @@ echo "--append-line $ooc_option_name DEFINE\ LibxnetPrefix:=\\\"$ooc_xnet_prefix
 
 
 echo $ac_n "checking whether ${MAKE-make} sets \${MAKE}""... $ac_c" 1>&6
-echo "configure:973: checking whether ${MAKE-make} sets \${MAKE}" >&5
+echo "configure:1002: checking whether ${MAKE-make} sets \${MAKE}" >&5
 set dummy ${MAKE-make}; ac_make=`echo "$2" | sed 'y%./+-%__p_%'`
 if eval "test \"`echo '$''{'ac_cv_prog_make_${ac_make}_set'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1015,12 +1044,12 @@ test "$program_suffix" != NONE &&
 test "$program_transform_name" = "" && program_transform_name="s,x,x,"
 
 echo $ac_n "checking for Cygwin environment""... $ac_c" 1>&6
-echo "configure:1019: checking for Cygwin environment" >&5
+echo "configure:1048: checking for Cygwin environment" >&5
 if eval "test \"`echo '$''{'ac_cv_cygwin'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 1024 "configure"
+#line 1053 "configure"
 #include "confdefs.h"
 
 int main() {
@@ -1031,7 +1060,7 @@ int main() {
 return __CYGWIN__;
 ; return 0; }
 EOF
-if { (eval echo configure:1035: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:1064: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_cygwin=yes
 else
@@ -1048,19 +1077,19 @@ echo "$ac_t""$ac_cv_cygwin" 1>&6
 CYGWIN=
 test "$ac_cv_cygwin" = yes && CYGWIN=yes
 echo $ac_n "checking for mingw32 environment""... $ac_c" 1>&6
-echo "configure:1052: checking for mingw32 environment" >&5
+echo "configure:1081: checking for mingw32 environment" >&5
 if eval "test \"`echo '$''{'ac_cv_mingw32'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 1057 "configure"
+#line 1086 "configure"
 #include "confdefs.h"
 
 int main() {
 return __MINGW32__;
 ; return 0; }
 EOF
-if { (eval echo configure:1064: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:1093: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_mingw32=yes
 else
@@ -1079,7 +1108,7 @@ test "$ac_cv_mingw32" = yes && MINGW32=yes
 
 
 echo $ac_n "checking for executable suffix""... $ac_c" 1>&6
-echo "configure:1083: checking for executable suffix" >&5
+echo "configure:1112: checking for executable suffix" >&5
 if eval "test \"`echo '$''{'ac_cv_exeext'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1089,7 +1118,7 @@ else
   rm -f conftest*
   echo 'int main () { return 0; }' > conftest.$ac_ext
   ac_cv_exeext=
-  if { (eval echo configure:1093: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; }; then
+  if { (eval echo configure:1122: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; }; then
     for file in conftest.*; do
       case $file in
       *.c | *.o | *.obj) ;;
@@ -1261,6 +1290,7 @@ s%@OOC_INIT@%$OOC_INIT%g
 s%@OOC_LIBDIR@%$OOC_LIBDIR%g
 s%@OOCONFIG@%$OOCONFIG%g
 s%@ooc_have_libs@%$ooc_have_libs%g
+s%@OOCN@%$OOCN%g
 s%@INSTALL_PROGRAM@%$INSTALL_PROGRAM%g
 s%@INSTALL_SCRIPT@%$INSTALL_SCRIPT%g
 s%@INSTALL_DATA@%$INSTALL_DATA%g

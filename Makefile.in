@@ -3,6 +3,7 @@
 OOC=@OOC@
 OFLAGS=@OFLAGS@
 OOCONFIG=@OOCONFIG@
+OOCN=@OOCN@
 
 ### The compiler's installation directory, and its primary initialization file.
 OOC_LIBDIR=@OOC_LIBDIR@
@@ -54,7 +55,7 @@ INSTALL_DATA = @INSTALL_DATA@
 # ============================= Targets ==============================
 
 
-.PHONY: all clean test
+.PHONY: all clean test doc
 
 all: libxml$(exeext)
 
@@ -101,6 +102,13 @@ installlib: all mkdir config.ooc
           umask 022; $(OOC) --install-lib --config oo2crc --lib-path $(libdir) libxml; \
 	fi
 
+### `doc'
+###      Create documentation from module sources.
+doc:	mkdir
+	${OOCN} --def-txt -Cv -o doc/txt libxml
+	${OOCN} --def-html -Cv -o doc/html libxml
+	${OOCN} --xref -Cv -o doc/xref libxml
+
 # ======================== Auxiliary Targets =========================
 
 oo2crc: config.ooc
@@ -120,7 +128,10 @@ mkdir: FRC
 	(umask 022; \
           ./mkinstalldirs ${ooc_pkgdir} ${ooc_pkgdir}/IO \
 	                  ${ooc_pkgdir}/sym ${ooc_pkgdir}/obj; \
-	  for i in ${subdirs}; do ./mkinstalldirs ${ooc_pkgdir}/$$i; done )
+	  for i in ${subdirs}; do ./mkinstalldirs ${ooc_pkgdir}/$$i; done; \
+	  for i in doc doc/txt doc/html doc/xref; do \
+	    ./mkinstalldirs $$i; \
+	  done )
 
 Makefile: Makefile.in config.status
 	./config.status

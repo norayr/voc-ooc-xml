@@ -13,6 +13,7 @@ OOC_PROG_OOCONFIG()
 OOC_SUPPORTS_LIBS()
 
 dnl Check for programs.
+AC_CHECK_PROG(OOCN, oocn, oocn)
 AC_PROG_INSTALL
 
 dnl Required and optional base libraries.
