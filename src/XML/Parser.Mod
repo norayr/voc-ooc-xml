@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.24 2001/03/18 17:02:02 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.25 2001/03/19 00:22:43 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -2344,6 +2344,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         elementName: DTD.String;
         cp: DTD.CP;
         elementDecl: DTD.ElementDecl;
+        decl: DTD.Declaration;
         dummy: BOOLEAN;
         
       PROCEDURE contentspec(): DTD.CP;
@@ -2490,7 +2491,10 @@ PROCEDURE (p: Parser) ParseDocument*;
         OptS (FALSE);
 
         elementDecl := dtd. NewElementDecl (elementName, cp);
-        dummy := dtd. elementNamespace. Add (elementDecl);
+        IF ~dtd. elementNamespace. Add (elementDecl) THEN
+          decl := dtd. elementNamespace. Get (elementName);
+          decl(DTD.ElementDecl). SetMultipleDecl
+        END;
 
         CheckCurrentEntity (currentEntity);
         CheckChar (">")

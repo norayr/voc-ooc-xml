@@ -1,3 +1,5 @@
 In file invalid/id04.xml: 
 line=4, column=2
 55: Attribute declaration `root/@id2' of type ID must not have a default value
+line=10, column=1
+142: Element type `root' is not declared

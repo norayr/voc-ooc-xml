@@ -1,4 +1,4 @@
-(* 	$Id: DTD.Mod,v 1.12 2001/03/18 17:02:02 mva Exp $	 *)
+(* 	$Id: DTD.Mod,v 1.13 2001/03/19 00:22:43 mva Exp $	 *)
 MODULE XML:DTD [OOC_EXTENSIONS];
 (*  Implements the internal representation of a document DTD.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -357,7 +357,12 @@ TYPE
     (CPDesc)
     name-: String;
   END;
-  
+
+
+TYPE
+  RegexpNode* = POINTER TO RegexpNodeDesc;
+  RegexpNodeDesc* = RECORD
+  END;
 
 TYPE
   ElementDecl* = POINTER TO ElementDeclDesc;
@@ -366,8 +371,13 @@ TYPE
     (DeclarationDesc)
     contentModel-: CP;
     (**The content model of the element.  *)
+    regexp-: RegexpNode;
+    (**Regular expression contructed for @samp{children} element content.  *)
     contentType-: ContentType;
     (**Type of the content model.  *)
+    multipleDecl-: BOOLEAN;
+    (**Set to @code{TRUE}, if more than one declaration of this element type
+       appears in the DTD.  *)
     attrNamespace-: Namespace;
     (**The attribute namespace of the element.  *)
     idAttr-: AttrDecl;
@@ -1057,6 +1067,7 @@ PROCEDURE InitElementDecl (elemDecl: ElementDecl; name: String; contentModel: CP
     ELSE
       elemDecl. contentType := contentChildren
     END;
+    elemDecl. multipleDecl := FALSE;
     elemDecl. attrNamespace := attrNamespace;
     elemDecl. idAttr := NIL;
     elemDecl. notationAttr := NIL;
@@ -1070,6 +1081,16 @@ PROCEDURE (b: Builder) NewElementDecl* (name: String; contentModel: CP): Element
     InitElementDecl (elemDecl, name, contentModel, NewNamespace());
     RETURN elemDecl
   END NewElementDecl;
+
+PROCEDURE (elemDecl: ElementDecl) SetRegexp* (regexp: RegexpNode);
+  BEGIN
+    elemDecl. regexp := regexp
+  END SetRegexp;
+
+PROCEDURE (elemDecl: ElementDecl) SetMultipleDecl*;
+  BEGIN
+    elemDecl. multipleDecl := TRUE
+  END SetMultipleDecl;
 
 PROCEDURE (elemDecl: ElementDecl) IsEmpty* (): BOOLEAN;
   BEGIN

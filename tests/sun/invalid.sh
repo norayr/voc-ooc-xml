@@ -4,8 +4,7 @@ SUBDIR="invalid"
 
 err_count=0
 for d in $SUBDIR; do
-  # missing: dtd03
-  for i in $d/attr*.xml $d/dtd0[126].xml $d/id*.xml $d/not-sa*.xml $d/required*.xml $d/root.xml; do
+  for i in $d/attr*.xml $d/dtd*.xml $d/el*.xml $d/id*.xml $d/not-sa*.xml $d/required*.xml $d/root.xml; do
   #for i in $d/*.xml; do
     rm -f test-output/$i test-output/$i.err
     if test $i != invalid/not-sa03.xml; then

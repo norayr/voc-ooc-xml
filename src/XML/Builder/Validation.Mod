@@ -1,4 +1,4 @@
-(*      $Id: Validation.Mod,v 1.5 2001/03/18 17:02:37 mva Exp $   *)
+(*      $Id: Validation.Mod,v 1.6 2001/03/19 00:22:54 mva Exp $   *)
 MODULE XML:Builder:Validation;
 (*  Adds validation services to the XML:Parser.
     Copyright (C) 2001  Michael van Acken
@@ -21,13 +21,16 @@ MODULE XML:Builder:Validation;
 
 IMPORT
   Ascii, Msg, LongStrings, URI, 
-  XML:Error, XML:DTD, XML:Locator, XML:Parser,
-  B := XML:Builder;
+  XML:Error, XML:DTD, XML:Locator, XML:Parser, XML:Regexp, B := XML:Builder;
 
 
 TYPE
   Builder* = POINTER TO BuilderDesc;
-  Stack = POINTER TO ARRAY OF DTD.ElementDecl;
+  Stack = POINTER TO ARRAY OF
+    RECORD
+      elem: DTD.ElementDecl;
+      regexp: Regexp.Node;
+    END;
   BuilderDesc = RECORD
   (**This builder adds validation services to the parser.  *)
     (B.BuilderDesc)
@@ -45,7 +48,7 @@ TYPE
     (* level of current element; document element is 0, each nesting level
        adds 1 *)
     stack: Stack;
-    (* stack[currLevel] may be NIL, if the element type is not declared *)
+    (* stack[currLevel].elem may be NIL, if the element type is not declared *)
   END;
 
 TYPE
@@ -86,6 +89,11 @@ CONST  (* error codes *)
   rootMismatch = 26;
   mixedTypeDuplicate = 27;
   unknownUnparsedEntityNotation = 28;
+  expectedEndTag = 29;
+  expectedElement = 30;
+  noSuchElementType = 31;
+  invalidContentInEMPTY = 32;
+  multipleElemDecl = 33;
   
 VAR
   validationContext: Error.Context;
@@ -264,19 +272,27 @@ PROCEDURE PushElement (b: Builder; elemDecl: DTD.Declaration);
       FOR i := 0 TO LEN (b. stack^)-1 DO
         new[i] := b. stack[i]
       END;
-      b. stack := new
+      b. stack := new;
     END;
     INC (b. currLevel);
     IF (elemDecl = NIL) THEN
-      b. stack[b. currLevel] := NIL
+      b. stack[b. currLevel]. elem := NIL;
+      b. stack[b. currLevel]. regexp := NIL;
     ELSE
-      b. stack[b. currLevel] := elemDecl(DTD.ElementDecl)
+      b. stack[b. currLevel]. elem := elemDecl(DTD.ElementDecl);
+      IF (elemDecl(DTD.ElementDecl). regexp = NIL) THEN
+        b. stack[b. currLevel]. regexp := NIL
+      ELSE
+        b. stack[b. currLevel]. regexp :=
+          elemDecl(DTD.ElementDecl). regexp(Regexp.Node)
+      END
     END
   END PushElement;
 
 PROCEDURE PopElement (b: Builder);
   BEGIN
-    b. stack[b. currLevel] := NIL;
+    b. stack[b. currLevel]. elem := NIL;
+    b. stack[b. currLevel]. regexp := NIL;
     DEC (b. currLevel)
   END PopElement;
 
@@ -400,6 +416,11 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
     WHILE (decl # NIL) DO
       elemDecl := decl(DTD.ElementDecl);
       
+      IF elemDecl. multipleDecl THEN
+        (* an element type must be declared only once *)
+        ErrString (b, multipleElemDecl, "element", elemDecl. name)
+      END;
+      
       IF (elemDecl. idAttr = DTD.undefAttr) THEN
         (* an element may have at most one ID attribute *)
         ErrString (b, multipleIDAttr, "element", elemDecl. name)
@@ -414,7 +435,10 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
                     "attribute", elemDecl. notationAttr. name) ... *)
       END;
       
-      IF (elemDecl. contentType = DTD.contentMixed) THEN
+      IF (elemDecl. contentType = DTD.contentChildren) THEN
+        (* create regular expression for `children' content *)
+        elemDecl. SetRegexp (Regexp.Create (elemDecl. contentModel))
+      ELSIF (elemDecl. contentType = DTD.contentMixed) THEN
         (* check that every child entry in a Mixed type is unique *)
         cp := elemDecl. contentModel(DTD.ChoiceCP). list;
         WHILE (cp # NIL) DO
@@ -429,6 +453,7 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
       
       (* check VCs on attributes attached to the current element *)
       CheckAttributes (elemDecl. attrNamespace. declList);
+      
       decl := decl. next
     END;
     
@@ -448,21 +473,161 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
 
 
 
+PROCEDURE CheckEmpty (b: Builder);
+  BEGIN
+    IF (b. currLevel >= 0) &
+       (b. stack[b. currLevel]. elem. contentType = DTD.contentEMPTY) THEN
+      ErrString (b, invalidContentInEMPTY,
+                 "element", b. stack[b. currLevel]. elem. name)
+    END
+  END CheckEmpty;
+
+PROCEDURE ListElements (ptr: Regexp.Node): DTD.String;
+  VAR
+    str, str2: DTD.String;
+    len, i: LONGINT;
+  BEGIN
+    NEW (str, 64);
+    str[0] := 0X;
+    len := 0;
+    
+    LOOP
+      IF (ptr = NIL) OR (ptr = Regexp.endOfRegexp) THEN
+        EXIT
+      ELSIF (ptr. elem = NIL) THEN
+        ptr := ptr. suc
+      ELSE
+        i := LongStrings.Length (ptr. elem^);
+        IF (len+i+1 >= LEN (str^)) THEN
+          NEW (str2, LEN (str^)*2);
+          COPY (str^, str2^)
+        END;
+        str[len] := " ";
+        str[len+1] := 0X;
+        LongStrings.Append (ptr. elem^, str^);
+        INC (len, i+1);
+        ptr := ptr. alt
+      END
+    END;
+    RETURN str
+  END ListElements;
+
 PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration; 
                                       localName: DTD.String);
+  VAR
+    ptr, start: Regexp.Node;
+    elemDecl: DTD.Declaration;
+    list: DTD.CP;
+  
+  PROCEDURE InCPList (name: DTD.String; list: DTD.CP): BOOLEAN;
+    BEGIN
+      WHILE (list # NIL) & (list(DTD.NameCP). name^ # name^) DO
+        list := list. next
+      END;
+      RETURN (list # NIL)
+    END InCPList;
+  
+  PROCEDURE ListMixedElements (list: DTD.CP): DTD.String;
+    VAR
+      str, str2: DTD.String;
+      len, i: LONGINT;
+    BEGIN
+      NEW (str, 64);
+      str[0] := 0X;
+      len := 0;
+      
+      WHILE (list # NIL) DO
+        i := LongStrings.Length (list(DTD.NameCP). name^);
+        IF (len+i+1 >= LEN (str^)) THEN
+          NEW (str2, LEN (str^)*2);
+          COPY (str^, str2^)
+        END;
+        str[len] := " ";
+        str[len+1] := 0X;
+        LongStrings.Append (list(DTD.NameCP). name^, str^);
+        INC (len, i+1);
+        list := list. next
+      END;
+      RETURN str
+    END ListMixedElements;
+
   BEGIN
-    IF (b. currLevel = -1) &  (* this is the root element *)
-       (b. dtd. rootName^ # localName^) THEN
-      ErrString (b, rootMismatch, "name", b. dtd. rootName)
+    CheckEmpty (b);
+    IF (b. currLevel = -1) THEN          (* this is the root element *)
+      IF (b. dtd. rootName^ # localName^) THEN
+        ErrString (b, rootMismatch, "name", b. dtd. rootName)
+      END
+      
+    ELSIF (b. stack[b. currLevel]. regexp # NIL) THEN
+      (* this element has a parent, and we are within a `children' content
+         model *)
+      start := b. stack[b. currLevel]. regexp;
+      ptr := start;
+      LOOP
+        IF (ptr = Regexp.endOfRegexp) THEN (* error: end of regexp *)
+          ErrString (b, expectedEndTag,
+                     "element", b. stack[b. currLevel]. elem. name);
+          ptr := NIL;
+          EXIT
+        ELSIF (ptr = NIL) THEN           (* error: no matching node *)
+          ErrString (b, expectedElement, "elements", 
+                     ListElements (start));
+          EXIT
+        ELSIF (ptr. elem = NIL) THEN
+          ptr := ptr. suc
+        ELSIF (ptr. elem^ = localName^) THEN
+          EXIT
+        ELSE
+          ptr := ptr. alt
+        END
+      END;
+      b. stack[b. currLevel]. regexp := ptr
+      
+    ELSIF (b. stack[b. currLevel]. elem. contentType = DTD.contentMixed) THEN
+      (* this element has a parent, and we are within a `Mixed' content
+         model: make sure that this element is in the given list *)
+      list := b. stack[b. currLevel]. elem. contentModel(DTD.ChoiceCP). list;
+      IF ~InCPList (localName, list) THEN
+        ErrString (b, expectedElement, "elements", ListMixedElements (list))
+      END
     END;
     
-    PushElement (b, b. dtd. elementNamespace. Get (localName));
+    (* check that the element type is declared *)
+    elemDecl := b. dtd. elementNamespace. Get (localName);
+    IF (elemDecl = NIL) THEN
+      ErrString (b, noSuchElementType, "name", localName)
+    END;
+    PushElement (b, elemDecl);
+
+    (* missing: element declared?  valid mixed content? ... *)
+
     b. delegateBuilder. StartElement (namespaceDecl, localName)
   END StartElement;
 
 PROCEDURE (b: Builder) EndElement* (namespaceDecl: DTD.NamespaceDeclaration; 
                                     localName: DTD.String);
+  VAR
+    start, ptr: Regexp.Node;
   BEGIN
+    (* did we reach the end of the regular expression of the `children'
+       content model? *)
+    start := b. stack[b. currLevel]. regexp;
+    IF (start # NIL) THEN
+      (* find out if there is an empty path from the current position to
+         the `endOfRegexp' node *)
+      ptr := start;
+      WHILE (ptr # NIL) & (ptr # Regexp.endOfRegexp) DO
+        IF (ptr. elem = NIL) THEN
+          ptr := ptr. suc
+        ELSE
+          ptr := ptr. alt
+        END
+      END;
+      IF (ptr # Regexp.endOfRegexp) THEN
+        ErrString (b, expectedElement, "elements", ListElements (start))
+      END
+    END;
+    
     b. delegateBuilder. EndElement (namespaceDecl, localName);
     PopElement (b)
   END EndElement;
@@ -664,6 +829,7 @@ PROCEDURE (b: Builder) AttributesDone*;
 
 PROCEDURE (b: Builder) SkippedEntity* (name: DTD.String; referent: DTD.Entity);
   BEGIN
+    CheckEmpty (b);
     b. delegateBuilder. SkippedEntity (name, referent)
   END SkippedEntity;
 
@@ -672,11 +838,12 @@ PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
                                     charsStart, charsEnd: DTD.CharPos;
                                     elementWhitespace: DTD.ElementWhitespaceType);
   BEGIN
+    CheckEmpty (b);
     IF IsStandalone (b) &
-       (b. stack[b. currLevel] # NIL) &
-       b. stack[b. currLevel]. IsElementContent() THEN
+       (b. stack[b. currLevel]. elem # NIL) &
+       b. stack[b. currLevel]. elem. IsElementContent() THEN
       ErrString (b, invalidStandaloneWhitespace,
-                 "element", b. stack[b. currLevel]. name)
+                 "element", b. stack[b. currLevel]. elem. name)
     END;
     
     b. delegateBuilder. Characters (chars, charsStart, charsEnd,
@@ -686,13 +853,15 @@ PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
 
 PROCEDURE (b: Builder) StartCDATA*;
   BEGIN
+    CheckEmpty (b);
+    
     (* an element with element content cannot include non-whitespace character
        data; a CDATA section does not match S and is therefore forbidden *)
     IF IsStandalone (b) &
-       (b. stack[b. currLevel] # NIL) &
-       b. stack[b. currLevel]. IsElementContent() THEN
+       (b. stack[b. currLevel]. elem # NIL) &
+       b. stack[b. currLevel]. elem. IsElementContent() THEN
       ErrString (b, invalidCharacterContent,
-                 "element", b. stack[b. currLevel]. name)
+                 "element", b. stack[b. currLevel]. elem. name)
     END;
     
     b. delegateBuilder. StartCDATA
@@ -705,6 +874,7 @@ PROCEDURE (b: Builder) EndCDATA*;
 
 PROCEDURE (b: Builder) StartEntity* (entity: DTD.Entity);
   BEGIN
+    CheckEmpty (b);
     IF IsStandalone (b) & entity. externalMarkupDecl THEN
       Err (b, invalidStandaloneElemEntityRef)
     END;
@@ -765,7 +935,8 @@ PROCEDURE Init* (b: Builder; delegateBuilder: B.Builder);
     b. currLevel := -1;
     NEW (b. stack, 16);
     FOR i := 0 TO LEN (b. stack^)-1 DO
-      b. stack[i] := NIL
+      b. stack[i]. elem := NIL;
+      b. stack[i]. regexp := NIL;
     END
   END Init;
 
@@ -846,6 +1017,16 @@ PROCEDURE SetErrorMessages;
         t := "In element `${element}', child `${child}' appears multiple times in the Mixed declaration"
       | unknownUnparsedEntityNotation:
         t := "Unparsed entity `${entity}' refers to undeclared notation `${notation}'"
+      | expectedEndTag:
+        t := "Expected end tag </${element}>"
+      | expectedElement:
+        t := "Expected elements:${elements}"
+      | noSuchElementType:
+        t := "Element type `${name}' is not declared"
+      | invalidContentInEMPTY:
+        t := "Parent element `${element}' is declared EMPTY"
+      | multipleElemDecl:
+        t := "Element `${element}' is declared more than once"
       ELSE
         t := ""
       END;
