@@ -1,4 +1,4 @@
-(* 	$Id: File.Mod,v 1.2 2000/07/13 21:04:29 mva Exp $	 *)
+(* 	$Id: Memory.Mod,v 1.1 2000/07/17 07:43:12 mva Exp $	 *)
 MODULE URI:Scheme:Memory;
 (*  Implementation of the "memory" URI scheme.
     Copyright (C) 2000  Michael van Acken
@@ -27,7 +27,11 @@ IMPORT
 TYPE
   URI* = POINTER TO URIDesc;
   URIDesc = RECORD
-  (**This class implements the @samp{file} URI scheme.  *)
+  (**This class implements the @samp{memory:} URI scheme.  This is not
+     an official URI scheme.  It is used by OOC to access resouces defined by
+     the module @omodule{IO:Memory}.  Similar to the @samp{file:} scheme,
+     this one uses @otype{ServerBased.Authority} for its authority component,
+     and does not support a query part.  *)
     (Hierarchical.GenericDesc)
   END;
 
@@ -69,7 +73,7 @@ PROCEDURE (file: URI) Clone* (): URI;
 
 PROCEDURE (file: URI) GetPath* (VAR filePath: ARRAY OF CHAR);
 (**Returns the file path associated with the URI @oparam{file}.  On a Unix 
-   system, this is the URI's path component.  *)
+   system, this is identical to the URI's path component.  *)
   VAR
     segm: Hierarchical.Segment;
   BEGIN
@@ -103,13 +107,14 @@ PROCEDURE NewPrototype*(): URI;
 
 
 PROCEDURE ToURI* (filePath: ARRAY OF CHAR): URI;
-(**Constructs a file URI for a given file path.  *)
+(**Constructs a @samp{memory:} URI for a given file path.  Characters that
+   are not valid within an URI are escaped.  *)
   VAR
     uri: URI0.URI;
     uriString: ARRAY 4*1024 OF CHAR;
     res: Msg.Msg;
   BEGIN
-    uriString := "file:";
+    uriString := "memory:";
     String.AppendEscaped (filePath, CharClass.unreservedPChar+"/", uriString);
     uri := Parser.NewURI (uriString, NIL, res);
     IF (uri = NIL) THEN

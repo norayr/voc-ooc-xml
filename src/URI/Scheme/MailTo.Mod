@@ -1,4 +1,4 @@
-(* 	$Id: MailTo.Mod,v 1.1.1.1 2000/07/10 15:24:44 mva Exp $	 *)
+(* 	$Id: MailTo.Mod,v 1.1.1.2 2000/07/10 20:31:53 mva Exp $	 *)
 MODULE URI:Scheme:MailTo;
 (*  Implementation of the "mailto" URI scheme.
     Copyright (C) 2000  Michael van Acken
@@ -26,9 +26,8 @@ IMPORT
 TYPE
   URI* = POINTER TO URIDesc;
   URIDesc = RECORD
-  (**This class implements the @samp{mailto} URI scheme.  Note: Syntax checks
-     on the mail address are not implemented yet, nor does
-     @oproc{URI.GetChannel} work.  *)
+  (**This class implements the @samp{mailto:} URI scheme.  Note: Syntax checks
+     on the mail address are not implemented yet.  *)
     (Opaque.GenericDesc)
   END;
 

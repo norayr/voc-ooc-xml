@@ -1,4 +1,4 @@
-(* 	$Id: RegistryBased.Mod,v 1.1.1.1 2000/07/10 15:24:41 mva Exp $	 *)
+(* 	$Id: RegistryBased.Mod,v 1.1.1.2 2000/07/10 20:31:53 mva Exp $	 *)
 MODULE URI:Authority:RegistryBased;
 (*  Implements class for registry-based authority components.
     Copyright (C) 2000  Michael van Acken
@@ -26,7 +26,10 @@ IMPORT
 TYPE
   Authority* = POINTER TO AuthorityDesc;
   AuthorityDesc* = RECORD
-  (**Registry-based authority component.  *)
+  (**Registry-based authority component of an URI.  This is similar to
+     @otype{URI:Authority:Unparsed}, except for that the given authority name
+     must not be empty, and that any escaped characters are replaced by their
+     value.  *)
     (URI.AuthorityDesc)
     regName-: URI.StringPtr;
     (**Holds the authority substring of a URI.  Escaped characters are
@@ -47,7 +50,7 @@ PROCEDURE Init* (auth: Authority; regName: URI.StringPtr);
     auth. regName := regName
   END Init;
 
-PROCEDURE New* (regName: URI.StringPtr; offset: URI.Offset): Authority;
+PROCEDURE New* (regName: URI.StringPtr): Authority;
   VAR
     auth: Authority;
   BEGIN

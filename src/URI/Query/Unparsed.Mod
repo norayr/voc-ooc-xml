@@ -1,4 +1,4 @@
-(* 	$Id: Unparsed.Mod,v 1.1.1.1 2000/07/10 15:24:41 mva Exp $	 *)
+(* 	$Id: Unparsed.Mod,v 1.1.1.2 2000/07/10 20:31:53 mva Exp $	 *)
 MODULE URI:Query:Unparsed;
 (*  Implements class for unparsed query components.
     Copyright (C) 2000  Michael van Acken
@@ -26,12 +26,12 @@ IMPORT
 TYPE
   Query* = POINTER TO QueryDesc;
   QueryDesc = RECORD
-  (**Unparsed query component.  *)
+  (**Unparsed query component of an URI.  *)
     (URI.QueryDesc)
     unparsed-: URI.StringPtr;
     (**Holds the query substring of a URI @emph{without} any modifications.
        In particular, escaped characters are @emph{not} replaced with their
-       character value.  *)
+       character value.  This field is never @code{NIL}.  *)
   END;
 
 

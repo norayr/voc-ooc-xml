@@ -1,4 +1,4 @@
-(* 	$Id: Unparsed.Mod,v 1.1.1.1 2000/07/10 15:24:41 mva Exp $	 *)
+(* 	$Id: Unparsed.Mod,v 1.1.1.2 2000/07/10 20:31:53 mva Exp $	 *)
 MODULE URI:Authority:Unparsed;
 (*  Implements class for unparsed authority components.
     Copyright (C) 2000  Michael van Acken
@@ -26,7 +26,7 @@ IMPORT
 TYPE
   Authority* = POINTER TO AuthorityDesc;
   AuthorityDesc = RECORD
-  (**Unparsed authority component.  *)
+  (**Unparsed authority component of an URI.  *)
     (URI.AuthorityDesc)
     unparsed-: URI.StringPtr
     (**Holds the authority substring of a URI @emph{without} any

@@ -1,4 +1,4 @@
-(* 	$Id: CurrentDoc.Mod,v 1.1.1.1 2000/07/10 15:24:44 mva Exp $	 *)
+(* 	$Id: CurrentDoc.Mod,v 1.1.1.2 2000/07/10 20:31:53 mva Exp $	 *)
 MODULE URI:Scheme:CurrentDoc;
 (*  Implements degenerate case of "current document" URI.
     Copyright (C) 2000  Michael van Acken
@@ -27,7 +27,7 @@ TYPE
   CurrentDoc* = POINTER TO CurrentDocDesc;
   CurrentDocDesc = RECORD
   (**This class implements the special case of the @samp{current document}
-     URI.  *)
+     URI.  It is used whenever an URI consists of just the empty string.  *)
     (URI.URIDesc)
   END;
 

@@ -1,4 +1,4 @@
-(* 	$Id: URI.Mod,v 1.2 2000/07/28 15:11:19 mva Exp $	 *)
+(* 	$Id: URI.Mod,v 1.3 2000/07/31 12:32:02 mva Exp $	 *)
 MODULE URI [OOC_EXTENSIONS];
 (*  Implements RFC2396 "Uniform Resource Identifiers: Generic Syntax"
     Copyright (C) 2000  Michael van Acken
@@ -452,11 +452,12 @@ PROCEDURE (uri: HierarchicalURI) [ABSTRACT] ClearPath*;
   END ClearPath;
 
 PROCEDURE (uri: HierarchicalURI) [ABSTRACT] ParsePath* (str: StringPtr; absolute: BOOLEAN; offset: Offset): Error.Msg;
-(**Parses the path component @oparam{str} of an URI.  On success, the data is
-   stored in the URI @oparam{uri} and the result is @code{NIL}.  In case of 
-   error, an error message is returned and @oparam{uri} is not modified.
-   A character position in an error message refers to an index in @oparam{str},
-   incremented by the value of @oparam{offset}.  *)
+(**Parses the path component @oparam{str} of an URI.  The parameter
+   @oparam{absolute} indicates, whether the path is absolute or relative.  On
+   success, the data is stored in the URI @oparam{uri} and the result is
+   @code{NIL}.  In case of error, an error message is returned and @oparam{uri}
+   is not modified.  A character position in an error message refers to an
+   index in @oparam{str}, incremented by the value of @oparam{offset}.  *)
   END ParsePath;
 
 PROCEDURE (uri: HierarchicalURI) MakeRelative* (baseURI: HierarchicalURI): URI;

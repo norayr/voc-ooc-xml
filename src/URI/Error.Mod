@@ -1,4 +1,4 @@
-(* 	$Id: Error.Mod,v 1.1.1.1 2000/07/10 15:24:40 mva Exp $	 *)
+(* 	$Id: Error.Mod,v 1.1.1.2 2000/07/10 20:31:52 mva Exp $	 *)
 MODULE URI:Error;
 (*  Error handling for URI parser.
     Copyright (C) 2000  Michael van Acken
@@ -31,7 +31,7 @@ TYPE
   LStringPtr* = M.LStringPtr;
 
 TYPE
-  Mapping* = POINTER TO MappingDesc;
+  Mapping = POINTER TO MappingDesc;
   MappingDesc = RECORD
     next: Mapping;
     code: Code;
@@ -67,6 +67,8 @@ PROCEDURE (context: Context) GetTemplate* (msg: Msg; VAR templ: LString);
   END GetTemplate;
 
 PROCEDURE (context: Context) SetString* (code: Code; str: String);
+(**Maps the error code @oparam{code} onto the error text @oparam{str}.  If a
+   mapping for @oparam{code} exists, it is replaced with the new one.  *)
   PROCEDURE Append (VAR mlist: Mapping);
     VAR
       str16: ARRAY 1024 OF M.LChar;
@@ -90,6 +92,8 @@ PROCEDURE (context: Context) SetString* (code: Code; str: String);
   END SetString;
 
 PROCEDURE NewContext* (id: M.String): Context;
+(**Creates a new error context, using the id @oparam{id}.  @oparam{id} should
+   be a module name.  *)
   VAR
     c: Context;
   BEGIN
@@ -101,11 +105,15 @@ PROCEDURE NewContext* (id: M.String): Context;
 
 
 PROCEDURE SetURIString* (msg: Msg; VAR str: Str.String);
+(**Sets the attribute @samp{uri} of @oparam{msg} to @oparam{str}.  *)
   BEGIN
     msg. SetStringAttrib ("uri", M.GetStringPtr (str));
   END SetURIString;
 
 PROCEDURE New* (context: Context; code: Code; pos: Str.Offset): Msg;
+(**Creates a new error message.  The message's context is @oparam{context}, its
+   error code @oparam{code}.  The attribute @samp{uri_pos} is set to
+   @oparam{pos}.  *)
   VAR
     msg: M.Msg;
   BEGIN

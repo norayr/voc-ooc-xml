@@ -1,4 +1,4 @@
-(* 	$Id: Hierarchical.Mod,v 1.1.1.1 2000/07/10 15:24:43 mva Exp $	 *)
+(* 	$Id: Hierarchical.Mod,v 1.1.1.2 2000/07/10 20:31:53 mva Exp $	 *)
 MODULE URI:Scheme:Hierarchical;
 (*  Implementation of the generic hierarchical URI.
     Copyright (C) 2000  Michael van Acken
@@ -28,6 +28,8 @@ IMPORT
 TYPE
   Parameter* = POINTER TO ParameterDesc;
   ParameterDesc = RECORD
+  (**A parameter of a path segment.  A path segment can have a list of
+     several parameters.  *)
     next-: Parameter;
     string-: URI.StringPtr;
     (**Parameter text.  Any escaped characters have been replaced by their
@@ -37,6 +39,7 @@ TYPE
 TYPE
   Segment* = POINTER TO SegmentDesc;
   SegmentDesc = RECORD
+  (**A path segment of a hierarchical URI.  *)
     next-: Segment;
     string-: URI.StringPtr;
     (**Segment text.  Any escaped characters have been replaced by their
@@ -53,7 +56,8 @@ TYPE
   (**This class implements the generic hierarchical URI.  *)
     (URI.HierarchicalURIDesc)
     pathList-: Segment;
-    (**List of path segments of an URI.  *)
+    (**List of path segments of an URI.  A hierarchical URI may have an empty
+       path.  In this case, this field is @code{NIL}.  *)
     absolutePath-: BOOLEAN;
     (**If @code{TRUE}, then @ofield{pathList} is an absolute path beginning
        at the root of the authority's name space.  Otherwise, the path is
@@ -207,6 +211,7 @@ PROCEDURE (segm: Segment) Append* (VAR str: ARRAY OF CHAR);
 
 PROCEDURE Init* (uri: Generic; schemeId: URI.StringPtr;
                  authority: URI.Authority; query: URI.Query);
+(**See @otype{Generic}.  *)
   BEGIN
     URI.InitHierarchicalURI (uri, schemeId, authority, query);
     uri. pathList := NIL;
@@ -215,6 +220,7 @@ PROCEDURE Init* (uri: Generic; schemeId: URI.StringPtr;
 
 PROCEDURE New* (schemeId: URI.StringPtr;
                 authority: URI.Authority; query: URI.Query): Generic;
+(**See @otype{Generic}.  *)
   VAR
     uri: Generic;
   BEGIN
@@ -224,6 +230,12 @@ PROCEDURE New* (schemeId: URI.StringPtr;
   END New;
 
 PROCEDURE (uri: Generic) AppendSegment* (segm: Segment);
+(**Adds the segment @oparam{segm} to the end of the list of path segments of
+   @oparam{uri}.
+
+   @precond
+   @oparam{segm} has not been added to a URI previously.
+   @end precond  *)
   PROCEDURE Append (VAR list: Segment);
     BEGIN
       IF (list = NIL) THEN
@@ -325,11 +337,6 @@ PROCEDURE (uri: Generic) ParsePath* (str: URI.StringPtr; absolute: BOOLEAN; offs
   END ParsePath;
 
 PROCEDURE (uri: Generic) ResolveRelative* (baseURI: URI.HierarchicalURI);
-(**Converts a relative reference in URI @oparam{uri} to an absolute one.  
-   
-   @precond
-   The dynamic type of @oparam{baseURI} is an extension of @otype{Generic}.
-   @end precond *)
   VAR
     copy: URI.URI;
     ptr, next: Segment;
@@ -353,7 +360,9 @@ PROCEDURE (uri: Generic) ResolveRelative* (baseURI: URI.HierarchicalURI);
       IF (segm # NIL) THEN
         IF (segm # NIL) &
            ((segm. string^ # "..") OR segm. hasEscapes) &
-           (segm. next # NIL) & (segm. next. string^ = "..") & ~segm. next. hasEscapes THEN
+           (segm. next # NIL) &
+           (segm. next. string^ = "..") &
+           ~segm. next. hasEscapes THEN
           IF (segm. next. next = NIL) THEN
             segm. string := Str.Copy ("");
             segm. next := NIL

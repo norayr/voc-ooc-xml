@@ -1,4 +1,4 @@
-(* 	$Id: File.Mod,v 1.2 2000/07/13 21:04:29 mva Exp $	 *)
+(* 	$Id: File.Mod,v 1.3 2000/07/28 15:15:21 mva Exp $	 *)
 MODULE URI:Scheme:File;
 (*  Implementation of the "file" URI scheme.
     Copyright (C) 2000  Michael van Acken
@@ -28,7 +28,9 @@ IMPORT
 TYPE
   URI* = POINTER TO URIDesc;
   URIDesc = RECORD
-  (**This class implements the @samp{file} URI scheme.  *)
+  (**This class implements the @samp{file:} URI scheme.  It uses
+     @otype{ServerBased.Authority} for its authority component, and does
+     not support a query part.  *)
     (Hierarchical.GenericDesc)
   END;
 
@@ -70,7 +72,7 @@ PROCEDURE (file: URI) Clone* (): URI;
 
 PROCEDURE (file: URI) GetPath* (VAR filePath: ARRAY OF CHAR);
 (**Returns the file path associated with the URI @oparam{file}.  On a Unix 
-   system, this is the URI's path component.  *)
+   system, this is identical to the URI's path component.  *)
   VAR
     segm: Hierarchical.Segment;
   BEGIN
@@ -130,7 +132,8 @@ PROCEDURE GetCwd*(): URI;
   END GetCwd;
 
 PROCEDURE ToURI* (filePath: ARRAY OF CHAR): URI;
-(**Constructs a file URI for a given file path.  *)
+(**Constructs a @samp{file:} URI for a given file path.  Characters that
+   are not valid within an URI are escaped.  *)
   VAR
     uri: URI0.URI;
     uriString: ARRAY 4*1024 OF CHAR;

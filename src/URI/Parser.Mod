@@ -1,4 +1,4 @@
-(* 	$Id: Parser.Mod,v 1.1.1.1 2000/07/10 15:24:41 mva Exp $	 *)
+(* 	$Id: Parser.Mod,v 1.1.1.2 2000/07/10 20:31:52 mva Exp $	 *)
 MODULE URI:Parser;
 (*  Implements the URI parser.
     Copyright (C) 2000  Michael van Acken
@@ -224,7 +224,10 @@ PROCEDURE NewReference* (str: URI.String; baseURI: URI.HierarchicalURI;
                          VAR res: Error.Msg): URI.Reference;
 (**Like @oproc{NewURI}, but parses a URI reference in @oparam{str}.  The
    instance @oparam{fragmentPrototype} is used to parse the fragment identifier
-   of the URI.  *)
+   of the URI.  The format of the fragment identifier is not related to the
+   URI.  The application must know what to expect, and provide a matching
+   @otype{URI.Fragment} prototype, to which the parser delegates analysis of
+   the fragment identifier.  *)
   VAR
     i: URI.Offset;
     uri: URI.URI;

@@ -1,4 +1,4 @@
-(* 	$Id: ServerBased.Mod,v 1.1.1.1 2000/07/10 15:24:41 mva Exp $	 *)
+(* 	$Id: ServerBased.Mod,v 1.1.1.2 2000/07/10 20:31:53 mva Exp $	 *)
 MODULE URI:Authority:ServerBased;
 (*  Implements class for registry-based authority components.
     Copyright (C) 2000  Michael van Acken
@@ -30,7 +30,7 @@ TYPE
   Port* = LONGINT;
   Authority* = POINTER TO AuthorityDesc;
   AuthorityDesc* = RECORD
-  (**Server-based authority component.  *)
+  (**Server-based authority component of an URI.  *)
     (URI.AuthorityDesc)
     userinfo-: String.StringPtr;
     (**Userinfo from authority component.  @code{NIL} if no userinfo is
@@ -70,6 +70,14 @@ PROCEDURE Init* (auth: Authority; userinfo, host: String.StringPtr; port, defaul
   END Init;
 
 PROCEDURE New* (userinfo, host: String.StringPtr; port, defaultPort: Port): Authority;
+(**Creates a new server-based authority component.  The arguments
+   @oparam{userinfo}, @oparam{host}, @oparam{port}, and @oparam{defaultPort}
+   are used to initialize the corresponding fields of a new instance of
+   @otype{Authority}.
+
+   @precond
+   @oparam{host} must not be @code{NIL}.
+   @end precond  *)
   VAR
     auth: Authority;
   BEGIN

@@ -1,4 +1,4 @@
-(* 	$Id: Unparsed.Mod,v 1.1.1.2 2000/07/10 20:31:53 mva Exp $	 *)
+(* 	$Id: Unparsed.Mod,v 1.2 2000/07/28 15:12:57 mva Exp $	 *)
 MODULE URI:Fragment:Unparsed;
 (*  Implements class for unparsed fragment identifiers.
     Copyright (C) 2000  Michael van Acken
@@ -73,7 +73,6 @@ PROCEDURE New* (unparsed: String.StringPtr): Fragment;
   END New;
 
 PROCEDURE (frag: Fragment) Clone* (): Fragment;
-(**Creates a deep copy of the fragment identifier @oparam{frag}.  *)
   VAR
     copy: Fragment;
   BEGIN
@@ -83,12 +82,6 @@ PROCEDURE (frag: Fragment) Clone* (): Fragment;
   END Clone;
 
 PROCEDURE (frag: Fragment) Copy* (dest: URI.Fragment);
-(**Copies the contents of of the fragment identifier @oparam{frag} to
-   @oparam{dest}.  This is a deep copy.
-   
-   @precond
-   @oparam{dest} is not @code{NIL} and is an extension of @otype{Fragment}.
-   @end precond *)
   BEGIN
     (*frag. Copy^ (dest); procedure is abstract in super class *)
     WITH dest: Fragment DO
@@ -97,7 +90,6 @@ PROCEDURE (frag: Fragment) Copy* (dest: URI.Fragment);
   END Copy;
 
 PROCEDURE (frag: Fragment) ParseFragment* (str: URI.StringPtr; offset: URI.Offset): Error.Msg;
-(**Parses the fragment component @oparam{str} of an URI.  *)
   VAR
     i: URI.Offset;
   BEGIN
@@ -112,8 +104,6 @@ PROCEDURE (frag: Fragment) ParseFragment* (str: URI.StringPtr; offset: URI.Offse
   END ParseFragment;
 
 PROCEDURE (frag: Fragment) WriteXML* (w: TextRider.Writer);
-(**Writes an XML fragment describing the fragment identifier to the writer
-   @oparam{w}.  *)
   BEGIN
     w. WriteString (CC.eol+"<fragment-unparsed>");
     w. WriteString (frag. unparsed^);
@@ -121,8 +111,6 @@ PROCEDURE (frag: Fragment) WriteXML* (w: TextRider.Writer);
   END WriteXML;
 
 PROCEDURE (frag: Fragment) Append* (VAR str: ARRAY OF CHAR);
-(**Appends the textual representation of the fragment identifier
-   @oparam{frag} to the string @oparam{str}.  *)
   BEGIN
     Strings.Append ("#", str);
     Strings.Append (frag. unparsed^, str)
