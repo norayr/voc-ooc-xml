@@ -1,4 +1,4 @@
-(*	$Id: Memory.Mod,v 1.1 2000/01/03 16:54:54 ooc-devel Exp $	*)
+(*	$Id: Memory.Mod,v 1.1 2000/07/17 07:43:00 mva Exp $	*)
 MODULE IO:Memory;
 (*  Implementation of a simple file system in memory.
     Copyright (C) 1999, 2000  Michael van Acken
@@ -35,17 +35,18 @@ CONST
   readAfterEnd* = Ch.readAfterEnd;
   
   accessDenied* = Ch.freeErrorCode;
-  (* access to the file was denied; here this means that a call to New, Old, 
-     or Tmp didn't specify any access method *)
+  (**Access to the file was denied.  For this class, this means that a call to
+     @oproc{New}, @oproc{Old}, or @oproc{Tmp} did not specify any access
+     method.  *)
   noSuchFile* = Ch.freeErrorCode+1;
-  (* the file named in a call to `Old' does not exist *)
+  (**The file named in a call to @oproc{Old} does not exist.  *)
 
 CONST
   (* possible elements for `flags' parameter of New/Old/Tmp: *)
   read* = 0;
-  (* open file for read access *)
+  (**Open file for read access.  *)
   write* = 1;
-  (* open file for write access *)
+  (**Open file for write access.  *)
   (* note: at least one of the above flags has to be set; otherwise you'll 
      get an `access denied' error *)
 
@@ -66,23 +67,30 @@ TYPE
     next: File;
     name: Name;
     length-: LONGINT;
+    (**Length of the file in bytes.  *)
     dataLength: LONGINT;                 (* equals LEN(data^) *)
     openCount: LONGINT;
     data-: Data;
+    (**Data of the file.  The bytes in the interval @samp{[0..@ofield{length}[}
+       make up its content.  *)
   END;
   
   Channel* = POINTER TO ChannelDesc;
   ChannelDesc* = RECORD
+  (**A channel for a given instance of @otype{File}.  *)
     (Ch.ChannelDesc)
     file-: File;
+    (**Any read or write operations are performed on this object.  *)
   END;
   Reader* = POINTER TO ReaderDesc;
   ReaderDesc* = RECORD
+  (**A reader on an instance of @otype{File}.  *)
     (Ch.ReaderDesc)
     pos: LONGINT;
   END;
   Writer* = POINTER TO WriterDesc;
   WriterDesc* = RECORD
+  (**A writer on an instance of @otype{File}.  *)
     (Ch.WriterDesc)
     pos: LONGINT;
   END;
@@ -439,13 +447,19 @@ PROCEDURE (ch: Channel) Length*(): LONGINT;
     END
   END Length;
   
-PROCEDURE (ch: Channel) Fingerprint* (VAR key: ARRAY OF SYSTEM.BYTE);
-(* Generates fingerprint value over the data of `ch', over the byte range
-   [0..ch.file.length-1].  The argument passed to `key' must be a LONGINT
-   variable.
+PROCEDURE (ch: Channel) Fingerprint* (VAR key: ARRAY OF SYSTEM.BYTE;
+                                      start, end: LONGINT);
+(**Generates fingerprint value over the data of @oparam{ch}, over the byte
+   range @samp{[start..end[}.  The argument passed to @oparam{key} must be a
+   @code{LONGINT} variable.  To fingerprint the whole file, use a
+   @oparam{start} value of @samp{0} and an @oparam{end} of
+   @samp{ch.file.length}.
    
-   see Structured Programming(1993) 14: 136-147 
-   pre: LEN(key) = fpSize *)
+   See @cite{Structured Programming(1993) 14: 136-147}.
+   
+   @precond
+   @samp{LEN(key) = fpSize}
+   @end precond *)
   CONST
     fpSize = SIZE(LONGINT);
   VAR
@@ -458,7 +472,7 @@ PROCEDURE (ch: Channel) Fingerprint* (VAR key: ARRAY OF SYSTEM.BYTE);
     END;
     i := 0; j := 0;
     (* calculate fp *)
-    FOR pos := 0 TO ch. file. length-1 DO
+    FOR pos := start TO end-1 DO
       byte := SYSTEM.VAL (CHAR, ch. file. data[pos]);
       old := ORD (SYSTEM.VAL (CHAR, key[i]));
       new := ORD (SYSTEM.VAL (CHAR, SYSTEM.ROT (byte, j)));
@@ -483,6 +497,8 @@ PROCEDURE (ch: Channel) GetModTime* (VAR mtime: Time.TimeStamp);
   END GetModTime;
 
 PROCEDURE (ch: Channel) Register*;
+(**Registers the file under @oparam{ch} under the name passed to @oproc{Tmp}.
+   Afterwards, the file can be accessed with @oproc{Old}.  *)
   BEGIN
     InsertFile (ch. file);
     ch. ClearError
@@ -500,6 +516,7 @@ PROCEDURE (ch: Channel) Close*;
   END Close;
 
 PROCEDURE (ch: Channel) CopyToWriter* (writer: Ch.Writer);
+(**Copies the file under @oparam{ch} to the given writer @oparam{writer}.  *)
   BEGIN
     IF ch. open THEN
       writer. WriteBytes (ch. file. data^, 0, ch. file. length);
@@ -534,6 +551,12 @@ PROCEDURE Attach (b: File; flags: SET): Channel;
   END Attach;
 
 PROCEDURE New* (name: ARRAY OF CHAR; flags: SET; VAR res: Msg.Msg): Channel;
+(**Creates a new file under the given @oparam{name}.  On success a channel on
+   the new is returned and @oparam{res} is set to @oconst{done}.  Otherwise,
+   result is @code{NIL} and @oparam{res} and will indicate the problem.
+   
+   Note that in terms of the Oberon System this procedure combines the 
+   procedures New and Register.  *)
   VAR
     b: File;
   BEGIN
@@ -554,6 +577,10 @@ PROCEDURE New* (name: ARRAY OF CHAR; flags: SET; VAR res: Msg.Msg): Channel;
   END New;
   
 PROCEDURE Old* (name: ARRAY OF CHAR; flags: SET; VAR res: Msg.Msg): Channel;
+(**Opens a channel on an existing file.  On success the new channel is returned
+   and @oparam{res} is set to @oconst{done}.  Otherwise, result is @code{NIL}
+   and @oparam{res} will indicate the problem.  *)
+  
   VAR
     b: File;
   BEGIN
@@ -573,6 +600,9 @@ PROCEDURE Old* (name: ARRAY OF CHAR; flags: SET; VAR res: Msg.Msg): Channel;
   END Old;
   
 PROCEDURE Tmp* (name: ARRAY OF CHAR; flags: SET; VAR res: Msg.Msg): Channel;
+(**Creates a temporary file that can be registered later on.  On success the 
+   channel on the file is returned and @oparam{res} is set to @oconst{done}.
+   Otherwise result is @code{NIL} and @oparam{res} will indicate the problem.*)
   VAR
     b: File;
   BEGIN

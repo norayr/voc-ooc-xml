@@ -1,4 +1,4 @@
-(* 	$Id: Unparsed.Mod,v 1.1.1.1 2000/07/10 15:24:44 mva Exp $	 *)
+(* 	$Id: Unparsed.Mod,v 1.1.1.2 2000/07/10 20:31:53 mva Exp $	 *)
 MODULE URI:Fragment:Unparsed;
 (*  Implements class for unparsed fragment identifiers.
     Copyright (C) 2000  Michael van Acken
@@ -26,12 +26,17 @@ IMPORT
 TYPE
   Fragment* = POINTER TO FragmentDesc;
   FragmentDesc = RECORD
-  (**Unparsed fragment identifier.  *)
+  (**Unparsed fragment identifier of an URI reference.  A fragment identifier
+     is the component in an URI reference following the crosshatch character
+     @samp{#}.  The format of the fragment identifier is interpreted by the
+     user agent after the URI document has been retrieved.  That it, it depends
+     on the document, and @emph{not} on the URI scheme being used.  *)
     (URI.FragmentDesc)
     unparsed-: String.StringPtr;
     (**Holds the fragment identifier of a URI @emph{without} any modifications.
        In particular, escaped characters are @emph{not} replaced with their
-       character value.  *)
+       character value.  Interpretation of special characters and escaped
+       characters is up to the user agent.  *)
   END;
 
 
@@ -43,12 +48,22 @@ VAR
 
 
 PROCEDURE Init* (frag: Fragment; unparsed: String.StringPtr);
+(**Initializes unparsed fragment identifier.
+
+   @precond
+   @oparam{unparsed} is not @code{NIL}.
+   @end precond *)
   BEGIN
     ASSERT (unparsed # NIL);
     frag. unparsed := unparsed
   END Init;
 
 PROCEDURE New* (unparsed: String.StringPtr): Fragment;
+(**Creates new unparsed fragment identifier.
+
+   @precond
+   @oparam{unparsed} is not @code{NIL}.
+   @end precond *)
   VAR
     frag: Fragment;
   BEGIN
@@ -58,6 +73,7 @@ PROCEDURE New* (unparsed: String.StringPtr): Fragment;
   END New;
 
 PROCEDURE (frag: Fragment) Clone* (): Fragment;
+(**Creates a deep copy of the fragment identifier @oparam{frag}.  *)
   VAR
     copy: Fragment;
   BEGIN
@@ -67,6 +83,12 @@ PROCEDURE (frag: Fragment) Clone* (): Fragment;
   END Clone;
 
 PROCEDURE (frag: Fragment) Copy* (dest: URI.Fragment);
+(**Copies the contents of of the fragment identifier @oparam{frag} to
+   @oparam{dest}.  This is a deep copy.
+   
+   @precond
+   @oparam{dest} is not @code{NIL} and is an extension of @otype{Fragment}.
+   @end precond *)
   BEGIN
     (*frag. Copy^ (dest); procedure is abstract in super class *)
     WITH dest: Fragment DO
@@ -75,6 +97,7 @@ PROCEDURE (frag: Fragment) Copy* (dest: URI.Fragment);
   END Copy;
 
 PROCEDURE (frag: Fragment) ParseFragment* (str: URI.StringPtr; offset: URI.Offset): Error.Msg;
+(**Parses the fragment component @oparam{str} of an URI.  *)
   VAR
     i: URI.Offset;
   BEGIN
@@ -89,6 +112,8 @@ PROCEDURE (frag: Fragment) ParseFragment* (str: URI.StringPtr; offset: URI.Offse
   END ParseFragment;
 
 PROCEDURE (frag: Fragment) WriteXML* (w: TextRider.Writer);
+(**Writes an XML fragment describing the fragment identifier to the writer
+   @oparam{w}.  *)
   BEGIN
     w. WriteString (CC.eol+"<fragment-unparsed>");
     w. WriteString (frag. unparsed^);
@@ -96,6 +121,8 @@ PROCEDURE (frag: Fragment) WriteXML* (w: TextRider.Writer);
   END WriteXML;
 
 PROCEDURE (frag: Fragment) Append* (VAR str: ARRAY OF CHAR);
+(**Appends the textual representation of the fragment identifier
+   @oparam{frag} to the string @oparam{str}.  *)
   BEGIN
     Strings.Append ("#", str);
     Strings.Append (frag. unparsed^, str)
