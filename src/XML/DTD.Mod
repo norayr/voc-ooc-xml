@@ -1,4 +1,4 @@
-(* 	$Id: DTD.Mod,v 1.14 2001/03/19 23:54:09 mva Exp $	 *)
+(* 	$Id: DTD.Mod,v 1.15 2001/03/20 22:16:32 mva Exp $	 *)
 MODULE XML:DTD [OOC_EXTENSIONS];
 (*  Implements the internal representation of a document DTD.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -1057,27 +1057,32 @@ PROCEDURE (b: Builder) NewNameCP* (cpMode: CPModeType; name: String): NameCP;
   END NewNameCP;
 
 
-PROCEDURE InitElementDecl (elemDecl: ElementDecl; name: String; contentModel: CP; attrNamespace: Namespace; externalMarkupDecl: BOOLEAN);
+PROCEDURE InitElementDecl* (elemDecl: ElementDecl; name: String; contentModel: CP; attrNamespace: Namespace; externalMarkupDecl: BOOLEAN);
   BEGIN
     InitDeclaration (elemDecl, name);
     elemDecl. contentModel := contentModel;
-    WITH contentModel: NameCP DO
-      IF (contentModel. name^ = "EMPTY") THEN
-        elemDecl. contentType := contentEMPTY
-      ELSIF (contentModel. name^ = "ANY") THEN
-        elemDecl. contentType := contentANY
-      ELSE
-        elemDecl. contentType := contentANY  (* only possible after wf error *)
-      END
-    | contentModel: ChoiceCP DO
-      IF (contentModel. list IS NameCP) &
-         (contentModel. list(NameCP). name^ = "#PCDATA") THEN
-        elemDecl. contentType := contentMixed
+    elemDecl. contentType := contentANY;
+    
+    IF (elemDecl. contentModel # NIL) THEN
+      WITH contentModel: NameCP DO
+        IF (contentModel. name^ = "EMPTY") THEN
+          elemDecl. contentType := contentEMPTY
+        ELSIF (contentModel. name^ = "ANY") THEN
+          elemDecl. contentType := contentANY
+        ELSE
+          elemDecl. contentType := contentANY
+          (* only possible after well-formnedness error *)
+        END
+      | contentModel: ChoiceCP DO
+        IF (contentModel. list IS NameCP) &
+           (contentModel. list(NameCP). name^ = "#PCDATA") THEN
+          elemDecl. contentType := contentMixed
+        ELSE
+          elemDecl. contentType := contentChildren
+        END
       ELSE
         elemDecl. contentType := contentChildren
       END
-    ELSE
-      elemDecl. contentType := contentChildren
     END;
     elemDecl. externalMarkupDecl := externalMarkupDecl;
     elemDecl. multipleDecl := FALSE;
@@ -1160,6 +1165,11 @@ PROCEDURE GetString* (VAR string: ARRAY OF Char; start, end: LONGINT): String;
     s[end-start] := 0X;
     RETURN s
   END GetString;
+
+PROCEDURE GetStringValue* (string: ARRAY OF Char): String;
+  BEGIN
+    RETURN GetString (string, 0, LongStrings.Length (string))
+  END GetStringValue;
 
 PROCEDURE GetStringURI* (VAR string: ARRAY OF CHAR; start, end: LONGINT): StringURI;
   VAR
