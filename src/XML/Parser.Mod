@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.10 2000/07/28 15:17:39 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.11 2000/07/31 18:37:07 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -46,6 +46,8 @@ TYPE
   Parser* = POINTER TO ParserDesc;
   ParserDesc = RECORD
     errList-: Error.List;
+    (**Holds all error messages related to the currently parsed XML document.
+       After an error occured, @samp{errList.msgCount} is no longer zero.  *)
     
     l: Locator.Locator;
     (* This object keeps track of file position (character index, line and
@@ -73,14 +75,15 @@ TYPE
        is never @code{NIL} *)
        
     followExternalRef*: BOOLEAN;
-    (* If TRUE, then the parser should try to follow external references.
-       It is an error if the external entity cannot be read.  The default
-       value is @code{TRUE}.  *)
+    (**If @code{TRUE}, then the parser should try to follow external
+       references.  It is an error if the external entity cannot be read.  The
+       default value is @code{TRUE}.  *)
     enforceQNames*: BOOLEAN;
-    (* If TRUE, then the parser checks that element and attribute names also
-       match the production `QName', and that entity names, PI targets, and
-       notation names contain no colon.  This enables parts of the checks 
-       required from namespace aware parser.  The default is @code{FALSE}.  *)
+    (**If @code{TRUE}, then the parser checks that element and attribute names
+       also match the production @samp{QName}, and that entity names, PI
+       targets, and notation names contain no colon.  This enables parts of the
+       checks required from namespace aware parser.  The default is
+       @code{FALSE}.  *)
     processDeclarations: BOOLEAN;
     (* if FALSE, then entity declarations and attribute declarations must no
        be processed; this field starts out TRUE, and is set to FALSE after
@@ -496,7 +499,11 @@ PROCEDURE (el: ErrorListener) Error* (context: Error.Context; code: Error.Code;
     RETURN err
   END Error;
 
+
 PROCEDURE (p: Parser) ParseDocument*;
+(**Parses the document, issuing callbacks to @otype{Builder.Builder} as
+   it goes along.  After completion, any errors are reported in
+   @ofield{p.errList}.  *)
   VAR
     dtd: DTD.Builder;
     cpos: Buffer.CharPos;
