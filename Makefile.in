@@ -106,10 +106,10 @@ installlib: all mkdir config.ooc
 
 ### `doc'
 ###      Create documentation from module sources.
-doc:	mkdir
-	${OOCN} --def-txt -Cv -o doc/txt libxml
-	${OOCN} --def-html -Cv -o doc/html libxml
-	${OOCN} --xref -Cv -o doc/xref libxml
+doc:	mkdir oo2crc
+	${OOCN} --config oo2crc --def-txt -Cv -o doc/txt libxml
+	${OOCN} --config oo2crc --def-html -Cv -o doc/html libxml
+	${OOCN} --config oo2crc --xref -Cv -o doc/xref libxml
 
 # ======================== Auxiliary Targets =========================
 
