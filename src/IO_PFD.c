@@ -1,4 +1,4 @@
-/*	$Id: IO_PFD.c,v 1.2 2000/08/28 07:25:10 mva Exp $	*/
+/*	$Id: IO_PFD.c,v 1.3 2000/09/12 09:19:04 mva Exp $	*/
 /*  Generalized access to POSIX-style file descriptors.
     Copyright (C) 1997-2000  Michael van Acken
 
@@ -323,7 +323,7 @@ static Msg__Msg get_error(Msg__Code code, int use_errno) {
 #if HAVE_STRERROR
     char *errstr = strerror(errno);
     DYN_TBCALL(Msg,MsgDesc,SetStringAttrib,msg,
-	       (msg, (const Msg__String)"errstr", 7, (CHAR*)errstr));
+	       (msg, (const Msg__String)"errstr", 7, (OOC_CHAR*)errstr));
 #endif
     DYN_TBCALL(Msg,MsgDesc,SetIntAttrib,msg,
 	       (msg, (const Msg__String)"errno", 6, (LONGINT)errno));
@@ -453,7 +453,7 @@ void IO_PFD__ReaderDesc_SetPos(IO_PFD__Reader r, LONGINT newPos) {
 }
 
 
-void IO_PFD__ReaderDesc_ReadBytes(IO_PFD__Reader r, BYTE* x, int x_0d, LONGINT start, LONGINT n) {
+void IO_PFD__ReaderDesc_ReadBytes(IO_PFD__Reader r, OOC_BYTE* x, int x_0d, LONGINT start, LONGINT n) {
   IO_PFD__Channel ch = (IO_PFD__Channel)r->base;
 
   if (r->res == Channel__done) {
@@ -500,7 +500,7 @@ void IO_PFD__ReaderDesc_ReadBytes(IO_PFD__Reader r, BYTE* x, int x_0d, LONGINT s
   }
 }
 
-void IO_PFD__ReaderDesc_ReadByte(IO_PFD__Reader r, BYTE *x) {
+void IO_PFD__ReaderDesc_ReadByte(IO_PFD__Reader r, OOC_BYTE *x) {
   IO_PFD__ReaderDesc_ReadBytes(r, x, 1, 0, 1);
 }
 
@@ -526,7 +526,7 @@ void IO_PFD__WriterDesc_SetPos(IO_PFD__Writer w, LONGINT newPos) {
   }
 }
 
-void IO_PFD__WriterDesc_WriteBytes(IO_PFD__Writer w, BYTE* x, int x_0d, LONGINT start, LONGINT n) {
+void IO_PFD__WriterDesc_WriteBytes(IO_PFD__Writer w, OOC_BYTE* x, int x_0d, LONGINT start, LONGINT n) {
   IO_PFD__Channel ch = (IO_PFD__Channel)w->base;
 
   if (w->res == Channel__done) {
@@ -559,7 +559,7 @@ void IO_PFD__WriterDesc_WriteBytes(IO_PFD__Writer w, BYTE* x, int x_0d, LONGINT 
   }
 }
 
-void IO_PFD__WriterDesc_WriteByte(IO_PFD__Writer w, BYTE x) {
+void IO_PFD__WriterDesc_WriteByte(IO_PFD__Writer w, OOC_BYTE x) {
   IO_PFD__WriterDesc_WriteBytes(w, &x, 1, 0, 1);
 }
 

@@ -1,4 +1,4 @@
-/* 	$Id: OS_ProcessManagment.c,v 1.1.1.2 2000/07/10 20:31:49 mva Exp $	 */
+/* 	$Id: OS_ProcessManagment.c,v 1.2 2000/09/12 09:19:04 mva Exp $	 */
 #include "__oo2c.h"
 
 #include <unistd.h>
@@ -133,7 +133,7 @@ static Msg__Msg get_error() {
   msg = Msg__New((Msg__Context)OS_ProcessManagment__errorContext, code);
 #if HAVE_STRERROR
   DYN_TBCALL(Msg,MsgDesc,SetStringAttrib,msg,
-	     (msg, (const Msg__String)"errstr", 7, (CHAR*)strerror(errno)));
+	     (msg, (const Msg__String)"errstr", 7, (OOC_CHAR*)strerror(errno)));
 #endif
   DYN_TBCALL(Msg,MsgDesc,SetIntAttrib,msg,
 	     (msg, (const Msg__String)"errno", 6, (LONGINT)errno));
@@ -141,7 +141,7 @@ static Msg__Msg get_error() {
 }
 */
 
-int OS_ProcessManagment__system(const CHAR* command, int command_0d) {
+int OS_ProcessManagment__system(const OOC_CHAR* command, int command_0d) {
   return system((const char*)command);
 }
 

@@ -132,10 +132,10 @@ static Msg__Msg get_error(const OS_Files__Path path) {
   
   msg = Msg__New((Msg__Context)OS_Files__errorContext, code);
   DYN_TBCALL(Msg,MsgDesc,SetStringAttrib,msg,
-	     (msg, (const Msg__String)"path", 5, (CHAR*)path));
+	     (msg, (const Msg__String)"path", 5, (OOC_CHAR*)path));
 #if HAVE_STRERROR
   DYN_TBCALL(Msg,MsgDesc,SetStringAttrib,msg,
-	     (msg, (const Msg__String)"errstr", 7, (CHAR*)strerror(errno)));
+	     (msg, (const Msg__String)"errstr", 7, (OOC_CHAR*)strerror(errno)));
 #endif
   DYN_TBCALL(Msg,MsgDesc,SetIntAttrib,msg,
 	     (msg, (const Msg__String)"errno", 6, (LONGINT)errno));
@@ -167,7 +167,7 @@ void OS_Files__makedirs(const OS_Files__Path path, LONGINT path_0d,
   
   rc = stat((const char*)path, &sbuf);
   if (rc) {			/* stat failure: file does not exist */
-    CHAR ppath[BUFFER_SIZE];
+    OOC_CHAR ppath[BUFFER_SIZE];
     int i;
     int last = 0;
     
