@@ -1,4 +1,4 @@
-/*	$Id: IO_Socket.c,v 1.2 2000/08/29 14:36:04 mva Exp $	*/
+/*	$Id: IO_Socket.c,v 1.3 2000/09/12 09:19:04 mva Exp $	*/
 /*  Interface to socket facilities.
     Copyright (C) 2000  Michael van Acken
 
@@ -27,6 +27,10 @@
 #include <string.h>
 #include <fcntl.h>
 
+#ifdef __CYGWIN__
+typedef unsigned short uint16_t;
+#endif
+
 #include "__oo2c.h"
 #include "__mini_gc.h"
 #include "__StdTypes.h"
@@ -35,7 +39,7 @@
 #include "Channel.h"
 #include "Msg.h"
 
-/* --- begin #include "IO:Socket.d" */
+/* --- begin #include "IO_Socket.d" */
 #include "IO_Socket.h"
 #include "C.h"
 #include "CharClass.h"
@@ -306,7 +310,7 @@ struct _TD IO_Socket__ErrorContextDesc_td = {
 
 /* local strings */
 
-/* --- end #include "IO:Socket.d" */
+/* --- end #include "IO_Socket.d" */
 
 
 int IO_Socket__AF_INET = AF_INET;
@@ -315,13 +319,28 @@ int IO_Socket__AF_UNSPEC = AF_UNSPEC;
 int IO_Socket__SOCK_STREAM = SOCK_STREAM;
 int IO_Socket__SOCK_DGRAM = SOCK_DGRAM;
 unsigned int IO_Socket__MSG_DONTROUTE = MSG_DONTROUTE;
-unsigned int IO_Socket__MSG_DONTWAIT = MSG_DONTWAIT;
 unsigned int IO_Socket__MSG_OOB = MSG_OOB;
 unsigned int IO_Socket__MSG_PEEK = MSG_PEEK;
+#ifdef MSG_DONTWAIT
+unsigned int IO_Socket__MSG_DONTWAIT = MSG_DONTWAIT;
+#else
+unsigned int IO_Socket__MSG_DONTWAIT = 0;
+#endif
+#ifdef MSG_WAITALL
 unsigned int IO_Socket__MSG_WAITALL = MSG_WAITALL;
+#else
+unsigned int IO_Socket__MSG_WAITALL = 0;
+#endif
+
+#ifdef SHUT_RD
 int IO_Socket__SHUT_RD = SHUT_RD;
 int IO_Socket__SHUT_WR = SHUT_WR;
 int IO_Socket__SHUT_RDWR = SHUT_RDWR;
+#else
+int IO_Socket__SHUT_RD = 0;
+int IO_Socket__SHUT_WR = 1;
+int IO_Socket__SHUT_RDWR = 2;
+#endif
 
 static IO_Socket__ErrorContext IO_Socket__errorContext;
 
