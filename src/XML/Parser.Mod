@@ -1,4 +1,4 @@
-(*      $Id: Builder.Mod,v 1.3 2000/07/11 22:26:09 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.4 2000/07/12 22:28:05 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -21,10 +21,12 @@ MODULE XML:Parser;
 
 IMPORT
   Log, Out, Ascii, Channel, Msg, LongStrings, URI, URI:Scheme:File,
-  AbstrLocator := XML:Locator,
   Codec := XML:UnicodeCodec, XML:UnicodeCodec:UTF8, XML:UnicodeCodec:UTF16,
-  Buffer := XML:UnicodeBuffer, XML:Error, DTD := XML:BuilderDTD, XML:Builder,
-  XML:EntityResolver;
+  AbstrLocator := XML:Locator, XML:EntityResolver,
+  Buffer := XML:UnicodeBuffer, XML:Error, DTD := XML:BuilderDTD, XML:Builder;
+  (* warning: the modules UTF8 and UTF16 are not used in this module, but
+     they must be imported to guarantee that these codecs are available to
+     the XML parser *)
 
 TYPE
   PEInfo = RECORD
@@ -469,7 +471,7 @@ PROCEDURE IsEncNameChar (ch: Buffer.Char; first: BOOLEAN): BOOLEAN;
 
 (* ------------------------------------------------------------------------ *)
 
-PROCEDURE document (p: Parser);
+PROCEDURE (p: Parser) ParseDocument*;
   VAR
     dtd: DTD.Builder;
     cpos: Buffer.CharPos;
@@ -2883,40 +2885,24 @@ PROCEDURE document (p: Parser);
     
     StorePosition (p. l^);
     p. initialBuilder. EndDocument       (* callback *)
-  END document;
-
-
-PROCEDURE (p: Parser) ParseDocument*;
-  BEGIN
-    document (p)
   END ParseDocument;
 
-PROCEDURE New* (ch: Channel.Channel; codecFactory: Codec.Factory;
-                baseURI: URI.URI; entityResolver: EntityResolver.Resolver;
-                builder: Builder.Builder): Parser;
-(**@oparam{baseURI} is the absolute URI of the document entity, as computed
-   by the method of RFC 2396, if that is known.  If this value is @code{NIL},
-   or refers to an opaque URI, then relative URIs in the document cannot be
-   resolved.  *)
-  VAR
-    p: Parser;
-    cwdURI: File.URI;
+
+PROCEDURE Init (p: Parser; baseURI: URI.URI;
+                entityResolver: EntityResolver.Resolver;
+                builder: Builder.Builder);
   BEGIN
-    NEW (p);
-    cwdURI := File.GetCwd();
-    IF (cwdURI # NIL) THEN
-      p. errList := Error.NewList (baseURI. MakeRelative (cwdURI))
-    ELSE
-      p. errList := Error.NewList (baseURI)
-    END;
     NEW (p. l);
-    p. in := Buffer.NewInput (ch, codecFactory, p. errList);
-    p. er := entityResolver;
+    p. dtd := DTD.New();
+    p. errList := Error.NewList();
+    p. documentEntity := p. dtd. NewDocumentEntity (baseURI);
     p. builder := builder;
     p. initialBuilder := builder;
-    p. dtd := DTD.New();
+    IF (entityResolver = NIL) THEN
+      entityResolver := EntityResolver.New()
+    END;
+    p. er := entityResolver;
     
-    p. documentEntity := p. dtd. NewDocumentEntity (baseURI);
     
     p. followExternalRef := TRUE;
     p. processDeclarations := TRUE;
@@ -2930,10 +2916,99 @@ PROCEDURE New* (ch: Channel.Channel; codecFactory: Codec.Factory;
     NEW (p. nameList, initNameList);
     p. lenNameList := 0;
     NEW (p. peStack, initPEStack);
-    p. lenPEStack := 0;
-    
+    p. lenPEStack := 0
+  END Init;
+
+
+PROCEDURE NewChannel* (ch: Channel.Channel; baseURI: URI.URI; 
+                       codecFactory: Codec.Factory;
+                       entityResolver: EntityResolver.Resolver;
+                       builder: Builder.Builder): Parser;
+(**Creates new parser for the input channel @oparam{ch}.  @oparam{baseURI} is
+   the absolute URI of the document entity, as computed by the method of
+   RFC 2396, if that is known.  If this value is @code{NIL}, or refers to an
+   opaque URI, then relative URIs in the document cannot be resolved.
+   
+   @oparam{codecFactory} designates the decoder that should be used to read
+   the byte stream from @oparam{ch}.  If this is @code{NIL}, then autodetection
+   is done on the input encoding.  If everything fails, the decoder defaults
+   to @ovar{UTF8.factory}.
+   
+   The entity resolver @oparam{entityResolver} is used to map public and
+   system identifiers of the document to absolute URIs.
+   
+   The interface to the application is the builder instance @oparam{builder}.
+   During parsing, the parser will call the methods of this object.  *)
+  VAR
+    p: Parser;
+  BEGIN
+    NEW (p);
+    Init (p, baseURI, entityResolver, builder);
+    p. in := Buffer.NewInput (ch, codecFactory, p. errList);
     RETURN p
-  END New;
+  END NewChannel;
+
+PROCEDURE NewURI* (uri, baseURI: URI.URI; 
+                   codecFactory: Codec.Factory;
+                   entityResolver: EntityResolver.Resolver;
+                   builder: Builder.Builder; VAR res: Msg.Msg): Parser;
+(**Like @oproc{NewChannel}, but opens the channel on the URI @oparam{uri}.  If
+   the channel cannot be opened, result is @code{NIL} and @oparam{res} holds
+   the error message.  *)
+  VAR
+    ch: Channel.Channel;
+  BEGIN
+    ch := uri. GetChannel (FALSE, res);
+    IF (ch = NIL) THEN
+      RETURN NIL
+    ELSE
+      RETURN NewChannel (ch, uri, codecFactory, entityResolver, builder)
+    END
+  END NewURI;
+
+PROCEDURE NewFile* (filePath: ARRAY OF CHAR; baseURI: URI.URI; 
+                    codecFactory: Codec.Factory;
+                    entityResolver: EntityResolver.Resolver;
+                    builder: Builder.Builder; VAR res: Msg.Msg): Parser;
+(**Like @oproc{NewURI}, using the file @oparam{filePath}.  *)
+  BEGIN
+    RETURN NewURI (File.ToURI (filePath), baseURI, codecFactory,
+                   entityResolver, builder, res)
+  END NewFile;
+
+PROCEDURE NewExternalID* (public, system: ARRAY OF DTD.Char;
+                          systemBaseURI: URI.URI; 
+                          codecFactory: Codec.Factory;
+                          entityResolver: EntityResolver.Resolver;
+                          builder: Builder.Builder; VAR res: Msg.Msg): Parser;
+(**Like @oproc{NewURI}, using the given public or system identifier.  The
+   external identifiers are mapped to an absolute URI using
+   @oparam{entityResolver}.  *)
+  VAR
+    uri: URI.URI;
+    
+  PROCEDURE ToString (VAR s: ARRAY OF DTD.Char): DTD.String;
+    VAR
+      str: DTD.String;
+    BEGIN
+      IF (s = "") THEN
+        RETURN NIL
+      ELSE
+        NEW (str, LongStrings.Length (s)+1);
+        COPY (s, str^);
+        RETURN str
+      END
+    END ToString;
+  
+  BEGIN
+    entityResolver. GetURI (ToString (public), ToString (system),
+                            systemBaseURI, uri, res);
+    IF (uri = NIL) THEN
+      RETURN NIL
+    ELSE
+      RETURN NewURI (uri, NIL, codecFactory, entityResolver, builder, res)
+    END
+  END NewExternalID;
 
 
 PROCEDURE SetErrorMessages;

@@ -1,4 +1,4 @@
-(* 	$Id: Error.Mod,v 1.1.1.1 2000/07/10 15:24:31 mva Exp $	 *)
+(* 	$Id: Error.Mod,v 1.1.1.2 2000/07/10 20:31:56 mva Exp $	 *)
 MODULE XML:Error;
 (*  Creates lists of error messages and converts them to text.
     Copyright (C) 2000  Michael van Acken
@@ -39,10 +39,6 @@ TYPE
   List* = POINTER TO ListDesc;
   ListDesc = RECORD
     (M.MsgListDesc)
-    uri-: URI.URI;
-    (**Any error messages appended to this list refer to the source text
-       obtained from this URI.  It is prefixed to the output when
-       writing the list of error messages to the output channel.  *)
     cwdURI: URI.HierarchicalURI;
   END;
 
@@ -61,41 +57,6 @@ PROCEDURE NewContext* (id: M.String): Context;
     InitContext (c, id);
     RETURN c
   END NewContext;
-
-(*PROCEDURE (c: Context) BaseTemplate* (msg: Msg; text: LString; VAR templ: LString);
-(**Creates the default error description for message @oparam{msg}.  The
-   argument @oparam{text} holds the readable description of the error code
-   @samp{msg.code}.  For debugging purposes, all attributes defined for the
-   message @oparam{msg} are attached to the template string using the pattern
-   @samp{foo=$@{foo@}}.  *)
-  VAR
-    attr: M.Attribute;
-    repl: ARRAY 8*1024 OF M.LChar;
-    entityName: M.Attribute;
-  BEGIN
-    entityName := msg. GetAttribute ("entity_name");
-    IF (entityName = NIL) THEN
-      COPY ("", templ)
-    ELSE
-      COPY ("While expanding entity `", templ);
-      LongStrings.Append (entityName(M.LStringAttribute). string^, templ);
-      LongStrings.Append ("': ", templ)
-    END;
-    LongStrings.Append (text, templ);
-    COPY (CharClass.eol, repl);
-    LongStrings.Append (repl, templ);
-    attr := msg. attribList;
-    WHILE (attr # NIL) DO
-      COPY (attr. name^, repl);
-      LongStrings.Append (repl, templ);
-      LongStrings.Append ("=${", templ);
-      LongStrings.Append (repl, templ);
-      LongStrings.Append ("}", templ);
-      COPY (CharClass.eol, repl);
-      LongStrings.Append (repl, templ);
-      attr := attr. nextAttrib
-    END
-  END BaseTemplate;*)
 
 PROCEDURE (context: Context) GetTemplate* (msg: Msg; VAR templ: LString);
   VAR
@@ -156,14 +117,13 @@ PROCEDURE New* (context: Context; code: Code): Msg;
     RETURN M.New (context, code)
   END New;
 
-PROCEDURE NewList* (uri: URI.URI): List;
-(**Creates new error list for the file @oparam{fileName}.  *)
+PROCEDURE NewList*(): List;
+(**Creates new error list.  *)
   VAR
     list: List;
   BEGIN
     NEW (list);
     M.InitMsgList (list);
-    list. uri := uri;
     list. cwdURI := File.GetCwd();
     RETURN list
   END NewList;

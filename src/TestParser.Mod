@@ -1,4 +1,4 @@
-(*      $Id: TestParser.Mod,v 1.1.1.2 2000/07/10 20:31:50 mva Exp $   *)
+(*      $Id: TestParser.Mod,v 1.2 2000/07/12 22:28:05 mva Exp $   *)
 MODULE TestParser;
 (*  Converts XML document into its canonical representation.
     Copyright (C) 2000  Michael van Acken
@@ -20,9 +20,8 @@ MODULE TestParser;
 
 IMPORT
   ProgramArgs, TextRider, StdChannels, Channel, Err, Msg,
-  URI, URIParser := URI:Parser, URI:Scheme:File,
   XML:Builder, XML:Parser, XML:UnicodeCodec:UTF8, XML:UnicodeCodec:ImportAll,
-  XML:EntityResolver, XML:Builder:Canonical, XML:Builder:ParserProtocol;
+  XML:Builder:Canonical, XML:Builder:ParserProtocol;
 
 
 CONST
@@ -40,12 +39,9 @@ PROCEDURE CreateParser(): Parser.Parser;
   VAR
     arg: ARRAY 256 OF CHAR;
     argReader: TextRider.Reader;
+    p: Parser.Parser;
     
-    cwdURI: File.URI;
-    documentURI: URI.URI;
-    ch: Channel.Channel;
     res: Msg.Msg;
-    entityResolver: EntityResolver.Resolver;
   BEGIN
     NEW (canon);
     
@@ -76,21 +72,15 @@ PROCEDURE CreateParser(): Parser.Parser;
       argReader. ReadLine (arg)
     END;
     
-    cwdURI := File.GetCwd();
-    documentURI := URIParser.NewURI (arg, cwdURI, res);
-    ASSERT (res = NIL);
-    
-    ch := documentURI. GetChannel (FALSE, res);
-    ASSERT (res = NIL);
-    
     IF (mode = modeCanonical) THEN
       builder := Canonical.New (StdChannels.stdout, UTF8.factory, format)
     ELSIF (mode = modeParserProtocol) THEN
       builder := ParserProtocol.New (StdChannels.stdout, UTF8.factory)
     END;
-    entityResolver := EntityResolver.New();
     
-    RETURN Parser.New (ch, NIL, documentURI, entityResolver, builder)
+    p := Parser.NewFile (arg, NIL, NIL, NIL, builder, res);
+    ASSERT (res = NIL);
+    RETURN p
   END CreateParser;
 
 BEGIN

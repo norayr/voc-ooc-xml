@@ -1,4 +1,4 @@
-(* 	$Id: File.Mod,v 1.1.1.1 2000/07/10 15:24:44 mva Exp $	 *)
+(* 	$Id: File.Mod,v 1.1.1.2 2000/07/10 20:31:53 mva Exp $	 *)
 MODULE URI:Scheme:File;
 (*  Implementation of the "file" URI scheme.
     Copyright (C) 2000  Michael van Acken
@@ -69,6 +69,8 @@ PROCEDURE (file: URI) Clone* (): URI;
   END Clone;
 
 PROCEDURE (file: URI) GetPath* (VAR filePath: ARRAY OF CHAR);
+(**Returns the file path associated with the URI @oparam{file}.  On a Unix 
+   system, this is the URI's path component.  *)
   VAR
     segm: Hierarchical.Segment;
   BEGIN
@@ -123,6 +125,27 @@ PROCEDURE GetCwd*(): URI;
     END;
     RETURN NIL
   END GetCwd;
+
+PROCEDURE ToURI* (filePath: ARRAY OF CHAR): URI;
+(**Constructs a file URI for a given file path.  *)
+  VAR
+    uri: URI0.URI;
+    uriString: ARRAY 4*1024 OF CHAR;
+    res: Msg.Msg;
+  BEGIN
+    IF (filePath[0] = "/") THEN
+      uriString := "file:";
+      String.AppendEscaped (filePath, CharClass.unreservedPChar+"/", uriString);
+      uri := Parser.NewURI (uriString, NIL, res)
+    ELSE
+      uri := Parser.NewURI (filePath, GetCwd(), res)
+    END;
+    IF (uri = NIL) THEN
+      RETURN NIL
+    ELSE
+      RETURN uri(URI)
+    END
+  END ToURI;
 
 BEGIN
   URI0.RegisterScheme (NewPrototype())
