@@ -1,7 +1,7 @@
-(*	$Id: Memory.Mod,v 1.3 2000/08/20 12:59:50 mva Exp $	*)
+(*	$Id: Memory.Mod,v 1.4 2000/12/08 21:41:23 mva Exp $	*)
 MODULE IO:Memory;
 (*  Implementation of a simple file system in memory.
-    Copyright (C) 1999, 2000  Michael van Acken
+    Copyright (C) 1999-2001  Michael van Acken
 
     This module is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License
@@ -56,7 +56,7 @@ CONST
 
 TYPE
   File* = POINTER TO FileDesc;
-  Data = POINTER TO ARRAY OF SYSTEM.BYTE;
+  Data* = POINTER TO ARRAY OF CHAR;
   Name = POINTER TO ARRAY OF CHAR;
   FileDesc = RECORD
   (**A file instance in memory.  This module does not implement a hierarchical
@@ -325,7 +325,7 @@ PROCEDURE (w: Writer) Truncate* (newLength: LONGINT);
           ExtendFile (b, newLength)
         END;
         FOR i := b. length TO newLength-1 DO
-          b. data[i] := SYSTEM.VAL (SYSTEM.BYTE, 0X)
+          b. data[i] := 0X
         END
       END;
       b. length := newLength
@@ -348,7 +348,7 @@ PROCEDURE (w: Writer) WriteByte* (x: SYSTEM.BYTE);
         IF (w. pos > b. length) THEN
           w. Truncate (w. pos)
         END;
-        b. data[w. pos] := x;
+        b. data[w. pos] := SYSTEM.VAL (CHAR, x);
         w. bytesWritten := 1;
         INC (w. pos);
         IF (w. pos > b. length) THEN
