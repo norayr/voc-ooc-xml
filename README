@@ -1,3 +1,7 @@
+Requires oo2c-1.5
+(oo2c-2.x already contains a modified version of most of the modules)
+--------
+
 The libxml sources include the XML parser itself, encoder and decoder
 for the most prominent Unicode encodings, an URI library, some
 auxiliary OS level functions, and low-level support modules for socket
