@@ -133,29 +133,24 @@ PROCEDURE AutodetectEnc (input: Input; VAR enc: ARRAY OF CHAR): LONGINT;
             str := "UCS-4-2143"
           ELSIF (x[2] = 0FEX) & (x[3] = 0FFX) THEN(* UCS-4, 1234 order, BOM *)
             str := "UCS-4-1234"; skip := 4
+          ELSIF (x[2] = 0FFX) & (x[3] = 0FEX) THEN(* UCS-4, 2143 order, BOM *)
+            str := "UCS-4-2143"; skip := 4
           END
         ELSIF (x[1] = 3CX) & (x[2] = 0X) & (x[3] = 0X) THEN
-          (* UTF-16, 3412 order *)
+          (* UCS-4, 3412 order *)
           str := "UCS-4-3412"
-        ELSIF ((x[1] = 3CX) OR (x[1] = 25X) OR (x[1] = 20X) OR
-               (x[1] = 09X) OR (x[1] = 0DX) OR (x[1] = 0AX)) &
-              (x[2] # 0X) & (x[3] # 0X) THEN
-          (* big endian UTF-16 *)
-          str := "UTF-16BE"
+        ELSIF (x[1] = 3CX) & (x[2] = 0X) & (x[3] = 3FX) THEN  (* UTF-16LE *)
+          str := "UTF16-LE"
         END
       | 03CX:
         IF (x[1] = 0X) THEN
           IF (x[2] = 0X) & (x[3] = 0X) THEN  (* UTF-16, 4321 order *)
             str := "UCS-4-4321"
-          ELSIF (x[2] # 0X) & (x[3] # 0X) THEN  (* UTF-16, little endian *)
+          ELSIF (x[2] = 3FX) & (x[3] = 0X) THEN  (* UTF-16, little endian *)
             str := "UTF-16LE"
           END
         ELSIF (x[1] = 3FX) & (x[2] = 78X) & (x[3] = 6DX) THEN
           str := "UTF-8"
-        END
-      | 25X, 20X, 09X, 0DX, 0AX:
-        IF (x[1] = 0X) & (x[2] # 0X) & (x[3] # 0X) THEN
-          str := "UTF-16LE"
         END
       | 04CX:
         IF (x[1] = 6FX) & (x[2] = 0A7X) & (x[3] = 94X) THEN
@@ -169,14 +164,22 @@ PROCEDURE AutodetectEnc (input: Input; VAR enc: ARRAY OF CHAR): LONGINT;
           str := "UTF-8"; skip := 3
         END
       | 0FEX:
-        IF (x[1] = 0FFX) & ((x[2] # 0X) OR (x[3] # 0X)) THEN
-          (* UTF-16 big endian, with byte order mark *)
-          str := "UTF-16BE"; skip := 2
+        IF (x[1] = 0FFX) THEN
+          IF (x[2] # 0X) OR (x[3] # 0X) THEN
+            (* UTF-16 big endian, with byte order mark *)
+            str := "UTF-16BE"; skip := 2
+          ELSIF (x[2] = 0X) & (x[3] = 0X) THEN(* UCS-4, 3412 order, BOM *)
+            str := "UCS-4-3412"; skip := 4
+          END
         END
       | 0FFX:
-        IF (x[1] = 0FEX) & ((x[2] # 0X) OR (x[3] # 0X)) THEN
-          (* UTF-16 little endian, with byte order mark *)
-          str := "UTF-16LE"; skip := 2
+        IF (x[1] = 0FEX) THEN
+          IF (x[2] # 0X) OR (x[3] # 0X) THEN
+            (* UTF-16 little endian, with byte order mark *)
+            str := "UTF-16LE"; skip := 2
+          ELSIF (x[2] = 0X) & (x[3] = 0X) THEN(* UCS-4, 4321 order, BOM *)
+            str := "UCS-4-4321"; skip := 4
+          END
         END
       ELSE  (* use default *)
       END
