@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.20 2001/03/16 21:49:07 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.21 2001/03/17 21:34:43 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -95,6 +95,10 @@ TYPE
        do not violate the nesting requirements imposed by the various validity
        constraints.  This enables parts of the checks required from validating
        parsers.  The default is @code{FALSE}.  *)
+    enforceRequiredAttr*: BOOLEAN;
+    (**If @code{TRUE}, then the parser checks that required attributes are 
+       present in an element's attribute list.  This enables parts of the
+       checks required from validating parsers.  The default is @code{FALSE}.*)
     processDeclarations: BOOLEAN;
     (* if FALSE, then entity declarations and attribute declarations must not
        be processed; this field starts out TRUE, and is set to FALSE after
@@ -222,6 +226,7 @@ CONST  (* error codes *)
   noSuchParameterEntity = 211;
   multipleAttrName = 212;
   recursiveGeneralEntity = 213;
+  requiredAttrMissing = 214;
   
   (* reference errors *)
   unbalancedPERef = 300;
@@ -2152,11 +2157,16 @@ PROCEDURE (p: Parser) ParseDocument*;
         decl := elemDecl. attrNamespace. declList;
         WHILE (decl # NIL) DO
           attrDecl := decl(DTD.AttrDecl);
-          IF (attrDecl. default >= DTD.attrDefault) & 
-             ~AttributeDefined (attrDecl. name) THEN
-            Expand (attrDecl. defaultValue);
-            p. builder. Attribute (NIL, decl. name, attrDecl,
-                                   attrDecl. defaultValue, FALSE)
+          IF ~AttributeDefined (attrDecl. name) THEN
+            IF (attrDecl. default >= DTD.attrDefault) THEN
+              Expand (attrDecl. defaultValue);
+              p. builder. Attribute (NIL, decl. name, attrDecl,
+                                     attrDecl. defaultValue, FALSE)
+            ELSIF p. enforceRequiredAttr &
+                  (attrDecl. default = DTD.attrRequired) THEN
+              ErrPos (requiredAttrMissing, p. l^);
+              p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (attrDecl. name^))
+            END
           END;
           decl := decl. next
         END
@@ -2213,10 +2223,10 @@ PROCEDURE (p: Parser) ParseDocument*;
           p. builder. Attribute (NIL, attrName, attrDecl, attrValue, TRUE) (* callback *)
         END;
         
+        StorePosition (p. l^);
         IF (decl # NIL) THEN
           AddDefaultAttributes (decl(DTD.ElementDecl))
         END;
-        StorePosition (p. l^);
         CheckChar (">");
         p. builder. AttributesDone();    (* callback *)
         
@@ -3009,6 +3019,7 @@ PROCEDURE Init (p: Parser; new: BOOLEAN;
     p. followExternalRef := TRUE;
     p. enforceQNames := FALSE;
     p. enforceGroupNesting := FALSE;
+    p. enforceRequiredAttr := FALSE;
     p. processDeclarations := TRUE;
     p. readCompleteDTD := TRUE;
     
@@ -3257,6 +3268,8 @@ PROCEDURE SetErrorMessages;
         t := "Attribute `${name}' is already defined"
       | recursiveGeneralEntity:
         t := "General entity `${name}' is defined recursively"
+      | requiredAttrMissing:
+        t := "Required attribute `${name}' is not set"
       
       | unbalancedPERef:
         t := "End tag `${name}' comes from a different entity than its start tag"

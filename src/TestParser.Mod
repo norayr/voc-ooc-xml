@@ -1,4 +1,4 @@
-(*      $Id: TestParser.Mod,v 1.5 2001/03/16 21:48:37 mva Exp $   *)
+(*      $Id: TestParser.Mod,v 1.6 2001/03/17 21:34:02 mva Exp $   *)
 MODULE TestParser;
 (*  Converts XML document into its canonical representation.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -98,6 +98,7 @@ PROCEDURE CreateParser(): Parser.Parser;
     p := Parser.NewFile (arg, NIL, NIL, NIL, builder, res);
     p. enforceQNames := namespaceSupport; (* enable QName and NCName checks *)
     p. enforceGroupNesting := validating; (* enable PE nesting checks *)
+    p. enforceRequiredAttr := validating; (* enfore required attributes *)
     ASSERT (res = NIL);
     RETURN p
   END CreateParser;

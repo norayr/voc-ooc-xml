@@ -1,4 +1,4 @@
-(*      $Id: Validation.Mod,v 1.1 2001/03/17 21:35:12 mva Exp $   *)
+(*      $Id: Validation.Mod,v 1.2 2001/03/17 23:14:55 mva Exp $   *)
 MODULE XML:Builder:Validation;
 (*  Adds validation services to the XML:Parser.
     Copyright (C) 2001  Michael van Acken
@@ -394,7 +394,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
            to check the attribute syntax, because all declared entities have
            a valid name *)
         string := value. Flatten (attrDecl);
-        IF ~IsName (string^) THEN
+        IF specified & ~IsName (string^) THEN
           ErrString (b, notName, "name", string)
         ELSE
           decl := b. dtd. geNamespace. Get (string);
@@ -407,7 +407,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
       
       | DTD.attrENTITIES:
         string := value. Flatten (attrDecl);
-        IF ~IsNames (string^) THEN
+        IF specified & ~IsNames (string^) THEN
           Err (b, notNames)
         ELSE
           i := 0;
@@ -442,19 +442,19 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
         
       | DTD.attrNMTOKEN:
         string := value. Flatten (attrDecl);
-        IF ~IsNmtoken (string^) THEN
+        IF specified & ~IsNmtoken (string^) THEN
           ErrString (b, notNmtoken, "name", string)
         END
       
       | DTD.attrNMTOKENS:
         string := value. Flatten (attrDecl);
-        IF ~IsNmtokens (string^) THEN
+        IF specified & ~IsNmtokens (string^) THEN
           Err (b, notNmtokens)
         END
       
       | DTD.attrENUMERATED:
         string := value. Flatten (attrDecl);
-        IF ~IsNmtoken (string^) THEN
+        IF specified & ~IsNmtoken (string^) THEN
           Err (b, notNmtoken)
         ELSIF ~attrDecl. enumeration. Matches (string^) THEN
           ErrString (b, notInEnumeration, "name", string)
@@ -462,7 +462,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
       
       | DTD.attrID:
         string := value. Flatten (attrDecl);
-        IF ~IsName (string^) THEN
+        IF specified & ~IsName (string^) THEN
           ErrString (b, notName, "name", string)
         ELSIF ~b. idNamespace. Add (NewIDDecl (string)) THEN
           ErrString (b, multipleIDs, "name", string)
@@ -470,7 +470,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
         
       | DTD.attrIDREF:
         string := value. Flatten (attrDecl);
-        IF ~IsName (string^) THEN
+        IF specified & ~IsName (string^) THEN
           ErrString (b, notName, "name", string)
         ELSE
           dummy := ~b. idrefNamespace. Add (NewIDDecl (string))
@@ -478,7 +478,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
         
       | DTD.attrIDREFS:
         string := value. Flatten (attrDecl);
-        IF ~IsNames (string^) THEN
+        IF specified & ~IsNames (string^) THEN
           ErrString (b, notNames, "name", string)
         ELSE
           i := 0;
