@@ -1,4 +1,4 @@
-(*      $Id: Writer.Mod,v 1.5 2000/10/24 08:40:11 mva Exp $   *)
+(*      $Id: Writer.Mod,v 1.6 2000/10/29 20:17:17 mva Exp $   *)
 MODULE XML:Writer [OOC_EXTENSIONS];
 (*  Support for generating XML documents.
     Copyright (C) 2000  Michael van Acken
@@ -52,26 +52,43 @@ TYPE
   END;
 
 
-PROCEDURE New* (ch: Channel.Channel; codecFactory: Codec.Factory;
-                writeBOM: BOOLEAN; indentLevel: LONGINT): Writer;
-  VAR
-    w: Writer;
+PROCEDURE Init (w: Writer; new: BOOLEAN;
+                writer: Channel.Writer; codecFactory: Codec.Factory;
+                writeBOM: BOOLEAN; indentLevel: LONGINT);
   BEGIN
-    NEW (w);
-    UnicodeBuffer.InitOutput (w, ch, codecFactory, writeBOM);
+    IF new THEN
+      UnicodeBuffer.InitOutput (w, TRUE, writer, codecFactory, writeBOM);
+      NEW (w. elementStack, 8);
+    END;
+      
     w. indentLevel := indentLevel;
     w. indent := 0;
     w. baseURI := NIL;
     w. newLine := Ascii.lf;
     w. lenNewLine := 1;
     
-    NEW (w. elementStack, 8);
     w. lenElementStack := 0;
     w. doIndent := FALSE;                (* don't indent first start tag *)
     w. openStartTag := FALSE;
-    
+  END Init;
+
+PROCEDURE New* (writer: Channel.Writer; codecFactory: Codec.Factory;
+                writeBOM: BOOLEAN; indentLevel: LONGINT): Writer;
+  VAR
+    w: Writer;
+  BEGIN
+    NEW (w);
+    Init (w, TRUE, writer, codecFactory, writeBOM, indentLevel);
     RETURN w
   END New;
+
+(*PROCEDURE (w: Writer) Reset* (writer: Channel.Writer; 
+                              codecFactory: Codec.Factory;
+                              writeBOM: BOOLEAN);
+  BEGIN
+    w. Reset^ (writer, codecFactory, writeBOM);
+    Init (w, FALSE, writer, codecFactory, writeBOM, w. indentLevel);
+  END Reset;*)
 
 PROCEDURE (w: Writer) SetBaseURI* (baseURI: URI.HierarchicalURI);
   BEGIN

@@ -1,4 +1,4 @@
-(*      $Id: Canonical.Mod,v 1.6 2000/07/31 18:38:31 mva Exp $   *)
+(*      $Id: Canonical.Mod,v 1.7 2000/08/08 13:58:37 mva Exp $   *)
 MODULE XML:Builder:Canonical [OOC_EXTENSIONS];
 (*  Translates XML document to canonical XML.
     Copyright (C) 2000  Michael van Acken
@@ -283,7 +283,8 @@ PROCEDURE New* (outputChannel: Channel.Channel;
   BEGIN
     NEW (b);
     B.Init (b);
-    b. out := UnicodeBuffer.NewOutput (outputChannel, codecFactory, TRUE);
+    b. out := UnicodeBuffer.NewOutput (outputChannel. NewWriter(),
+                                       codecFactory, TRUE);
     b. format := format;
     
     b. notationList := NIL;

@@ -315,7 +315,8 @@ PROCEDURE InitInput* (input: Input; new: BOOLEAN;
       input. byteBuffer := InputBuffer.New (reader, errList);
       NEW (input. chars, sizeOfInputBuffer);
     ELSE
-      input. byteBuffer. Reset (reader, errList)
+      ASSERT (FALSE);
+      (*input. byteBuffer. Reset (reader, errList)*)
     END;
     
     input. byteEndOfData := FALSE;
@@ -332,19 +333,19 @@ PROCEDURE InitInput* (input: Input; new: BOOLEAN;
     input. SetCodec (codecFactory, autoDetect);
   END InitInput;
 
-PROCEDURE (input: Input) Reset* (reader: Channel.Reader; 
+(*PROCEDURE (input: Input) Reset* (reader: Channel.Reader; 
                                  codecFactory: Codec.Factory;
                                  errList: Msg.MsgList);
-(**Resets the buffer @oparam{b} to its initial state.  This has the same effect
-   as calling @oproc{NewInput} with the same parameters, except that some of
-   the resources allocated by @oparam{b} are reused.
-   
+(**Resets the buffer @oparam{input} to its initial state.  This has the same
+   effect as calling @oproc{NewInput} with the same parameters, except that
+   some of the resources allocated by @oparam{input} are reused.
+
    Note: This method does not change the state of the reader @oparam{reader}.
    For example, if the reader should continue reading a file from its
-   beginning, then it must be positioned @emph{before} this method is called.*)
+   beginning, then it must be positioned @emph{before} this method is called.  *)
   BEGIN
     InitInput (input, FALSE, reader, codecFactory, errList)
-  END Reset;
+  END Reset;*)
 
 PROCEDURE NewInput* (reader: Channel.Reader; codecFactory: Codec.Factory;
                      errList: Msg.MsgList): Input;
@@ -476,15 +477,19 @@ PROCEDURE (out: Output) Flush*;
     out. writer. base. Flush
   END Flush;
 
-PROCEDURE InitOutput* (out: Output; ch: Channel.Channel;
+PROCEDURE InitOutput* (out: Output; new: BOOLEAN;
+                       writer: Channel.Writer;
                        codecFactory: Codec.Factory; createBOM: BOOLEAN);
   BEGIN
+    IF new THEN
+      NEW (out. byteBuffer);
+      NEW (out. unicodeBuffer);
+    END;
+    
     out. codecFactory := codecFactory;
     out. codec := codecFactory. NewCodec();
-    out. writer := ch. NewWriter();
-    NEW (out. byteBuffer);
+    out. writer := writer;
     out. byteStart := 0; out. byteEnd := 0;
-    NEW (out. unicodeBuffer);
     out. unicodeEnd := 0;
     
     IF createBOM THEN
@@ -493,18 +498,28 @@ PROCEDURE InitOutput* (out: Output; ch: Channel.Channel;
     END
   END InitOutput;
 
-PROCEDURE NewOutput* (ch: Channel.Channel; codecFactory: Codec.Factory;
-                      createBOM: BOOLEAN): Output;
-(**Creates new output buffer for channel @oparam{ch}.  
+(*PROCEDURE (output: Output) Reset* (writer: Channel.Writer; 
+                                   codecFactory: Codec.Factory;
+                                   createBOM: BOOLEAN);
+(**Resets the buffer @oparam{output} to its initial state.  This has the same
+   effect as calling @oproc{NewOutput} with the same parameters, except that
+   some of the resources allocated by @oparam{output} are reused.
 
-   @precond
-   The channel @oparam{ch} is writable.
-   @end precond *)
+   Note: This method does not change the state of the writer @oparam{writer}.
+   For example, if the writer should continue writing to the beginning of a
+   file, then it should be positioned @emph{before} this method is called.  *)
+  BEGIN
+    InitOutput (output, FALSE, writer, codecFactory, createBOM)
+  END Reset;*)
+
+PROCEDURE NewOutput* (writer: Channel.Writer; codecFactory: Codec.Factory;
+                      createBOM: BOOLEAN): Output;
+(**Creates new output buffer for writer @oparam{writer}.  *)
   VAR
     output: Output;
   BEGIN
     NEW (output);
-    InitOutput (output, ch, codecFactory, createBOM);
+    InitOutput (output, TRUE, writer, codecFactory, createBOM);
     RETURN output
   END NewOutput;
 

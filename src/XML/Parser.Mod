@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.15 2000/10/15 10:19:35 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.16 2000/10/29 20:32:14 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -2920,7 +2920,8 @@ PROCEDURE Init (p: Parser; new: BOOLEAN;
       NEW (p. peStack, initPEStack);
       p. in := Buffer.NewInput (reader, codecFactory, p. errList);
     ELSE
-      p. in. Reset (reader, codecFactory, p. errList)
+      ASSERT (FALSE);
+      (*p. in. Reset (reader, codecFactory, p. errList)*)
     END;
     
     p. l. inInternalEntity := NIL;
@@ -2950,7 +2951,7 @@ PROCEDURE Init (p: Parser; new: BOOLEAN;
     p. lenPEStack := 0
   END Init;
 
-PROCEDURE (p: Parser) Reset* (reader: Channel.Reader;
+(*PROCEDURE (p: Parser) Reset* (reader: Channel.Reader;
                               baseURI: URI.URI;
                               codecFactory: Codec.Factory;
                               entityResolver: EntityResolver.Resolver;
@@ -2964,7 +2965,7 @@ PROCEDURE (p: Parser) Reset* (reader: Channel.Reader;
    beginning, then it must be positioned @emph{before} this method is called.*)
   BEGIN
     Init (p, FALSE, reader, baseURI, codecFactory, entityResolver, builder)
-  END Reset;
+  END Reset;*)
 
 PROCEDURE NewChannel* (ch: Channel.Channel;
                        baseURI: URI.URI; 

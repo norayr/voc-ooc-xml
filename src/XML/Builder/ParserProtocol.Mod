@@ -1,4 +1,4 @@
-(*      $Id: ParserProtocol.Mod,v 1.8 2000/07/31 18:38:31 mva Exp $   *)
+(*      $Id: ParserProtocol.Mod,v 1.9 2000/08/08 13:49:27 mva Exp $   *)
 MODULE XML:Builder:ParserProtocol [OOC_EXTENSIONS];
 (*  Translates XML document to canonical XML.
     Copyright (C) 2000  Michael van Acken
@@ -402,7 +402,7 @@ PROCEDURE New* (outputChannel: Channel.Channel;
   BEGIN
     NEW (b);
     B.Init (b);
-    b. w := Writer.New (outputChannel, codecFactory, TRUE, 2);
+    b. w := Writer.New (outputChannel. NewWriter(), codecFactory, TRUE, 2);
     b. w. WriteTextDecl ("1.0", "");
     b. w. SetBaseURI (File.GetCwd());
     RETURN b

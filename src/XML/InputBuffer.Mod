@@ -1,4 +1,4 @@
-(* 	$Id: InputBuffer.Mod,v 1.2 2000/08/16 08:23:43 mva Exp $	 *)
+(* 	$Id: InputBuffer.Mod,v 1.3 2000/10/29 20:22:07 mva Exp $	 *)
 MODULE XML:InputBuffer;
 (*  Defines input buffer for OOC's scanner.
     Copyright (C) 2000  Michael van Acken
@@ -167,7 +167,7 @@ PROCEDURE Init (b: Buffer; new: BOOLEAN;
     dummy := b. NextBlock();
   END Init;
 
-PROCEDURE (b: Buffer) Reset* (reader: Channel.Reader; errList: Msg.MsgList);
+(*PROCEDURE (b: Buffer) Reset* (reader: Channel.Reader; errList: Msg.MsgList);
 (**Resets the buffer @oparam{b} to its initial state.  This has the same effect
    as calling @oproc{New} with the same parameters, except that some of the
    resources allocated by @oparam{b} are reused.
@@ -177,7 +177,7 @@ PROCEDURE (b: Buffer) Reset* (reader: Channel.Reader; errList: Msg.MsgList);
    beginning, then it must be positioned @emph{before} this method is called.*)
   BEGIN
     Init (b, FALSE, reader, errList)
-  END Reset;
+  END Reset;*)
 
 PROCEDURE New* (reader: Channel.Reader; errList: Msg.MsgList): Buffer;
 (**Creates a new input buffer for reader @oparam{reader} and tries to read the
