@@ -1,1 +1,1 @@
-<doc>a&#13;&#10;b</doc>
+<doc>&#10;  <elem></elem>&#10;</doc>

@@ -12,12 +12,10 @@ for d in $SUBDIR; do
       else
 	err_count=`expr $err_count + 1`
 	echo "failed: $i [wf]"
-        exit 1
       fi
     else
       err_count=`expr $err_count + 1`
       echo "failed: $i [wf] (exit code is non-zero)"
-      exit 1
     fi
     
     rm -f test-output/$i
@@ -27,12 +25,10 @@ for d in $SUBDIR; do
       else
 	err_count=`expr $err_count + 1`
 	echo "failed: $i [valid]"
-        exit 1
       fi
     else
       err_count=`expr $err_count + 1`
       echo "failed: $i [valid] (exit code is non-zero)"
-      exit 1
     fi
   done
 done

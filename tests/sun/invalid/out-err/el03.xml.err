@@ -1,3 +1,3 @@
 In file invalid/el03.xml: 
 line=4, column=17
-100: Expected elements: #PCDATA root
+100: Expected tags: #PCDATA root

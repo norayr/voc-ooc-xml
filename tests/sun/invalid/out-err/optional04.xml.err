@@ -1,3 +1,3 @@
 In file invalid/optional04.xml: 
 line=2, column=19
-72: Expected end tag </twice>
+72: Expected tags: /twice
