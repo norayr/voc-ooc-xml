@@ -524,7 +524,7 @@ fi
 
 
 for i in sym obj; do
-  if ! test -d $i; then mkdir $i; fi
+  if test ! -d $i; then mkdir $i; fi
 done
 
 # Extract the first word of "oo2c", so it can be a program name with args.

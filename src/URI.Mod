@@ -1,4 +1,4 @@
-(* 	$Id: URI.Mod,v 1.5 2000/08/20 12:59:40 mva Exp $	 *)
+(* 	$Id: URI.Mod,v 1.6 2000/08/27 15:12:41 mva Exp $	 *)
 MODULE URI [OOC_EXTENSIONS];
 (*  Implements RFC2396 "Uniform Resource Identifiers: Generic Syntax"
     Copyright (C) 2000  Michael van Acken
@@ -286,7 +286,7 @@ PROCEDURE (uri: URI) GetChannel* (mode: ChannelMode; VAR res: Msg.Msg): Channel.
    error.
 
    Note: Currently, only the @samp{file} URI (@omodule{*URI:Scheme:File})
-   supports this method.  *)
+   and the @samp{http} URI (@omodule{*URI:Scheme:HTTP}) support this method. *)
   VAR
     uriStr: ARRAY 1024 OF CHAR;
   BEGIN
