@@ -1,4 +1,4 @@
-/* 	$Id: OS_ProcessParameters.c,v 1.1.1.1 2000/07/10 15:24:30 mva Exp $	 */
+/* 	$Id: OS_ProcessParameters.c,v 1.1.1.2 2000/07/10 20:31:49 mva Exp $	 */
 #include "__oo2c.h"
 
 #include <unistd.h>
@@ -8,7 +8,7 @@
 #include "__mini_gc.h"
 
 /* begin -  #include "OS:ProcessParameters.d" */
-#include "OS:ProcessParameters.h"
+#include "OS_ProcessParameters.h"
 #include "CharClass.h"
 #include "LongStrings.h"
 

@@ -1,4 +1,4 @@
-/*	$Id: IO_PFD.c,v 1.19 1999/10/31 13:59:36 ooc-devel Exp $	*/
+/*	$Id: IO_Select.c,v 1.1 2000/08/27 15:12:41 mva Exp $	*/
 /*  Wrapper around the select() function.
     Copyright (C) 2000  Michael van Acken
 
@@ -29,7 +29,7 @@
 
 
 /* --- begin #include "IO:Select.d" */
-#include "IO:Select.h"
+#include "IO_Select.h"
 #include "C.h"
 
 /* function prototypes */

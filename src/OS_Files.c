@@ -10,7 +10,7 @@
 #include "__mini_gc.h"
 
 /* begin -- #include "OS:Files.d" */
-#include "OS:Files.h"
+#include "OS_Files.h"
 #include "CharClass.h"
 #include "LongStrings.h"
 

@@ -1,4 +1,4 @@
-/* 	$Id: OS_ProcessManagment.c,v 1.1.1.1 2000/07/10 15:24:30 mva Exp $	 */
+/* 	$Id: OS_ProcessManagment.c,v 1.1.1.2 2000/07/10 20:31:49 mva Exp $	 */
 #include "__oo2c.h"
 
 #include <unistd.h>
@@ -8,7 +8,7 @@
 #include "__mini_gc.h"
 
 /* begin -  #include "OS:ProcessManagment.d" */
-#include "OS:ProcessManagment.h"
+#include "OS_ProcessManagment.h"
 
 /* local definitions */
 typedef struct OS_ProcessManagment__ErrorContextDesc {

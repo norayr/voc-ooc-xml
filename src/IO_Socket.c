@@ -1,4 +1,4 @@
-/*	$Id: IO_Socket.c,v 1.1 2000/08/27 15:12:41 mva Exp $	*/
+/*	$Id: IO_Socket.c,v 1.2 2000/08/29 14:36:04 mva Exp $	*/
 /*  Interface to socket facilities.
     Copyright (C) 2000  Michael van Acken
 
@@ -36,11 +36,11 @@
 #include "Msg.h"
 
 /* --- begin #include "IO:Socket.d" */
-#include "IO:Socket.h"
+#include "IO_Socket.h"
 #include "C.h"
 #include "CharClass.h"
 #include "LongStrings.h"
-#include "IO:PFD.h"
+#include "IO_PFD.h"
 
 /* function prototypes */
 

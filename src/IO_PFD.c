@@ -1,4 +1,4 @@
-/*	$Id: IO_PFD.c,v 1.1 2000/08/27 15:12:41 mva Exp $	*/
+/*	$Id: IO_PFD.c,v 1.2 2000/08/28 07:25:10 mva Exp $	*/
 /*  Generalized access to POSIX-style file descriptors.
     Copyright (C) 1997-2000  Michael van Acken
 
@@ -63,7 +63,7 @@
 #endif
 
 /* --- begin #include "IO_PFD.d" */
-#include "IO:PFD.h"
+#include "IO_PFD.h"
 #include "CharClass.h"
 #include "LongStrings.h"
 
