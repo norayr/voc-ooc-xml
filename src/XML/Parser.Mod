@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.27 2001/03/20 22:16:32 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.28 2001/03/21 21:11:17 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -1862,6 +1862,8 @@ PROCEDURE (p: Parser) ParseDocument*;
       decl: DTD.Declaration;
       entity: DTD.Entity;
 
+    PROCEDURE ^ExpandAttValue (entity: DTD.Entity): DTD.AttValue;
+    
     PROCEDURE IsRecursive (entity: DTD.Entity): BOOLEAN;
       VAR
         fragment: DTD.Fragment;
@@ -1870,6 +1872,9 @@ PROCEDURE (p: Parser) ParseDocument*;
           RETURN TRUE
         ELSE
           entity. expanding := TRUE;
+          IF (entity. attValue = NIL) THEN
+            entity. attValue := ExpandAttValue (entity)
+          END;
           fragment := entity. attValue. fragmentList;
           WHILE (fragment # NIL) DO
             WITH fragment: DTD.EntityRef DO
