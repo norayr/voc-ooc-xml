@@ -1,4 +1,4 @@
-(*      $Id: Writer.Mod,v 1.4 2000/08/08 13:46:18 mva Exp $   *)
+(*      $Id: Writer.Mod,v 1.5 2000/10/24 08:40:11 mva Exp $   *)
 MODULE XML:Writer [OOC_EXTENSIONS];
 (*  Support for generating XML documents.
     Copyright (C) 2000  Michael van Acken
@@ -36,6 +36,8 @@ TYPE
 TYPE
   Writer* = POINTER TO WriterDesc;
   WriterDesc = RECORD
+  (**Note: Output is buffered.  Calling @oproc{Writer.EndOfText} will also
+     flush the buffers.  *)
     (UnicodeBuffer.OutputDesc)
     indentLevel: LONGINT;
     indent: LONGINT;
@@ -357,6 +359,7 @@ PROCEDURE (w: Writer) EndTag*;
   END EndTag;
 
 PROCEDURE (w: Writer) EndOfText*;
+(**Adds final newline to text and flushes all buffers.  *)
   BEGIN
     w. NewLine;
     w. Flush;
