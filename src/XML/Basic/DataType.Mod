@@ -9,8 +9,9 @@ PROCEDURE GetIntAttr* (value: Element.AttValue; VAR number: LONGINT): BOOLEAN;
     str: Element.String;
     str8: ARRAY 32 OF CHAR;
     res: IntStr.ConvResults;
+    dummy: BOOLEAN;
   BEGIN
-    str := value. FlattenValue (FALSE);
+    str := value. FlattenValue (FALSE, dummy);
     LongStrings.Short (str^, "?", str8);
     IntStr.StrToInt (str8, number, res);
     RETURN (res = IntStr.strAllRight)
@@ -20,8 +21,9 @@ PROCEDURE GetStringLatin1Attr* (value: Element.AttValue; VAR str: ARRAY OF CHAR)
   VAR
     v: Element.String;
     i: LONGINT;
+    dummy: BOOLEAN;
   BEGIN
-    v := value. FlattenValue (FALSE);
+    v := value. FlattenValue (FALSE, dummy);
     IF (LongStrings.Length (v^) >= LEN (str)) THEN
       RETURN FALSE
     ELSE

@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.22 2001/03/18 00:10:01 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.23 2001/03/18 14:27:05 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -2897,6 +2897,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         INC (cpos, 9);                   (* skip over "<!DOCTYPE" *)
         S;
         rootName := Name (FALSE);
+        p. dtd. SetRootName (rootName);
         OptS (FALSE);
         IF LookingAt ("SYSTEM", followedByAny) OR
            LookingAt ("PUBLIC", followedByAny) THEN

@@ -10,6 +10,7 @@ cxml.html:
 	mv valid/sun-valid.xml .
 	mv not-wf/sun-not-wf.xml .
 	rm -f not-wf/lang0[1-6].xml  # no longer not-wf since First Ed. E73
+	rm -f invalid/pe01.*	     # external pe well-formed by definition
 
 test-output:
 	mkdir test-output test-output/valid test-output/not-wf test-output/invalid

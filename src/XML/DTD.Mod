@@ -1,4 +1,4 @@
-(* 	$Id: DTD.Mod,v 1.10 2001/03/17 23:14:09 mva Exp $	 *)
+(* 	$Id: DTD.Mod,v 1.11 2001/03/18 14:27:05 mva Exp $	 *)
 MODULE XML:DTD [OOC_EXTENSIONS];
 (*  Implements the internal representation of a document DTD.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -57,6 +57,9 @@ TYPE
   Declaration* = POINTER TO DeclarationDesc;
   Builder* = POINTER TO BuilderDesc;
   BuilderDesc* = RECORD
+    rootName-: String;
+    (**Name of the root name, as given in the DTD.  *)
+    
     geNamespace-: Namespace;
     (**Namespace with general entity declarations.  *)
     peNamespace-: Namespace;
@@ -1056,6 +1059,15 @@ PROCEDURE (elemDecl: ElementDecl) IsElementContent* (): BOOLEAN;
 
 
 
+(* Misc
+   ------------------------------------------------------------------------ *)
+
+PROCEDURE (b: Builder) SetRootName* (name: String);
+  BEGIN
+    b. rootName := name
+  END SetRootName;
+
+
 (* Namespace Declaration
    ------------------------------------------------------------------------ *)
 
@@ -1125,6 +1137,7 @@ PROCEDURE Init* (b: Builder);
     END PredefEntity;
   
   BEGIN
+    b. rootName := NIL;
     b. geNamespace := NewNamespace();
     b. peNamespace := NewNamespace();
     b. elementNamespace := NewNamespace();

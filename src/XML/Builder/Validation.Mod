@@ -1,4 +1,4 @@
-(*      $Id: Validation.Mod,v 1.3 2001/03/18 00:10:26 mva Exp $   *)
+(*      $Id: Validation.Mod,v 1.4 2001/03/18 14:27:48 mva Exp $   *)
 MODULE XML:Builder:Validation;
 (*  Adds validation services to the XML:Parser.
     Copyright (C) 2001  Michael van Acken
@@ -83,6 +83,7 @@ CONST  (* error codes *)
   invalidStandaloneDefaultAttr = 23;
   invalidStandaloneElemEntityRef = 24;
   invalidCharacterContent = 25;
+  rootMismatch = 26;
   
 VAR
   validationContext: Error.Context;
@@ -410,6 +411,11 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
 PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration; 
                                       localName: DTD.String);
   BEGIN
+    IF (b. currLevel = -1) &  (* this is the root element *)
+       (b. dtd. rootName^ # localName^) THEN
+      ErrString (b, rootMismatch, "name", b. dtd. rootName)
+    END;
+    
     PushElement (b, b. dtd. elementNamespace. Get (localName));
     b. delegateBuilder. StartElement (namespaceDecl, localName)
   END StartElement;
@@ -794,6 +800,8 @@ PROCEDURE SetErrorMessages;
         t := "With standalone='yes', this entity reference points to an externally declared entity"
       | invalidCharacterContent:
         t := "`${element}' does not have character content"
+      | rootMismatch:
+        t := "Element name does not match root name `${name}' from the DTD"
       ELSE
         t := ""
       END;
