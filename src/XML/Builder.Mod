@@ -1,4 +1,4 @@
-(*      $Id: Builder.Mod,v 1.3 2000/07/11 22:26:09 mva Exp $   *)
+(*      $Id: Builder.Mod,v 1.4 2000/07/12 22:28:05 mva Exp $   *)
 MODULE XML:Builder [OOC_EXTENSIONS];
 (*  Low-level builder interface to the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -56,6 +56,25 @@ TYPE
   of the entity reference, instead of the position of the markup text.  *)
   END;
 
+
+TYPE
+  Attribute* = POINTER TO AttributeDesc;
+  AttributeDesc = RECORD
+    namespaceURI-: DTD.NamespaceURI; 
+    localName-: DTD.String;
+    attrDecl-: DTD.AttrDecl;
+    value-: DTD.AttValue;
+    specified-: BOOLEAN;
+    pos-: Locator.Position;
+  END;
+  
+TYPE
+  AttributeList* = POINTER TO AttributeListDesc;
+  AttributeArray = POINTER TO ARRAY OF Attribute;
+  AttributeListDesc = RECORD
+    len-: LONGINT;
+    attr-: AttributeArray;
+  END;
 
 
 PROCEDURE (b: Builder) SetLocator* (locator: Locator.Locator);
@@ -232,5 +251,84 @@ PROCEDURE New*(): Builder;
     Init (b);
     RETURN b
   END New;
+
+(* Attribute Lists
+   ------------------------------------------------------------------------ *)
+
+PROCEDURE InitAttribute* (attr: Attribute;
+                          namespaceURI: DTD.NamespaceURI; 
+                          localName: DTD.String;
+                          attrDecl: DTD.AttrDecl;
+                          value: DTD.AttValue;
+                          specified: BOOLEAN;
+                          locator: Locator.Locator);
+  BEGIN
+    attr. namespaceURI := namespaceURI;
+    attr. localName := localName;
+    attr. attrDecl := attrDecl;
+    attr. value := value;
+    attr. specified := specified;
+    locator. StorePosition (attr. pos)
+  END InitAttribute;
+
+PROCEDURE NewAttribute* (namespaceURI: DTD.NamespaceURI; 
+                         localName: DTD.String;
+                         attrDecl: DTD.AttrDecl;
+                         value: DTD.AttValue;
+                         specified: BOOLEAN;
+                         locator: Locator.Locator): Attribute;
+  VAR
+    attr: Attribute;
+  BEGIN
+    NEW (attr);
+    IF ~specified THEN
+      locator := NIL
+    END;
+    InitAttribute (attr, namespaceURI, localName, attrDecl, value,
+                   specified, locator);
+    RETURN attr
+  END NewAttribute;
+
+
+PROCEDURE InitAttributeList* (attrList: AttributeList);
+  BEGIN
+    NEW (attrList. attr, 4);
+    attrList. len := 0
+  END InitAttributeList;
+
+PROCEDURE NewAttributeList* (): AttributeList;
+  VAR
+    attrList: AttributeList;
+  BEGIN
+    NEW (attrList);
+    InitAttributeList (attrList);
+    RETURN attrList
+  END NewAttributeList;
+
+PROCEDURE (attrList: AttributeList) Clear*;
+  VAR
+    i: LONGINT;
+  BEGIN
+    FOR i := 0 TO attrList. len-1 DO
+      attrList. attr[i] := NIL
+    END;
+    attrList. len := 0
+  END Clear;
+
+PROCEDURE (attrList: AttributeList) Append* (attr: Attribute);
+  VAR
+    new: AttributeArray;
+    i: LONGINT;
+  BEGIN
+    IF (attrList. len = LEN (attrList. attr^)) THEN
+      NEW (new, attrList. len*2);
+      FOR i := 0 TO attrList. len-1 DO
+        new[i] := attrList. attr[i]
+      END;
+      attrList. attr := new
+    END;
+    attrList. attr[attrList. len] := attr;
+    INC (attrList. len)
+  END Append;
 
 END XML:Builder.
