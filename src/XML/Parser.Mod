@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.29 2001/03/21 22:41:32 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.30 2001/03/22 22:04:58 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -95,17 +95,19 @@ TYPE
 
        @itemize @bullet
        @item
+       parameter entity references are expanded,
+
+       @item
        parameter entity references do not violate the nesting requirements
        imposed by the various validity constraints,
 
        @item
        required attributes are present in an element's attribute list,
-
-       @item
-       @dots{}
        @end itemize
 
-       The default value of this field is @code{FALSE}.*)
+       The default value of this field is @code{FALSE}.  Only use this setting
+       in conjunction with a builder of type
+       @otype{*XML:Builder:Validator.Builder}.  *)
     processDeclarations: BOOLEAN;
     (* if FALSE, then entity declarations and attribute declarations must not
        be processed; this field starts out TRUE, and is set to FALSE after

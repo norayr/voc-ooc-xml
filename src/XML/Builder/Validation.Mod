@@ -1,4 +1,4 @@
-(*      $Id: Validation.Mod,v 1.8 2001/03/20 22:16:44 mva Exp $   *)
+(*      $Id: Validation.Mod,v 1.9 2001/03/21 21:14:03 mva Exp $   *)
 MODULE XML:Builder:Validation;
 (*  Adds validation services to the XML:Parser.
     Copyright (C) 2001  Michael van Acken
@@ -20,6 +20,7 @@ MODULE XML:Builder:Validation;
 
 
 IMPORT
+Log,
   Ascii, Msg, LongStrings, URI, 
   XML:Error, XML:DTD, XML:Locator, XML:Parser, XML:Regexp, B := XML:Builder;
 
@@ -29,10 +30,21 @@ TYPE
   Stack = POINTER TO ARRAY OF
     RECORD
       elem: DTD.ElementDecl;
-      regexp: Regexp.Node;
+      matcher: Regexp.Matcher;
     END;
   BuilderDesc = RECORD
-  (**This builder adds validation services to the parser.  *)
+  (**This builder adds validation services to the parser.  It performs
+     additional error checking, but does not change element, attribute, or
+     content data.
+
+     Assuming that @samp{builder} is an instance of @otype{B.Builder}, the
+     following commands create a validating parser:
+
+     @example
+     builder := Validator.New (builder);
+     p := Parser.NewFile (arg, NIL, NIL, NIL, builder, res);
+     p. validating := TRUE;
+     @end example  *)
     (B.BuilderDesc)
     parserLocator: Locator.Locator;
     delegateBuilder: B.Builder;
@@ -286,14 +298,14 @@ PROCEDURE PushElement (b: Builder; elemDecl: DTD.Declaration);
     INC (b. currLevel);
     IF (elemDecl = NIL) THEN
       b. stack[b. currLevel]. elem := dummyElement;
-      b. stack[b. currLevel]. regexp := NIL;
+      b. stack[b. currLevel]. matcher := NIL;
     ELSE
       b. stack[b. currLevel]. elem := elemDecl(DTD.ElementDecl);
       IF (elemDecl(DTD.ElementDecl). regexp = NIL) THEN
-        b. stack[b. currLevel]. regexp := NIL
+        b. stack[b. currLevel]. matcher := NIL
       ELSE
-        b. stack[b. currLevel]. regexp :=
-          elemDecl(DTD.ElementDecl). regexp(Regexp.Node)
+        b. stack[b. currLevel]. matcher :=
+          Regexp.NewMatcher (elemDecl(DTD.ElementDecl). regexp(Regexp.Regexp))
       END
     END
   END PushElement;
@@ -301,7 +313,7 @@ PROCEDURE PushElement (b: Builder; elemDecl: DTD.Declaration);
 PROCEDURE PopElement (b: Builder);
   BEGIN
     b. stack[b. currLevel]. elem := NIL;
-    b. stack[b. currLevel]. regexp := NIL;
+    b. stack[b. currLevel]. matcher := NIL;
     DEC (b. currLevel)
   END PopElement;
 
@@ -475,7 +487,7 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
       
       IF (elemDecl. contentType = DTD.contentChildren) THEN
         (* create regular expression for `children' content *)
-        elemDecl. SetRegexp (Regexp.Create (elemDecl. contentModel))
+        elemDecl. SetRegexp (Regexp.New (elemDecl. contentModel))
       ELSIF (elemDecl. contentType = DTD.contentMixed) THEN
         (* check that every child entry in a Mixed type is unique *)
         cp := elemDecl. contentModel(DTD.ChoiceCP). list;
@@ -523,8 +535,8 @@ PROCEDURE CheckEmpty (b: Builder);
 PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration; 
                                       localName: DTD.String);
   VAR
-    ptr, start: Regexp.Node;
     elemDecl: DTD.Declaration;
+    expected: DTD.String;
     list: DTD.CP;
   
   PROCEDURE InCPList (name: DTD.String; list: DTD.CP): BOOLEAN;
@@ -569,25 +581,20 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
         ErrString (b, rootMismatch, "name", b. dtd. rootName)
       END
       
-    ELSIF (b. stack[b. currLevel]. regexp # NIL) THEN
+    ELSIF (b. stack[b. currLevel]. matcher # NIL) THEN
       (* this element has a parent, and we are within a `children' content
          model *)
-      start := b. stack[b. currLevel]. regexp;
-      ptr := Regexp.GetMatch (start, localName);
-      IF (ptr = Regexp.endOfRegexp) THEN (* error: end of regexp *)
+      IF ~b. stack[b. currLevel]. matcher. Matches (localName) THEN
+        expected := b. stack[b. currLevel]. matcher. ExpectedTags (b. stack[b. currLevel]. elem. name);
         IncErrorPos (b, -1);
-        ErrString (b, expectedEndTag,
-                   "element", b. stack[b. currLevel]. elem. name);
+        IF (expected = NIL) THEN
+          ErrString (b, expectedEndTag,
+                     "element", b. stack[b. currLevel]. elem. name)
+        ELSE
+          ErrString (b, expectedElement, "elements", expected)
+        END;
         IncErrorPos (b, 1);
-        ptr := NIL
-      ELSIF (ptr = NIL) THEN           (* error: no matching node *)
-        IncErrorPos (b, -1);
-        ErrString(b, expectedElement, "elements", Regexp.ListElements (start));
-        IncErrorPos (b, 1);
-      ELSE
-        ptr := ptr. suc
-      END;
-      b. stack[b. currLevel]. regexp := ptr
+      END
       
     ELSIF (b. stack[b. currLevel]. elem. contentType = DTD.contentMixed) THEN
       (* this element has a parent, and we are within a `Mixed' content
@@ -607,34 +614,24 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
     END;
     PushElement (b, elemDecl);
 
-    (* missing: element declared?  valid mixed content? ... *)
-
     b. delegateBuilder. StartElement (namespaceDecl, localName)
   END StartElement;
 
 PROCEDURE (b: Builder) EndElement* (namespaceDecl: DTD.NamespaceDeclaration; 
                                     localName: DTD.String);
   VAR
-    start, ptr: Regexp.Node;
+    expected: DTD.String;
   BEGIN
     (* did we reach the end of the regular expression of the `children'
        content model? *)
-    start := b. stack[b. currLevel]. regexp;
-    IF (start # NIL) THEN
-      (* find out if there is an empty path from the current position to
-         the `endOfRegexp' node *)
-      ptr := start;
-      WHILE (ptr # NIL) & (ptr # Regexp.endOfRegexp) DO
-        IF (ptr. elem = NIL) THEN
-          ptr := ptr. suc
-        ELSE
-          ptr := ptr. alt
-        END
-      END;
-      IF (ptr # Regexp.endOfRegexp) THEN
+    IF (b. stack[b. currLevel]. matcher # NIL) &
+       ~b. stack[b. currLevel]. matcher. EndOfRegexp() THEN
+      expected := b. stack[b. currLevel]. matcher. ExpectedTags (b. stack[b. currLevel]. elem. name);
+      IF (expected # NIL) THEN
         IncErrorPos (b, -2);
-        ErrString(b, expectedElement, "elements", Regexp.ListElements (start));
-        IncErrorPos (b, 2);
+        ErrString(b, expectedElement, "elements", 
+                  expected);
+        IncErrorPos (b, 2)
       END
     END;
     
@@ -952,7 +949,7 @@ PROCEDURE Init* (b: Builder; delegateBuilder: B.Builder);
     NEW (b. stack, 16);
     FOR i := 0 TO LEN (b. stack^)-1 DO
       b. stack[i]. elem := NIL;
-      b. stack[i]. regexp := NIL;
+      b. stack[i]. matcher := NIL;
     END
   END Init;
 
@@ -1036,7 +1033,7 @@ PROCEDURE SetErrorMessages;
       | expectedEndTag:
         t := "Expected end tag </${element}>"
       | expectedElement:
-        t := "Expected elements:${elements}"
+        t := "Expected tags:${elements}"
       | noSuchElementType:
         t := "Element type `${name}' is not declared"
       | invalidContentInEMPTY:
