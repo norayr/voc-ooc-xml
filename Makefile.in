@@ -128,6 +128,7 @@ test: localdirs
 	cd tests && ${MAKE} test
 
 dist: distclean
+	autoconf
 	f="ooc-libxml-`date +%Y%m%d`.tar"; cd .. && tar -c -v -f $$f libxml && bzip2 -9 $$f
 
 # ==================== Cleaning up and miscellanea ====================
