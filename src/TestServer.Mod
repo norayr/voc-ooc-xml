@@ -43,7 +43,7 @@ PROCEDURE ReadFromClient (sock: Socket.Socket): LONGINT;
   VAR
     nbytes: LONGINT;
   BEGIN
-    nbytes := sock. Recv (buffer, SIZE (Buffer), {});
+    nbytes := sock. Recv (buffer, 0, SIZE (Buffer), {});
     IF (nbytes < 0) THEN
       Log.Msg ("read error");
       HALT (1)
