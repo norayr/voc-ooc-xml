@@ -3,5 +3,5 @@
 <!ELEMENT doc (#PCDATA)>
 ]>
 <doc a1="foo&#xD;&#xA;bar"></doc>
-<!-- The character references are replaced with two saces in the 
-normalized attribute value.  -->
+<!-- The character references are replaced with their literal value.
+See Errata 2000-07-27 E70 -->
