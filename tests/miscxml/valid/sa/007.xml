@@ -3,5 +3,6 @@
 numerically (&#38;#38;#38;) or with a general entity
 (&amp;amp;).</p>">
 <!ELEMENT doc (p)>
+<!ELEMENT p (#PCDATA)>
 ]>
 <doc>&example;</doc>

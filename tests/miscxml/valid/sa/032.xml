@@ -14,7 +14,10 @@
 
 xyz"/>
   <e a="&d;&d;A&a;&a;B&da;"/>
-  <e a="&#xd;&#xd;A&#xa;&#xa;B&#xd;&#xa;"/>
+  <e a="A
+
+B
+"/>
 
   <e  b="
 
