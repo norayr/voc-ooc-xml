@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.6 2000/07/17 07:44:41 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.7 2000/07/22 16:18:08 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -22,7 +22,7 @@ MODULE XML:Parser;
 IMPORT
   Log, Out, Ascii, Channel, Msg, LongStrings, URI, URI:Scheme:File,
   Codec := XML:UnicodeCodec, XML:UnicodeCodec:UTF8, XML:UnicodeCodec:UTF16,
-  AbstrLocator := XML:Locator, XML:EntityResolver,
+  XML:Locator, XML:EntityResolver,
   Buffer := XML:UnicodeBuffer, XML:Error, XML:DTD, XML:Builder;
   (* warning: the modules UTF8 and UTF16 are not used in this module, but
      they must be imported to guarantee that these codecs are available to
@@ -40,26 +40,21 @@ TYPE
   END;
 
 TYPE
-  Parser* = POINTER TO ParserDesc;
-  
-TYPE
-  LocatorDesc = RECORD
-    (AbstrLocator.LocatorDesc)
-    p: Parser;
-  END;
-  Locator = POINTER TO LocatorDesc;
-
-TYPE
   NameList = POINTER TO ARRAY OF DTD.String;
   PEInfoList = POINTER TO ARRAY OF PEInfo;
+  ErrorListener = POINTER TO ErrorListenerDesc;
+  Parser* = POINTER TO ParserDesc;
   ParserDesc = RECORD
     errList-: Error.List;
     
-    l: Locator;
+    l: Locator.Locator;
     (* This object keeps track of file position (character index, line and
        column number).  It is passed to the builder to enable it to access
        this information for callback events.  *)
-    errorPos: LocatorDesc;
+    errorListener: ErrorListener;
+    (* This object is used by external code (typically, builders) to report
+       errors during document processing.  *)
+    errorPos: Locator.Position;
     er: EntityResolver.Resolver;
     in: Buffer.Input;
     initialBuilder, builder: Builder.Builder;
@@ -78,8 +73,14 @@ TYPE
        is never @code{NIL} *)
        
     followExternalRef*: BOOLEAN;
-    (* if TRUE, then the parser should try to follow external references;
-       if this fails, it is an error *)
+    (* If TRUE, then the parser should try to follow external references.
+       It is an error if the external entity cannot be read.  The default
+       value is @code{TRUE}.  *)
+    enforceQNames*: BOOLEAN;
+    (* If TRUE, then the parser checks that element and attribute names also
+       match the production `QName', and that entity names, PI targets, and
+       notation names contain no colon.  This enables parts of the checks 
+       required from namespace aware parser.  The default is @code{FALSE}.  *)
     processDeclarations: BOOLEAN;
     (* if FALSE, then entity declarations and attribute declarations must no
        be processed; this field starts out TRUE, and is set to FALSE after
@@ -140,6 +141,13 @@ VAR
   noName: DTD.String;
 
 
+TYPE
+  ErrorListenerDesc = RECORD
+    (Locator.ErrorListenerDesc)
+    p: Parser;
+  END;
+
+
 CONST  (* error codes *)
   (* lexical errors *)
   invalidChar = 1;
@@ -171,6 +179,8 @@ CONST  (* error codes *)
   invalidCharacterEncodings = 27;
   junkAfterExtSubset = 28;
   unknownCharacterEncoding = 29;
+  invalidNCName = 30;
+  invalidQName = 31;
   
   (* DTD errors *)
   expectedMarkupDecl = 105;
@@ -207,16 +217,6 @@ CONST  (* error codes *)
 VAR
   parserContext: Error.Context;
 
-
-PROCEDURE (l: Locator) InInternalEntity*(): DTD.InternalEntity;
-  BEGIN
-    IF (l. p. lenPEStack # 0) & 
-       (l. p. fileEntity # l. p. peStack[l. p. lenPEStack-1]. entity) THEN
-      RETURN l. p. peStack[l. p. lenPEStack-1]. entity(DTD.InternalEntity)
-    ELSE
-      RETURN NIL
-    END
-  END InInternalEntity;
 
 (* ------------------------------------------------------------------------ *)
 
@@ -472,12 +472,14 @@ PROCEDURE IsEncNameChar (ch: Buffer.Char; first: BOOLEAN): BOOLEAN;
 
 (* ------------------------------------------------------------------------ *)
 
-PROCEDURE (p: Parser) Error* (context: Error.Context; code: Error.Code;
-                              fatalError: BOOLEAN;
-                              pos: AbstrLocator.Position): Error.Msg;
+PROCEDURE (el: ErrorListener) Error* (context: Error.Context; code: Error.Code;
+                                      fatalError: BOOLEAN;
+                                      pos: Locator.Position): Error.Msg;
   VAR
     err: Error.Msg;
+    p: Parser;
   BEGIN
+    p := el. p;
     err := Error.New (context, code);
     err. SetIntAttrib ("char", pos. charIndex);
     err. SetIntAttrib ("line", pos. line);
@@ -541,13 +543,13 @@ PROCEDURE (p: Parser) ParseDocument*;
   for this are CR+LF end of line marker, or character references.
   *)
   
-  PROCEDURE DecLength (VAR pos: LocatorDesc; len: DTD.CharPos);
+  PROCEDURE DecLength (VAR pos: Locator.Position; len: DTD.CharPos);
     BEGIN
       DEC (pos. charIndex, len);
       DEC (pos. column, len)
     END DecLength;
   
-  PROCEDURE StorePosition (VAR pos: LocatorDesc);
+  PROCEDURE StorePosition (VAR pos: Locator.Position);
     VAR
       i: LONGINT;
     BEGIN
@@ -593,7 +595,7 @@ PROCEDURE (p: Parser) ParseDocument*;
     END SetFileEntity;
   
   
-  PROCEDURE ErrPos (code: Error.Code; VAR pos: LocatorDesc);
+  PROCEDURE ErrPos (code: Error.Code; VAR pos: Locator.Position);
     VAR
       i: LONGINT;
     BEGIN
@@ -754,6 +756,11 @@ PROCEDURE (p: Parser) ParseDocument*;
             chars[LEN (chars^)-2] := " ";
             chars[LEN (chars^)-1] := Buffer.markerEOB
           END
+        END;
+        
+        IF (entity. type = DTD.entityInternalGeneral) OR
+           (entity. type = DTD.entityInternalParameter) THEN
+          p. l. inInternalEntity := entity(DTD.InternalEntity)
         END
       END;
       cpos := 0; cdelta := 0; cstart := 0
@@ -800,6 +807,14 @@ PROCEDURE (p: Parser) ParseDocument*;
       ELSE
         SetFileEntity (p. documentEntity)
       END;
+      
+      IF (i # p. lenPEStack-1) THEN
+        (* parsing continues in replacement text of internal entity *)
+        p. l. inInternalEntity := p. peStack[p. lenPEStack-1]. entity(DTD.InternalEntity)
+      ELSE  (* parsing continues on file level *)
+        p. l. inInternalEntity := NIL
+      END;
+      
       p. in := p. peStack[p. lenPEStack]. in;
       cstart := cpos; cdelta := 0;
       
@@ -998,13 +1013,27 @@ PROCEDURE (p: Parser) ParseDocument*;
       END
     END NextChar;
   
-  PROCEDURE Nmtoken(): DTD.String;
+  PROCEDURE Nmtoken (checkForQName, noColon: BOOLEAN): DTD.String;
   (* pre: chars[cpos] # Buffer.markerEOB *)
     VAR
       string: DTD.String;
+      colon: DTD.CharPos;
     BEGIN
       IF IsNameChar (chars[cpos]) THEN
         cstart := cpos;
+        IF (chars[cpos] = ":") THEN
+          (* colon at beginning of name *)
+          colon := cpos;
+          IF checkForQName THEN
+            IF noColon THEN              (* no colon allowed in NCName *)
+              Err (invalidNCName)
+            ELSE
+              Err (invalidQName)
+            END
+          END
+        ELSE
+          colon := -1
+        END;
         INC (cpos);
         LOOP
           IF (chars[cpos] = Buffer.markerEOB) THEN
@@ -1015,12 +1044,24 @@ PROCEDURE (p: Parser) ParseDocument*;
             ELSE
               NextBlock
             END
+          ELSIF (chars[cpos] = ":") & checkForQName THEN
+            IF noColon THEN              (* no colon allowed in NCName *)
+              Err (invalidNCName)
+            ELSIF (colon >= 0) THEN      (* multiple colons *)
+              Err (invalidQName)
+            END;
+            colon := cpos;
+            INC (cpos)
           ELSIF IsNameChar (chars[cpos]) THEN
             INC (cpos)
           ELSE
             string := GetString (cstart, cpos);
             EXIT
           END
+        END;
+        IF checkForQName & (string[LEN (string^)-2] = ":") THEN
+          (* colon is last character in name *)
+          Err (invalidQName)
         END;
         RETURN string
       ELSE
@@ -1030,11 +1071,11 @@ PROCEDURE (p: Parser) ParseDocument*;
       END
     END Nmtoken;
   
-  PROCEDURE Name(): DTD.String;
-  (* pre: chars[cpos] # Buffer.markerEOB *)  
+  PROCEDURE Name (noColon: BOOLEAN): DTD.String;
+  (* pre: chars[cpos] # Buffer.markerEOB *)
     BEGIN
       IF IsNameChar0 (chars[cpos]) THEN
-        RETURN Nmtoken()
+        RETURN Nmtoken (p. enforceQNames, noColon)
       ELSE
         Err (expectedName);
         NextChar;
@@ -1079,7 +1120,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       END;
       CheckChar ("%");
       oldCStart := cstart+p. in. offsetFromPos0;
-      name := Name();
+      name := Name (TRUE);
       cstart := oldCStart-p. in. offsetFromPos0;
       CheckChar (";");
       decl := dtd. peNamespace. Get (name);
@@ -1234,7 +1275,7 @@ PROCEDURE (p: Parser) ParseDocument*;
   
   PROCEDURE String (type: SHORTINT): DTD.String;
     VAR
-      pos: LocatorDesc;
+      pos: Locator.Position;
       endChar: DTD.Char;
       string: DTD.String;
     
@@ -1421,7 +1462,7 @@ PROCEDURE (p: Parser) ParseDocument*;
     BEGIN
       StorePosition (p. l^);
       INC (cpos, 2);                     (* skip over "<?" *)
-      target := Name();
+      target := Name (TRUE);
       IF (target^ = "xml") THEN
         ErrPos (xmlDeclNotAtBeginning, p. l^)
       ELSIF IsReserved (target^) THEN
@@ -1532,7 +1573,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       errorReplacement = 20H;
     VAR
       cval: LONGINT;
-      pos: LocatorDesc;
+      pos: Locator.Position;
     
     PROCEDURE ToUnicode (cval: LONGINT): DTD.CharPos;
       BEGIN
@@ -1607,12 +1648,12 @@ PROCEDURE (p: Parser) ParseDocument*;
       decl: DTD.Declaration;
       entity: DTD.Entity;
       localCStart: DTD.CharPos;
-      pos: LocatorDesc;
+      pos: Locator.Position;
     BEGIN
       StorePosition (pos);
       CheckChar ("&");
       localCStart := p. in. offsetFromPos0+cstart;
-      name := Name();
+      name := Name (TRUE);
       cstart := localCStart-p. in. offsetFromPos0;
       CheckChar (";");
       
@@ -1653,7 +1694,7 @@ PROCEDURE (p: Parser) ParseDocument*;
     VAR
       attValue: DTD.AttValue;
       endChar: DTD.Char;
-      pos: LocatorDesc;
+      pos: Locator.Position;
     
     PROCEDURE Flush;
       BEGIN
@@ -1724,7 +1765,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       attrValue: DTD.AttValue;
       decl, decl0: DTD.Declaration;
       attrDecl: DTD.AttrDecl;
-      pos: LocatorDesc;
+      pos: Locator.Position;
       
     PROCEDURE content;
     (* post: chars[cpos] # Buffer.markerEOB *)
@@ -1806,7 +1847,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         VAR
           decl: DTD.Declaration;
           entity: DTD.Entity;
-          pos: LocatorDesc;
+          pos: Locator.Position;
         BEGIN
           decl := dtd. geNamespace. Get (entityRef. name);
           entity := NIL;
@@ -2129,7 +2170,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         p. lenNameList := 0;
         emptyElementTag := FALSE;
         StorePosition (p. l^);
-        startName := Name();
+        startName := Name (FALSE);
         decl := dtd. elementNamespace. Get (startName);
         p. builder. StartElement (NIL, startName); (* callback *)
         LOOP
@@ -2147,7 +2188,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           END;
           
           StorePosition (p. l^);
-          attrName := Name();
+          attrName := Name (FALSE);
           IF AttributeNameUsed (attrName) THEN
             ErrPos (multipleAttrName, p. l^);
             p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (attrName^))
@@ -2188,7 +2229,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           IF (chars[cpos] # "/") THEN ErrEndTag END;
           CheckChar ("/");
           StorePosition (p. l^);
-          endName := Name();
+          endName := Name (FALSE);
           IF (endName^ # startName^) THEN ErrEndTag END;
           p. builder. EndElement (NIL, startName); (* callback *)
           OptS (TRUE);
@@ -2286,7 +2327,7 @@ PROCEDURE (p: Parser) ParseDocument*;
               hasAlternative := TRUE;
               CheckChar ("|");
               OptS (FALSE);
-              last. SetNext (dtd. NewNameCP (DTD.cpOnce, Name()));
+              last. SetNext (dtd. NewNameCP (DTD.cpOnce, Name (FALSE)));
               OptS (FALSE)
             END;
             CheckChar (")");
@@ -2331,7 +2372,7 @@ PROCEDURE (p: Parser) ParseDocument*;
                   OptS (FALSE);
                   cp := choiceseq()
                 ELSIF IsNameChar0 (chars[cpos]) THEN
-                  cp := dtd. NewNameCP (DTD.cpOnce, Name())
+                  cp := dtd. NewNameCP (DTD.cpOnce, Name (FALSE))
                 ELSE
                   Err (expectedCP);
                   cp := dtd. NewNameCP (DTD.cpOnce, noName)
@@ -2378,9 +2419,9 @@ PROCEDURE (p: Parser) ParseDocument*;
 
         BEGIN
           IF LookingAt ("EMPTY", followedByNonName) THEN
-            RETURN dtd. NewNameCP (DTD.cpOnce, Name())
+            RETURN dtd. NewNameCP (DTD.cpOnce, Name (FALSE))
           ELSIF LookingAt ("ANY", followedByNonName) THEN
-            RETURN dtd. NewNameCP (DTD.cpOnce, Name())
+            RETURN dtd. NewNameCP (DTD.cpOnce, Name (FALSE))
           ELSIF (chars[cpos] = "(") THEN
             CheckChar ("(");
             OptS (FALSE);
@@ -2398,7 +2439,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       BEGIN
         INC (cpos, 9);                 (* skip over "<!ELEMENT" *)
         S;
-        elementName := Name();
+        elementName := Name (FALSE);
         S;
         cp := contentspec();
         OptS (FALSE);
@@ -2431,9 +2472,9 @@ PROCEDURE (p: Parser) ParseDocument*;
               OptS (FALSE);
               CASE attrType OF
               | DTD.attrNOTATION:
-                enum. Append (Name())
+                enum. Append (Name (TRUE))
               | DTD.attrENUMERATED:
-                enum. Append (Nmtoken())
+                enum. Append (Nmtoken (FALSE, FALSE))
               END;
               OptS (FALSE);
               IF (chars[cpos] = "|") THEN
@@ -2515,7 +2556,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       BEGIN
         INC (cpos, 9);                 (* skip over "<!ATTLIST" *)
         S;
-        elementName := Name();
+        elementName := Name (FALSE);
         LOOP
           IF (chars[cpos] # ">") THEN
             S
@@ -2524,7 +2565,7 @@ PROCEDURE (p: Parser) ParseDocument*;
             EXIT
           END;
 
-          attrName := Name();
+          attrName := Name (FALSE);
           S;
           AttType (attrType, attrEnumeration);
           S;
@@ -2553,7 +2594,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       (* pre: chars[cpos] # Buffer.markerEOB *)
         VAR
           endChar: DTD.Char;
-          pos: LocatorDesc;
+          pos: Locator.Position;
           storedPos: DTD.CharPos;
           string: DTD.String;
           fragment: DTD.Fragment;
@@ -2641,7 +2682,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           S
         END;
         StorePosition (p. l^);
-        name := Name();
+        name := Name (TRUE);
         S;
         IF (chars[cpos] = "'") OR (chars[cpos] = '"') THEN
           public := NIL; system := NIL; ndata := NIL;
@@ -2669,7 +2710,7 @@ PROCEDURE (p: Parser) ParseDocument*;
               entityType := DTD.entityUnparsed;
               INC (cpos, 5);           (* skipt over "NDATA" *)
               S;
-              ndata := Name()
+              ndata := Name (FALSE)
             END
           END;
           entity := dtd. NewExternalEntity (name, entityType, public, system, ndata, baseURI)
@@ -2695,7 +2736,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         INC (cpos, 10);                (* skipt over "<!NOTATION" *)
         S;
         StorePosition (p. l^);
-        name := Name();
+        name := Name (TRUE);
         S;
         ExternalID (TRUE, public, system, baseURI);
         (* what should be done if the external id of the notation cannot be
@@ -2727,7 +2768,7 @@ PROCEDURE (p: Parser) ParseDocument*;
 
   PROCEDURE extSubsetDecl;
     VAR
-      pos: LocatorDesc;
+      pos: Locator.Position;
       
     PROCEDURE ignoreSectContents;
       VAR
@@ -2817,7 +2858,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         
         INC (cpos, 9);                   (* skip over "<!DOCTYPE" *)
         S;
-        rootName := Name();
+        rootName := Name (FALSE);
         OptS (FALSE);
         IF LookingAt ("SYSTEM", followedByAny) OR
            LookingAt ("PUBLIC", followedByAny) THEN
@@ -2890,6 +2931,7 @@ PROCEDURE (p: Parser) ParseDocument*;
     
     StorePosition (p. l^);
     p. builder. SetLocator (p. l);
+    p. builder. SetErrorListener (p. errorListener);
     p. builder. StartDocument (p. documentEntity); (* callback *)
     
     prolog;
@@ -2916,7 +2958,11 @@ PROCEDURE Init (p: Parser; baseURI: URI.URI;
                 builder: Builder.Builder);
   BEGIN
     NEW (p. l);
-    p. l. p := p;
+    p. l. inInternalEntity := NIL;
+    
+    NEW (p. errorListener);
+    p. errorListener. p := p;
+    
     p. dtd := DTD.New();
     p. errList := Error.NewList();
     p. documentEntity := p. dtd. NewDocumentEntity (baseURI);
@@ -2929,6 +2975,7 @@ PROCEDURE Init (p: Parser; baseURI: URI.URI;
     
     
     p. followExternalRef := TRUE;
+    p. enforceQNames := FALSE;
     p. processDeclarations := TRUE;
     
     p. inDocumentElement := FALSE;
@@ -3100,6 +3147,10 @@ PROCEDURE SetErrorMessages;
         t := "Junk after external DTD subset"
       | unknownCharacterEncoding:
         t := "Unknown character encoding"
+      | invalidNCName:
+        t := "This name must not contain a colon character `:'"
+      | invalidQName:
+        t := "Invalid use of colon in a qualified name"
         
       | expectedMarkupDecl:
         t := "Expected markup declaration"
