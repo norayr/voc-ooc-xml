@@ -1,7 +1,7 @@
-(* 	$Id: Path.Mod,v 1.1.1.1 2000/07/10 15:24:44 mva Exp $	 *)
+(* 	$Id: Path.Mod,v 1.1.1.2 2000/07/10 20:31:52 mva Exp $	 *)
 MODULE OS:Path;
 (*  Manipulation of file and directory names.
-    Copyright (C) 2000  Michael van Acken
+    Copyright (C) 2000, 2001  Michael van Acken
 
     This module is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License
@@ -62,10 +62,51 @@ PROCEDURE dirname* (path: ARRAY OF CHAR; VAR dirname: ARRAY OF CHAR);
     END
   END dirname;
 
+PROCEDURE basename* (path: ARRAY OF CHAR; VAR basename: ARRAY OF CHAR);
+(**Calculates the basename of pathname @oparam{path} and returns the result in
+   @oparam{basename}.  The basename is the last pathname component of path.  It
+   will never contain a slash.  If path ends with a slash, then the basename is
+   the empty string.  If path does not contain a slash, then the basename
+   equals path.  If @oparam{basename} is not long enough to hold the result,
+   the string is truncated.  *)
+  VAR
+    i: INTEGER;
+  BEGIN
+    i := Strings.Length (path);
+    WHILE (i > 0) & (path[i-1] # "/") DO
+      DEC (i)
+    END;
+    Strings.Extract (path, i, MAX (INTEGER), basename)
+  END basename;
+
+PROCEDURE splitext* (path: ARRAY OF CHAR; VAR root, ext: ARRAY OF CHAR);
+(**Splits the pathname @oparam{path} into a pair @samp{(@oparam{root},
+   @oparam{ext})} such that @samp{concat(@oparam{root},@oparam{ext}) =
+   @oparam{path}}.  The extension @oparam{ext} is empty or begins with a period
+   and contains at most one period.  The extension string does not contain a
+   slash character.  *)
+  VAR
+    i: INTEGER;
+  BEGIN
+    i := Strings.Length (path);
+    WHILE (i > 0) & (path[i-1] # "/") & (path[i] # ".") DO
+      DEC (i)
+    END;
+    IF (path[i] = ".") THEN
+      Strings.Extract (path, 0, i, root);
+      Strings.Extract (path, i, MAX (INTEGER), ext)
+    ELSE
+      COPY (path, root);
+      COPY ("", ext)
+    END
+  END splitext;
+
 PROCEDURE Test;
   VAR
-    str: ARRAY 1024 OF CHAR;
+    str, root, ext: ARRAY 1024 OF CHAR;
   BEGIN
+    (* dirname
+       --------------------------------------------------------------------- *)
     dirname("", str);
     ASSERT (str = "");
 
@@ -95,6 +136,52 @@ PROCEDURE Test;
 
     dirname("abc///", str);
     ASSERT (str = "abc");
+    
+    
+    (* basename
+       --------------------------------------------------------------------- *)
+    basename("", str);
+    ASSERT (str = "");
+    
+    basename("/", str);
+    ASSERT (str = "");
+    
+    basename("abc/", str);
+    ASSERT (str = "");
+    
+    basename("abc", str);
+    ASSERT (str = "abc");
+    
+    basename("abc/x", str);
+    ASSERT (str = "x");
+    
+    
+    (* splitext
+       --------------------------------------------------------------------- *)
+    splitext("", root, ext);
+    ASSERT (root = ""); ASSERT (ext = "");
+    
+    splitext("/", root, ext);
+    ASSERT (root = "/"); ASSERT (ext = "");
+    
+    splitext(".", root, ext);
+    ASSERT (root = ""); ASSERT (ext = ".");
+    
+    splitext("/.", root, ext);
+    ASSERT (root = "/"); ASSERT (ext = ".");
+    
+    splitext("./", root, ext);
+    ASSERT (root = "./"); ASSERT (ext = "");
+    
+    splitext("a.", root, ext);
+    ASSERT (root = "a"); ASSERT (ext = ".");
+    
+    splitext("a.b", root, ext);
+    ASSERT (root = "a"); ASSERT (ext = ".b");
+    
+    splitext("a.b.c", root, ext);
+    ASSERT (root = "a.b"); ASSERT (ext = ".c");
+    
   END Test;
 
 BEGIN
