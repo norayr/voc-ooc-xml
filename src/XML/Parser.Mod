@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.17 2000/11/08 14:15:01 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.18 2001/02/07 10:37:06 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -710,6 +710,64 @@ PROCEDURE (p: Parser) ParseDocument*;
       END
     END GetBuffer;
   
+  PROCEDURE CheckInvalidChars;
+    VAR
+      str: ARRAY 2*1024 OF CHAR;
+    BEGIN
+      IF (p. in. codec. invalidChars # 0) THEN
+        Err (invalidCharacterEncodings);
+        p. fileEntity. baseURI. GetString (str);
+        p. lastError. SetStringAttrib ("uri", Msg.GetStringPtr (str));
+        p. lastError. SetIntAttrib ("encodings", p. in. codec. invalidChars)
+      END
+    END CheckInvalidChars;
+  
+  PROCEDURE Internalize (entity: DTD.ExternalEntity): DTD.String;
+    VAR
+      in: Buffer.Input;
+      len, i, delta: Buffer.CharPos;
+      str: DTD.String;
+    BEGIN
+      in := GetBuffer (entity);
+      IF (in # NIL) THEN
+        WHILE in. NextBlock() DO END;
+
+        (* do eol replacement magic *)
+        len := in. endOfBuffer;
+        i := 0; delta := 0;
+        WHILE (i # len) DO
+          CASE in. chars[i] OF
+          | Ascii.cr:
+            in. chars[i-delta] := Ascii.lf;
+            IF (in. chars[i+1] = Ascii.lf) THEN
+              INC (i); INC (delta)
+            END
+          ELSE
+            in. chars[i-delta] := in. chars[i]
+          END;
+          INC (i)
+        END;
+        DEC (len, delta);
+
+        NEW (str, len+2);
+        FOR i := 0 TO len-1 DO
+          str[i] := in. chars[i]
+        END;
+        CheckInvalidChars;
+        in. Close
+      ELSE
+        NEW (str, 2);
+        len := 0
+      END;
+      CASE entity. type OF
+      | DTD.entityExternalGeneral:
+        str[len] := Buffer.markerEOD
+      | DTD.entityExternalParameter:
+        str[len] := Buffer.markerEOB
+      END;
+      RETURN str
+    END Internalize;
+  
   PROCEDURE PushEntity (entity: DTD.Entity; syncEntity: BOOLEAN);
   (* `syncEntity=TRUE' means that the resolved entity is matched against
      a grammar production (extParsedPE, externalSubset) and is not
@@ -754,6 +812,9 @@ PROCEDURE (p: Parser) ParseDocument*;
         (* internal entity or internalized external entity that is inserted
            somewhere "in between"; continue parsing in a _copy_ of the entity
            value, because the value may be modified during parsing *)
+        IF (entity IS DTD.ExternalEntity) & (entity. entityValue = NIL) THEN
+          entity. SetEntityValue (Internalize (entity(DTD.ExternalEntity)))
+        END;
         chars := Clone (entity. entityValue);
         
         CASE entity. type OF
@@ -784,18 +845,6 @@ PROCEDURE (p: Parser) ParseDocument*;
       END;
       cpos := 0; cdelta := 0; cstart := 0
     END PushEntity;
-  
-  PROCEDURE CheckInvalidChars;
-    VAR
-      str: ARRAY 2*1024 OF CHAR;
-    BEGIN
-      IF (p. in. codec. invalidChars # 0) THEN
-        Err (invalidCharacterEncodings);
-        p. fileEntity. baseURI. GetString (str);
-        p. lastError. SetStringAttrib ("uri", Msg.GetStringPtr (str));
-        p. lastError. SetIntAttrib ("encodings", p. in. codec. invalidChars)
-      END
-    END CheckInvalidChars;
   
   PROCEDURE PopEntity;
     VAR
@@ -877,52 +926,6 @@ PROCEDURE (p: Parser) ParseDocument*;
         cstart := cpos
       END
     END DiscardPreviousInput;
-  
-  PROCEDURE Internalize (entity: DTD.ExternalEntity): DTD.String;
-    VAR
-      in: Buffer.Input;
-      len, i, delta: Buffer.CharPos;
-      str: DTD.String;
-    BEGIN
-      in := GetBuffer (entity);
-      IF (in # NIL) THEN
-        WHILE in. NextBlock() DO END;
-
-        (* do eol replacement magic *)
-        len := in. endOfBuffer;
-        i := 0; delta := 0;
-        WHILE (i # len) DO
-          CASE in. chars[i] OF
-          | Ascii.cr:
-            in. chars[i-delta] := Ascii.lf;
-            IF (in. chars[i+1] = Ascii.lf) THEN
-              INC (i); INC (delta)
-            END
-          ELSE
-            in. chars[i-delta] := in. chars[i]
-          END;
-          INC (i)
-        END;
-        DEC (len, delta);
-
-        NEW (str, len+2);
-        FOR i := 0 TO len-1 DO
-          str[i] := in. chars[i]
-        END;
-        CheckInvalidChars;
-        in. Close
-      ELSE
-        NEW (str, 2);
-        len := 0
-      END;
-      CASE entity. type OF
-      | DTD.entityExternalGeneral:
-        str[len] := Buffer.markerEOD
-      | DTD.entityExternalParameter:
-        str[len] := Buffer.markerEOB
-      END;
-      RETURN str
-    END Internalize;
   
   PROCEDURE EndOfLine;
   (* Must be called @emph{after} skipping over an end of line marker (LF, CR,
@@ -1130,7 +1133,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       decl: DTD.Declaration;
       entity: DTD.Entity;
       oldCStart: DTD.CharPos;
-      oldFlag: BOOLEAN;
+      oldFlag, inInternalSubset: BOOLEAN;
     BEGIN  (* pre: (chars[cpos] = "%") *)
       IF ~declSep & 
          (~p. inExternalSubset & ~p. inExternalEntity) THEN
@@ -1152,7 +1155,8 @@ PROCEDURE (p: Parser) ParseDocument*;
              parse the replacement text as a sequence of declarations *)
           IF p. followExternalRef OR
              (entity. type = DTD.entityInternalParameter) THEN
-            PushEntity (entity, TRUE);
+            inInternalSubset := ~(p. inExternalSubset OR p. inExternalEntity);
+            PushEntity (entity, inInternalSubset);
             
             (* an external entity should being with a TextDecl *)
             oldFlag := p. inExternalEntity;
@@ -1172,7 +1176,9 @@ PROCEDURE (p: Parser) ParseDocument*;
               p. inExternalEntity := oldFlag
             END;
             
-            PopEntity
+            IF inInternalSubset THEN
+              PopEntity
+            END
           ELSE
             p. readCompleteDTD := FALSE;
             IF (p. documentEntity. standalone # DTD.standaloneYes) THEN
