@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.25 2001/03/19 00:22:43 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.26 2001/03/19 23:54:09 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -1658,7 +1658,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           IF LookingAt ("]]>", followedByAny) THEN
             DecLength (p. l^, -9);
             p. builder. Characters (chars^, cstart, cpos-cdelta, (* callback *)
-                                    DTD.elementWhitespaceUnknown);
+                                    DTD.elementWhitespaceNo);
             INC (cpos, 3);
             StorePosition (p. l^);
             p. builder. EndCDATA;        (* callback *)
@@ -1871,9 +1871,12 @@ PROCEDURE (p: Parser) ParseDocument*;
          latter are included for efficiency reasons.  A text sequence with
          with embedded character references will cause only a single up 
          call.  *)
+        VAR
+          elementWhitespace: DTD.ElementWhitespaceType;
         BEGIN
           StorePosition (p. l^);
           cstart := cpos; cdelta := 0;
+          elementWhitespace := DTD.elementWhitespaceUnknown;
           
           LOOP  (* loop invariant: cdelta = 0 *)
             (* this is a very specialized version of the loop down below; it
@@ -1889,15 +1892,19 @@ PROCEDURE (p: Parser) ParseDocument*;
                   EXIT
                 END
               END
+            | " ":
+              INC (cpos)
             | "<", "&", Buffer.markerEOD:
               EXIT
             | "]":
               IF LookingAt ("]]>", followedByAny) THEN
                 EXIT
               ELSE
+                elementWhitespace := DTD.elementWhitespaceNo;
                 INC (cpos)
               END
             ELSE
+              elementWhitespace := DTD.elementWhitespaceNo;
               INC (cpos)
             END
           END;
@@ -1915,10 +1922,13 @@ PROCEDURE (p: Parser) ParseDocument*;
               ELSE
                 ControlChar (Ascii.lf)
               END
+            | " ":
+              chars[cpos-cdelta] := chars[cpos]; INC (cpos)
             | "<", Buffer.markerEOD:
               EXIT
             | "&":
               IF LookingAt ("&#", followedByAny) THEN (* character reference *)
+                elementWhitespace := DTD.elementWhitespaceNo;
                 CharRef()
               ELSE
                 EXIT
@@ -1927,15 +1937,17 @@ PROCEDURE (p: Parser) ParseDocument*;
               IF LookingAt ("]]>", followedByAny) THEN
                 Err (invalidCloseCDATA)
               END;
+              elementWhitespace := DTD.elementWhitespaceNo;
               chars[cpos-cdelta] := chars[cpos]; INC (cpos)
             ELSE
+              elementWhitespace := DTD.elementWhitespaceNo;
               chars[cpos-cdelta] := chars[cpos]; INC (cpos)
             END
           END;
           
           IF (cpos-cdelta # cstart) THEN
             p. builder. Characters (chars^, cstart, cpos-cdelta, (* callback *)
-                                    DTD.elementWhitespaceUnknown)
+                                    elementWhitespace)
           END
         END CharData;
 
@@ -2490,7 +2502,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         cp := contentspec();
         OptS (FALSE);
 
-        elementDecl := dtd. NewElementDecl (elementName, cp);
+        elementDecl := dtd. NewElementDecl (elementName, cp, ~currentEntity. IsDocumentEntity());
         IF ~dtd. elementNamespace. Add (elementDecl) THEN
           decl := dtd. elementNamespace. Get (elementName);
           decl(DTD.ElementDecl). SetMultipleDecl

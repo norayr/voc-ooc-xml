@@ -1,4 +1,4 @@
-(*      $Id: Builder.Mod,v 1.11 2001/02/07 10:37:06 mva Exp $   *)
+(*      $Id: Builder.Mod,v 1.12 2001/03/17 21:34:43 mva Exp $   *)
 MODULE XML:Builder [OOC_EXTENSIONS];
 (*  Low-level builder interface to the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -248,17 +248,17 @@ PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
    The array slice @samp{@oparam{chars}[@oparam{charsStart},
    @oparam{charsEnd}[} holds the character data.  @oparam{elementWhitespace}
    indicates whether the characters are whitespace appearing within element
-   content.
-   
+   content.  
+
    The locator refers to the first character.
-   
+
    @emph{Note}: It is up to the parser how it partitions character data before
    reporting it to the application.  For example, the character data of an
-   element may be reported in one call to @oproc{Builder.Characters}, or
-   in multiple chunks, depending on embedded character references, general
-   entity references, CDATA sections, and the size of the character content.
-   It is only guaranteed that this procedure is called with an integral number
-   of ISO 10646 characters (e.g., surrogate pairs are reported in one call). *)
+   element may be reported in one call to @oproc{Builder.Characters}, or in
+   multiple chunks, depending on embedded character references, general entity
+   references, CDATA sections, and the size of the character content.  It is
+   only guaranteed that this procedure is called with an integral number of ISO
+   10646 characters (e.g., surrogate pairs are reported in one call).  *)
   END Characters;
 
 

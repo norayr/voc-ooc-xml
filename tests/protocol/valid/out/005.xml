@@ -53,7 +53,7 @@
   
   <characters>
     <chars>foo</chars>
-    <element-whitespace>unknown</element-whitespace>
+    <element-whitespace>no</element-whitespace>
     <locator>
       <char-index>52</char-index>
       <line>3</line>
@@ -73,7 +73,7 @@
   
   <characters>
     <chars>frobozz</chars>
-    <element-whitespace>unknown</element-whitespace>
+    <element-whitespace>no</element-whitespace>
     <locator>
       <char-index>64</char-index>
       <line>3</line>
@@ -93,7 +93,7 @@
   
   <characters>
     <chars> bar </chars>
-    <element-whitespace>unknown</element-whitespace>
+    <element-whitespace>no</element-whitespace>
     <locator>
       <char-index>74</char-index>
       <line>3</line>
@@ -113,7 +113,7 @@
   
   <characters>
     <chars>&amp;</chars>
-    <element-whitespace>unknown</element-whitespace>
+    <element-whitespace>no</element-whitespace>
     <locator>
       <char-index>79</char-index>
       <line>3</line>
@@ -133,7 +133,7 @@
   
   <characters>
     <chars> yow!</chars>
-    <element-whitespace>unknown</element-whitespace>
+    <element-whitespace>no</element-whitespace>
     <locator>
       <char-index>84</char-index>
       <line>3</line>

@@ -1,4 +1,4 @@
-(*      $Id: Validation.Mod,v 1.6 2001/03/19 00:22:54 mva Exp $   *)
+(*      $Id: Regexp.Mod,v 1.1 2001/03/19 23:54:09 mva Exp $   *)
 MODULE XML:Regexp;
 (*  Creates regular expression data structure from `children' content model.
     Copyright (C) 2001  Michael van Acken
@@ -20,7 +20,7 @@ MODULE XML:Regexp;
 
 
 IMPORT
-  XML:DTD;
+  LongStrings, XML:DTD;
 
 
 TYPE
@@ -29,6 +29,7 @@ TYPE
     (DTD.RegexpNodeDesc)
     suc-, alt-: Node;
     elem-: DTD.String;
+    (* NIL for an empty node, and for @ovar{endOfRegexp} *)
   END;
 
 VAR
@@ -103,7 +104,11 @@ PROCEDURE Create* (contentModel: DTD.CP): Node;
         a := NewNode (NIL);
         q. alt := a; q := a; r := a; s := a
       | DTD.cpRepeat1:
-        ASSERT (FALSE)
+        a := NewNode (NIL);
+        link (r, a);
+        a. alt := p; r := a; s := a;
+        a := NewNode (NIL);
+        a. suc := p; p := a; q := a
       END
     END Convert;
   
@@ -112,6 +117,133 @@ PROCEDURE Create* (contentModel: DTD.CP): Node;
     link (r, endOfRegexp);
     RETURN start
   END Create;
+
+(*PROCEDURE MatchingMatch* (node: Node; name: DTD.String): Node;
+  VAR
+    suc, match: Node;
+      
+  PROCEDURE Matching (node: Node): Node;
+    VAR
+      alt, suc, match: Node;
+    BEGIN
+      WHILE (node # NIL) DO
+        IF (node. elem = NIL) THEN
+          IF (node. alt = NIL) THEN
+            node := node. suc
+          ELSIF (node. suc = NIL) THEN
+            node := node. alt
+          ELSE
+            alt := node. alt; suc := node. suc;
+            node. alt := NIL; node. suc := NIL;
+            match := Matching (alt);
+            IF (match = NIL) THEN
+              match := Matching (suc)
+            END;
+            node. alt := alt; node. suc := suc;
+            RETURN match
+          END
+        ELSIF (node. elem^ = name^) THEN
+          RETURN node
+        ELSE
+          node := node. alt
+        END
+      END;
+      RETURN NIL
+    END Matching;
+  
+  BEGIN
+    suc := node. suc;
+    node. suc := NIL;
+    match := Matching (suc);
+    node. suc := suc;
+    RETURN match
+  END MatchingMatch;*)
+
+PROCEDURE GetMatch* (ptr: Node; name: DTD.String): Node;
+  VAR
+    alt, suc, result, ptr1, ptr2: Node;
+  BEGIN
+    LOOP
+      IF (ptr = endOfRegexp) OR (ptr = NIL) THEN
+        RETURN ptr
+      ELSIF (ptr. elem = NIL) THEN
+        IF (ptr. alt = NIL) THEN
+          ptr := ptr. suc
+        ELSIF (ptr. suc = NIL) THEN
+          ptr := ptr. alt
+        ELSE
+          alt := ptr. alt; suc := ptr. suc;
+          ptr. alt := NIL; ptr. suc := NIL;
+          ptr1 := GetMatch (alt, name);
+          IF (ptr1 = NIL) OR (ptr1 = endOfRegexp) THEN
+            ptr2 := GetMatch (suc, name);
+            IF (ptr1 = NIL) OR (ptr2 # NIL) THEN
+              result := ptr2
+            ELSE
+              result := ptr1
+            END
+          ELSE
+            result := ptr1
+          END;
+          ptr. alt := alt; ptr. suc := suc;
+          RETURN result
+        END
+      ELSIF (ptr. elem^ = name^) THEN
+        EXIT
+      ELSE
+        ptr := ptr. alt
+      END
+    END;
+    RETURN ptr
+  END GetMatch;
+
+PROCEDURE ListElements* (ptr: Node): DTD.String;
+  VAR
+    str: DTD.String;
+    len: LONGINT;
+  
+  PROCEDURE ListRec (ptr: Node);
+    VAR
+      str2: DTD.String;
+      i: LONGINT;
+      alt, suc: Node;
+    BEGIN
+      LOOP
+        IF (ptr = NIL) OR (ptr = endOfRegexp) THEN
+          EXIT
+        ELSIF (ptr. elem = NIL) THEN
+          IF (ptr. alt = NIL) THEN
+            ptr := ptr. suc
+          ELSIF (ptr. suc = NIL) THEN
+            ptr := ptr. alt
+          ELSE
+            alt := ptr. alt; suc := ptr. suc;
+            ptr. alt := NIL; ptr. suc := NIL;
+            ListRec (alt); ListRec (suc);
+            ptr. alt := alt; ptr. suc := suc;
+          END
+        ELSE
+          i := LongStrings.Length (ptr. elem^);
+          IF (len+i+1 >= LEN (str^)) THEN
+            NEW (str2, LEN (str^)*2);
+            COPY (str^, str2^)
+          END;
+          str[len] := " ";
+          str[len+1] := 0X;
+          LongStrings.Append (ptr. elem^, str^);
+          INC (len, i+1);
+          ptr := ptr. alt
+        END
+      END;
+    END ListRec;
+  
+  BEGIN
+    NEW (str, 64);
+    str[0] := 0X;
+    len := 0;
+    ListRec (ptr);
+    RETURN str
+  END ListElements;
 
 BEGIN
   endOfRegexp := NewNode (NIL)

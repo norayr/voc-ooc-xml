@@ -4,8 +4,7 @@ SUBDIR="invalid"
 
 err_count=0
 for d in $SUBDIR; do
-  for i in $d/attr*.xml $d/dtd*.xml $d/el*.xml $d/id*.xml $d/not-sa*.xml $d/required*.xml $d/root.xml; do
-  #for i in $d/*.xml; do
+  for i in $d/*.xml; do
     rm -f test-output/$i test-output/$i.err
     if test $i != invalid/not-sa03.xml; then
         # invalid/not-sa03.xml is invalid and not well-formed; skip the

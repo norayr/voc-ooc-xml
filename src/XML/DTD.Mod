@@ -1,4 +1,4 @@
-(* 	$Id: DTD.Mod,v 1.13 2001/03/19 00:22:43 mva Exp $	 *)
+(* 	$Id: DTD.Mod,v 1.14 2001/03/19 23:54:09 mva Exp $	 *)
 MODULE XML:DTD [OOC_EXTENSIONS];
 (*  Implements the internal representation of a document DTD.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -375,6 +375,8 @@ TYPE
     (**Regular expression contructed for @samp{children} element content.  *)
     contentType-: ContentType;
     (**Type of the content model.  *)
+    externalMarkupDecl-: BOOLEAN;
+    (**Set if the entity is declared in an external markup declaration.  *)
     multipleDecl-: BOOLEAN;
     (**Set to @code{TRUE}, if more than one declaration of this element type
        appears in the DTD.  *)
@@ -401,9 +403,19 @@ TYPE
 
 CONST
   elementWhitespaceYes* = 0;
+  (**This flag is used if the document source matches the production @code{S},
+     the parser is validating, and the current element only permits
+     element content.  *)
   elementWhitespaceNo* = 1;
+  (**If the document source for a character sequence does not match the
+     @code{S} production (for example, because it includes a non-whitespace
+     character, a character reference, or is a @code{CDATA} section), then
+     @oparam{elementWhitespace} is @oconst{DTD.elementWhitespaceNo}.  *)
   elementWhitespaceUnknown* = 2;
-
+  (**If the document source matches the production @code{S}, but the parser
+     does not know if the current element permits only element content, then
+     the character data is flagged as @oconst{elementWhitespaceUnknown}.  *)
+  
 
 TYPE
   NamespaceDeclaration* = POINTER TO NamespaceDeclarationDesc;
@@ -1045,7 +1057,7 @@ PROCEDURE (b: Builder) NewNameCP* (cpMode: CPModeType; name: String): NameCP;
   END NewNameCP;
 
 
-PROCEDURE InitElementDecl (elemDecl: ElementDecl; name: String; contentModel: CP; attrNamespace: Namespace);
+PROCEDURE InitElementDecl (elemDecl: ElementDecl; name: String; contentModel: CP; attrNamespace: Namespace; externalMarkupDecl: BOOLEAN);
   BEGIN
     InitDeclaration (elemDecl, name);
     elemDecl. contentModel := contentModel;
@@ -1067,18 +1079,19 @@ PROCEDURE InitElementDecl (elemDecl: ElementDecl; name: String; contentModel: CP
     ELSE
       elemDecl. contentType := contentChildren
     END;
+    elemDecl. externalMarkupDecl := externalMarkupDecl;
     elemDecl. multipleDecl := FALSE;
     elemDecl. attrNamespace := attrNamespace;
     elemDecl. idAttr := NIL;
     elemDecl. notationAttr := NIL;
   END InitElementDecl;
 
-PROCEDURE (b: Builder) NewElementDecl* (name: String; contentModel: CP): ElementDecl;
+PROCEDURE (b: Builder) NewElementDecl* (name: String; contentModel: CP; externalMarkupDecl: BOOLEAN): ElementDecl;
   VAR
     elemDecl: ElementDecl;
   BEGIN
     NEW (elemDecl);
-    InitElementDecl (elemDecl, name, contentModel, NewNamespace());
+    InitElementDecl (elemDecl, name, contentModel, NewNamespace(), externalMarkupDecl);
     RETURN elemDecl
   END NewElementDecl;
 
@@ -1099,8 +1112,7 @@ PROCEDURE (elemDecl: ElementDecl) IsEmpty* (): BOOLEAN;
 
 PROCEDURE (elemDecl: ElementDecl) IsElementContent* (): BOOLEAN;
   BEGIN
-    (* element content is equivalent to not having mixed content *)
-    RETURN (elemDecl. contentType # contentMixed)
+    RETURN (elemDecl. contentType = contentChildren)
   END IsElementContent;
 
 

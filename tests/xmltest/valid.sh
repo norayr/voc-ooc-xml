@@ -8,15 +8,32 @@ for d in $SUBDIR; do
     rm -f test-output/$i
     if $TEST_PROG "$i" >test-output/$i; then
       if $DIFF "$d/out/`basename $i`" test-output/$i; then
-	echo "ok: $i"
+	echo "ok: $i [wf]"
       else
 	err_count=`expr $err_count + 1`
-	echo "failed: $i"
+	echo "failed: $i [wf]"
         exit 1
       fi
     else
       err_count=`expr $err_count + 1`
-      echo "failed: $i (exit code is non-zero)"
+      echo "failed: $i [wf] (exit code is non-zero)"
+      exit 1
+    fi
+
+    rm -f test-output/$i
+    if test $i = valid/not-sa/022.xml; then
+      echo "skipping: $i [invalid, not proper conditional section/PE nesting]"
+    elif $TEST_PROG -v "$i" >test-output/$i; then
+      if $DIFF "$d/out/`basename $i`" test-output/$i; then
+	echo "ok: $i [valid]"
+      else
+	err_count=`expr $err_count + 1`
+	echo "failed: $i [valid]"
+        exit 1
+      fi
+    else
+      err_count=`expr $err_count + 1`
+      echo "failed: $i [valid] (exit code is non-zero)"
       exit 1
     fi
   done

@@ -1,4 +1,4 @@
-(*      $Id: Validation.Mod,v 1.6 2001/03/19 00:22:54 mva Exp $   *)
+(*      $Id: Validation.Mod,v 1.7 2001/03/19 23:54:20 mva Exp $   *)
 MODULE XML:Builder:Validation;
 (*  Adds validation services to the XML:Parser.
     Copyright (C) 2001  Michael van Acken
@@ -94,6 +94,7 @@ CONST  (* error codes *)
   noSuchElementType = 31;
   invalidContentInEMPTY = 32;
   multipleElemDecl = 33;
+  invalidElementContentCDATA = 34;
   
 VAR
   validationContext: Error.Context;
@@ -154,6 +155,12 @@ PROCEDURE ErrString3 (b: Builder; code: Error.Code;
     err. SetLStringAttrib (name2, Msg.GetLStringPtr (value2^));
     err. SetLStringAttrib (name3, Msg.GetLStringPtr (value3^));
   END ErrString3;
+
+PROCEDURE IncErrorPos (b: Builder; delta: LONGINT);
+  BEGIN
+    INC (b. parserLocator. charIndex, delta);
+    INC (b. parserLocator. column, delta)
+  END IncErrorPos;
 
 
 PROCEDURE IsS (ch: DTD.Char): BOOLEAN;
@@ -482,36 +489,6 @@ PROCEDURE CheckEmpty (b: Builder);
     END
   END CheckEmpty;
 
-PROCEDURE ListElements (ptr: Regexp.Node): DTD.String;
-  VAR
-    str, str2: DTD.String;
-    len, i: LONGINT;
-  BEGIN
-    NEW (str, 64);
-    str[0] := 0X;
-    len := 0;
-    
-    LOOP
-      IF (ptr = NIL) OR (ptr = Regexp.endOfRegexp) THEN
-        EXIT
-      ELSIF (ptr. elem = NIL) THEN
-        ptr := ptr. suc
-      ELSE
-        i := LongStrings.Length (ptr. elem^);
-        IF (len+i+1 >= LEN (str^)) THEN
-          NEW (str2, LEN (str^)*2);
-          COPY (str^, str2^)
-        END;
-        str[len] := " ";
-        str[len+1] := 0X;
-        LongStrings.Append (ptr. elem^, str^);
-        INC (len, i+1);
-        ptr := ptr. alt
-      END
-    END;
-    RETURN str
-  END ListElements;
-
 PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration; 
                                       localName: DTD.String);
   VAR
@@ -554,7 +531,10 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
   BEGIN
     CheckEmpty (b);
     IF (b. currLevel = -1) THEN          (* this is the root element *)
-      IF (b. dtd. rootName^ # localName^) THEN
+      IF (b. dtd = NIL) THEN
+        (* document has no DTD, e.g. because it's completely broken *)
+        b. dtd := DTD.New()
+      ELSIF (b. dtd. rootName^ # localName^) THEN
         ErrString (b, rootMismatch, "name", b. dtd. rootName)
       END
       
@@ -562,24 +542,19 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
       (* this element has a parent, and we are within a `children' content
          model *)
       start := b. stack[b. currLevel]. regexp;
-      ptr := start;
-      LOOP
-        IF (ptr = Regexp.endOfRegexp) THEN (* error: end of regexp *)
-          ErrString (b, expectedEndTag,
-                     "element", b. stack[b. currLevel]. elem. name);
-          ptr := NIL;
-          EXIT
-        ELSIF (ptr = NIL) THEN           (* error: no matching node *)
-          ErrString (b, expectedElement, "elements", 
-                     ListElements (start));
-          EXIT
-        ELSIF (ptr. elem = NIL) THEN
-          ptr := ptr. suc
-        ELSIF (ptr. elem^ = localName^) THEN
-          EXIT
-        ELSE
-          ptr := ptr. alt
-        END
+      ptr := Regexp.GetMatch (start, localName);
+      IF (ptr = Regexp.endOfRegexp) THEN (* error: end of regexp *)
+        IncErrorPos (b, -1);
+        ErrString (b, expectedEndTag,
+                   "element", b. stack[b. currLevel]. elem. name);
+        IncErrorPos (b, 1);
+        ptr := NIL
+      ELSIF (ptr = NIL) THEN           (* error: no matching node *)
+        IncErrorPos (b, -1);
+        ErrString(b, expectedElement, "elements", Regexp.ListElements (start));
+        IncErrorPos (b, 1);
+      ELSE
+        ptr := ptr. suc
       END;
       b. stack[b. currLevel]. regexp := ptr
       
@@ -588,7 +563,9 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
          model: make sure that this element is in the given list *)
       list := b. stack[b. currLevel]. elem. contentModel(DTD.ChoiceCP). list;
       IF ~InCPList (localName, list) THEN
-        ErrString (b, expectedElement, "elements", ListMixedElements (list))
+        IncErrorPos (b, -1);
+        ErrString (b, expectedElement, "elements", ListMixedElements (list));
+        IncErrorPos (b, 1);
       END
     END;
     
@@ -624,7 +601,9 @@ PROCEDURE (b: Builder) EndElement* (namespaceDecl: DTD.NamespaceDeclaration;
         END
       END;
       IF (ptr # Regexp.endOfRegexp) THEN
-        ErrString (b, expectedElement, "elements", ListElements (start))
+        IncErrorPos (b, -2);
+        ErrString(b, expectedElement, "elements", Regexp.ListElements (start));
+        IncErrorPos (b, 2);
       END
     END;
     
@@ -837,13 +816,21 @@ PROCEDURE (b: Builder) SkippedEntity* (name: DTD.String; referent: DTD.Entity);
 PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
                                     charsStart, charsEnd: DTD.CharPos;
                                     elementWhitespace: DTD.ElementWhitespaceType);
+  VAR
+    elemDecl: DTD.ElementDecl;
   BEGIN
     CheckEmpty (b);
-    IF IsStandalone (b) &
-       (b. stack[b. currLevel]. elem # NIL) &
+    IF (b. stack[b. currLevel]. elem # NIL) &
        b. stack[b. currLevel]. elem. IsElementContent() THEN
-      ErrString (b, invalidStandaloneWhitespace,
-                 "element", b. stack[b. currLevel]. elem. name)
+      elemDecl := b. stack[b. currLevel]. elem;
+      IF (elementWhitespace = DTD.elementWhitespaceNo) THEN
+        ErrString (b, invalidElementContentCDATA, "element", elemDecl. name)
+      ELSIF elemDecl. externalMarkupDecl & IsStandalone (b) THEN
+        ErrString (b, invalidStandaloneWhitespace, "element", elemDecl. name)
+      END;
+      IF (elementWhitespace = DTD.elementWhitespaceUnknown) THEN
+        elementWhitespace := DTD.elementWhitespaceYes
+      END
     END;
     
     b. delegateBuilder. Characters (chars, charsStart, charsEnd,
@@ -1027,6 +1014,8 @@ PROCEDURE SetErrorMessages;
         t := "Parent element `${element}' is declared EMPTY"
       | multipleElemDecl:
         t := "Element `${element}' is declared more than once"
+      | invalidElementContentCDATA:
+        t := "Element `${element}' is restricted to element content"
       ELSE
         t := ""
       END;

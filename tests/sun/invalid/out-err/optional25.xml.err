@@ -1,0 +1,5 @@
+In file invalid/optional25.xml: 
+line=2, column=21
+74: Element `once-or-more-2e' is restricted to element content
+line=2, column=37
+90: Expected elements: e

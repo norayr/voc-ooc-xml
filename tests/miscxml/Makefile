@@ -1,10 +1,10 @@
 TEST_PROG=../../TestParser
-scripts=./not-wf.sh ./valid.sh
+scripts=./not-wf.sh ./wf.sh ./valid.sh
 
 .PHONY: clean test
 
 test-output:
-	mkdir test-output test-output/valid test-output/valid/ext-sa test-output/valid/not-sa test-output/valid/sa test-output/not-wf test-output/not-wf/sa test-output/not-wf/ext-sa test-output/not-wf/not-sa
+	mkdir test-output test-output/valid test-output/valid/ext-sa test-output/valid/not-sa test-output/valid/sa test-output/not-wf test-output/not-wf/sa test-output/not-wf/ext-sa test-output/not-wf/not-sa test-output/wf
 
 ${TEST_PROG}:
 	cd `dirname ${TEST_PROG}` && ${OOC} -MOv `basename ${TEST_PROG}`

@@ -1,5 +1,4 @@
 TEST_PROG=../../TestParser
-#scripts=./invalid.sh
 scripts=./not-wf.sh ./valid.sh ./invalid.sh
 
 .PHONY: all clean test ${TEST_PROG}
@@ -7,8 +6,7 @@ scripts=./not-wf.sh ./valid.sh ./invalid.sh
 cxml.html:
 	(cd .. && gzip -cd 3rd-party-archives/sun.tar.gz | tar xfv -)
 	patch -p1 <../3rd-party-archives/sun.diff
-	mv valid/sun-valid.xml .
-	mv not-wf/sun-not-wf.xml .
+	mv valid/sun-valid.xml not-wf/sun-not-wf.xml invalid/sun-invalid.xml .
 	rm -f not-wf/lang0[1-6].xml  # no longer not-wf since First Ed. E73
 	rm -f invalid/pe01.*	     # external pe well-formed by definition
 
