@@ -1,4 +1,4 @@
-(*      $Id: Locator.Mod,v 1.1 2000/07/12 22:28:05 mva Exp $   *)
+(*      $Id: Locator.Mod,v 1.2 2000/07/17 07:44:41 mva Exp $   *)
 MODULE XML:Locator [OOC_EXTENSIONS];
 (*  Provides access to position information for XML parser callbacks.
     Copyright (C) 2000  Michael van Acken
@@ -19,7 +19,7 @@ MODULE XML:Locator [OOC_EXTENSIONS];
 *)
 
 IMPORT
-  Buffer := XML:UnicodeBuffer, DTD := XML:BuilderDTD;
+  Buffer := XML:UnicodeBuffer, XML:DTD;
 
 TYPE
   Locator* = POINTER TO LocatorDesc;

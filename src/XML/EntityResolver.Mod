@@ -1,4 +1,4 @@
-(*      $Id: EntityResolver.Mod,v 1.4 1999/11/29 14:31:02 ooc-devel Exp $   *)
+(*      $Id: EntityResolver.Mod,v 1.1 2000/07/12 22:28:05 mva Exp $   *)
 MODULE XML:EntityResolver;
 (*  Locates and opens external entities for the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -20,7 +20,7 @@ MODULE XML:EntityResolver;
 
 IMPORT
   LongStrings, Msg, Strings, URI, URI:Parser,
-  DTD := XML:BuilderDTD, Codec := XML:UnicodeCodec, XML:UnicodeCodec:UTF8;
+  XML:DTD, Codec := XML:UnicodeCodec, XML:UnicodeCodec:UTF8;
 
 
 TYPE

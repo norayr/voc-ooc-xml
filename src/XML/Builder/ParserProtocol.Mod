@@ -1,4 +1,4 @@
-(*      $Id: ParserProtocol.Mod,v 1.3 2000/07/11 22:26:09 mva Exp $   *)
+(*      $Id: ParserProtocol.Mod,v 1.4 2000/07/12 22:28:05 mva Exp $   *)
 MODULE XML:Builder:ParserProtocol [OOC_EXTENSIONS];
 (*  Translates XML document to canonical XML.
     Copyright (C) 2000  Michael van Acken
@@ -21,7 +21,7 @@ MODULE XML:Builder:ParserProtocol [OOC_EXTENSIONS];
 
 IMPORT
   Channel, IntStr, URI, URI:Scheme:File,
-  Codec := XML:UnicodeCodec, DTD := XML:BuilderDTD, B := XML:Builder,
+  Codec := XML:UnicodeCodec, XML:DTD, B := XML:Builder,
   XML:Writer, XML:Locator;
 
 

@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.5 2000/07/13 21:04:29 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.6 2000/07/17 07:44:41 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -23,7 +23,7 @@ IMPORT
   Log, Out, Ascii, Channel, Msg, LongStrings, URI, URI:Scheme:File,
   Codec := XML:UnicodeCodec, XML:UnicodeCodec:UTF8, XML:UnicodeCodec:UTF16,
   AbstrLocator := XML:Locator, XML:EntityResolver,
-  Buffer := XML:UnicodeBuffer, XML:Error, DTD := XML:BuilderDTD, XML:Builder;
+  Buffer := XML:UnicodeBuffer, XML:Error, XML:DTD, XML:Builder;
   (* warning: the modules UTF8 and UTF16 are not used in this module, but
      they must be imported to guarantee that these codecs are available to
      the XML parser *)

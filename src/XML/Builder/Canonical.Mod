@@ -1,4 +1,4 @@
-(*      $Id: Canonical.Mod,v 1.2 2000/07/11 22:26:09 mva Exp $   *)
+(*      $Id: Canonical.Mod,v 1.3 2000/07/12 22:28:05 mva Exp $   *)
 MODULE XML:Builder:Canonical [OOC_EXTENSIONS];
 (*  Translates XML document to canonical XML.
     Copyright (C) 2000  Michael van Acken
@@ -21,8 +21,7 @@ MODULE XML:Builder:Canonical [OOC_EXTENSIONS];
 
 IMPORT
   LongStrings, Channel, URI, Ascii,
-  Codec := XML:UnicodeCodec, DTD := XML:BuilderDTD, B := XML:Builder,
-  XML:UnicodeBuffer;
+  Codec := XML:UnicodeCodec, XML:DTD, B := XML:Builder, XML:UnicodeBuffer;
 
 CONST
   firstCanonicalForm* = 1;

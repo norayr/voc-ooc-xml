@@ -1,4 +1,4 @@
-(*      $Id: Builder.Mod,v 1.4 2000/07/12 22:28:05 mva Exp $   *)
+(*      $Id: Builder.Mod,v 1.5 2000/07/17 07:41:00 mva Exp $   *)
 MODULE XML:Builder [OOC_EXTENSIONS];
 (*  Low-level builder interface to the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -19,7 +19,7 @@ MODULE XML:Builder [OOC_EXTENSIONS];
 *)
 
 IMPORT
-  URI, DTD := XML:BuilderDTD, XML:Locator;
+  URI, XML:DTD, XML:Locator;
 
 
 TYPE
