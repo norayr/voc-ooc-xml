@@ -1,4 +1,4 @@
-/*	$Id: IO_Select.c,v 1.2 2000/09/12 09:19:04 mva Exp $	*/
+/*	$Id: IO_Select.c,v 1.3 2000/11/24 08:46:54 mva Exp $	*/
 /*  Wrapper around the select() function.
     Copyright (C) 2000  Michael van Acken
 
@@ -122,7 +122,7 @@ void IO_Select__FileDescrSetDesc_Clear(IO_Select__FileDescrSet fdSet, int fd) {
 }
 
 unsigned char IO_Select__FileDescrSetDesc_IsSet(IO_Select__FileDescrSet fdSet, int fd) {
-  return FD_ISSET(fd, (fd_set*)(fdSet->fd_set));
+  return (FD_ISSET(fd, (fd_set*)(fdSet->fd_set)) != 0);
 }
 
 void IO_Select__FileDescrSetDesc_Copy(IO_Select__FileDescrSet fdSet, IO_Select__FileDescrSet dest) {
