@@ -10,3 +10,7 @@ GET *.c FROM
 GET *.o FROM
   obj;
 END
+
+#PRAGMAS  # if this is included, it confuses ./configure  :-((  stupid setup.
+#  DEFINE LIB_HAVE_LIBXNET := FALSE;
+#END
