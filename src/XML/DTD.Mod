@@ -1,4 +1,4 @@
-(* 	$Id: DTD.Mod,v 1.17 2001/03/24 01:10:12 mva Exp $	 *)
+(* 	$Id: DTD.Mod,v 1.18 2001/03/24 12:22:10 mva Exp $	 *)
 MODULE XML:DTD [OOC_EXTENSIONS];
 (*  Implements the internal representation of a document DTD.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -1074,6 +1074,7 @@ PROCEDURE InitElementDecl* (elemDecl: ElementDecl; name: String; contentModel: C
     InitDeclaration (elemDecl, name);
     elemDecl. contentModel := contentModel;
     elemDecl. contentType := contentANY;
+    elemDecl. regexp := NIL;
     
     IF (elemDecl. contentModel # NIL) THEN
       WITH contentModel: NameCP DO
