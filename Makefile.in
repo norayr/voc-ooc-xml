@@ -157,6 +157,7 @@ dist: distclean
 ###      with them.
 clean: FRC
 	rm -Rf sym obj doc .libs TestCodecs TestParser TestURI TestGet TestServer oo2crc oo2crc.tmp.orig libxml$(exeext)
+	rm -f *.o *.lo *.la
 	cd tests && ${MAKE} clean
 
 ### `distclean'
