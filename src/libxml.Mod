@@ -4,7 +4,7 @@ MODULE libxml [LIBRARY "oo2c_xml" "2:0:0"; INTERFACE "C"];
 IMPORT
   OS:Files,
   OS:Path,
-  OS:ProcessManagment,
+  OS:ProcessManagement,
   OS:ProcessParameters,
   URI:Authority:RegistryBased,
   URI:Authority:ServerBased,

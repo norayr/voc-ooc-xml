@@ -1,4 +1,4 @@
-/* 	$Id: OS_ProcessManagment.c,v 1.2 2000/09/12 09:19:04 mva Exp $	 */
+/* 	$Id: OS_ProcessManagement.c,v 1.3 2000/10/09 19:33:44 mva Exp $	 */
 #include "__oo2c.h"
 
 #include <unistd.h>
@@ -7,15 +7,15 @@
 #include <stdlib.h>
 #include "__mini_gc.h"
 
-/* begin -  #include "OS:ProcessManagment.d" */
-#include "OS_ProcessManagment.h"
+/* begin -  #include "OS:ProcessManagement.d" */
+#include "OS_ProcessManagement.h"
 
 /* local definitions */
-typedef struct OS_ProcessManagment__ErrorContextDesc {
+typedef struct OS_ProcessManagement__ErrorContextDesc {
   Msg__StringPtr id;
-} OS_ProcessManagment__ErrorContextDesc;
-typedef struct OS_ProcessManagment__ErrorContextDesc* OS_ProcessManagment__ErrorContext;
-static OS_ProcessManagment__ErrorContext OS_ProcessManagment__errorContext;
+} OS_ProcessManagement__ErrorContextDesc;
+typedef struct OS_ProcessManagement__ErrorContextDesc* OS_ProcessManagement__ErrorContext;
+static OS_ProcessManagement__ErrorContext OS_ProcessManagement__errorContext;
 
 /* function prototypes */
 
@@ -23,9 +23,9 @@ static OS_ProcessManagment__ErrorContext OS_ProcessManagment__errorContext;
 static const struct {
   int length;
   void* pad;
-  const char name[21];
-} _n0 = {21, NULL, {"OS:ProcessManagment"}};
-static struct _MD OS_ProcessManagment_md = {
+  const char name[22];
+} _n0 = {22, NULL, {"OS:ProcessManagement"}};
+static struct _MD OS_ProcessManagement_md = {
   NULL, 
   &Kernel__ModuleDesc_td.td, 
   {
@@ -45,12 +45,12 @@ static const struct {
   int length;
   void* pad;
   _Type btypes[2];
-} OS_ProcessManagment__ErrorContextDesc_tdb = {
+} OS_ProcessManagement__ErrorContextDesc_tdb = {
   2, 
   NULL, 
   {
     &Msg__ContextDesc_td.td, 
-    &OS_ProcessManagment__ErrorContextDesc_td.td
+    &OS_ProcessManagement__ErrorContextDesc_td.td
   }
 };
 static const struct {
@@ -60,38 +60,38 @@ static const struct {
 } _tb0 = {1, NULL, {
   (void*)Msg__ContextDesc_GetTemplate
 }};
-struct _TD OS_ProcessManagment__ErrorContextDesc_td = {
+struct _TD OS_ProcessManagement__ErrorContextDesc_td = {
   NULL,
   &Types__TypeDesc_td.td,
   {
-    OS_ProcessManagment__ErrorContextDesc_tdb.btypes,
+    OS_ProcessManagement__ErrorContextDesc_tdb.btypes,
     _tb0.tbprocs,
     (const unsigned char*)_n1.name,
-    &OS_ProcessManagment_md.md,
+    &OS_ProcessManagement_md.md,
     1, 
     '0', '1',
-    sizeof(OS_ProcessManagment__ErrorContextDesc),
+    sizeof(OS_ProcessManagement__ErrorContextDesc),
     NULL
   }
 };
 
 /* local strings */
 
-/* end -  #include "OS:ProcessManagment.d" */
+/* end -  #include "OS:ProcessManagement.d" */
 
 static _ModId _mid;
 
 
-void OS_ProcessManagment__ErrorContextDesc_GetTemplate(OS_ProcessManagment__ErrorContext context, Msg__Msg msg, Msg__LString templ, LONGINT templ_0d) {
+void OS_ProcessManagement__ErrorContextDesc_GetTemplate(OS_ProcessManagement__ErrorContext context, Msg__Msg msg, Msg__LString templ, LONGINT templ_0d) {
   char *str;
 /*
   LONGINT res = msg->code;
   
-  if (res == OS_ProcessManagment__invalidBuffer) {
+  if (res == OS_ProcessManagement__invalidBuffer) {
     str = "Internal error: Buffer for `getcwd' is empty";
-  } else if (res == OS_ProcessManagment__cwdTooLong) {
+  } else if (res == OS_ProcessManagement__cwdTooLong) {
     str = "Current working directory does not fit into buffer";
-  } else if (res == OS_ProcessManagment__accessDenied) {
+  } else if (res == OS_ProcessManagement__accessDenied) {
     str = "Access denied to component of current working directory";
   }
 
@@ -125,12 +125,12 @@ static Msg__Msg get_error() {
   LONGINT code;
   
   switch (errno) {
-  case EINVAL: code = OS_ProcessManagment__invalidBuffer; break;
-  case ERANGE: code = OS_ProcessManagment__cwdTooLong; break;
-  case EACCES: code = OS_ProcessManagment__accessDenied; break;
+  case EINVAL: code = OS_ProcessManagement__invalidBuffer; break;
+  case ERANGE: code = OS_ProcessManagement__cwdTooLong; break;
+  case EACCES: code = OS_ProcessManagement__accessDenied; break;
   }
   
-  msg = Msg__New((Msg__Context)OS_ProcessManagment__errorContext, code);
+  msg = Msg__New((Msg__Context)OS_ProcessManagement__errorContext, code);
 #if HAVE_STRERROR
   DYN_TBCALL(Msg,MsgDesc,SetStringAttrib,msg,
 	     (msg, (const Msg__String)"errstr", 7, (OOC_CHAR*)strerror(errno)));
@@ -141,15 +141,15 @@ static Msg__Msg get_error() {
 }
 */
 
-int OS_ProcessManagment__system(const OOC_CHAR* command, int command_0d) {
+int OS_ProcessManagement__system(const OOC_CHAR* command, int command_0d) {
   return system((const char*)command);
 }
 
 
-void OS_ProcessManagment_init(void) {
-  _mid = _register_module(&OS_ProcessManagment_md.md, &OS_ProcessManagment__ErrorContextDesc_td.td);
+void OS_ProcessManagement_init(void) {
+  _mid = _register_module(&OS_ProcessManagement_md.md, &OS_ProcessManagement__ErrorContextDesc_td.td);
 
-  NEW_REC(OS_ProcessManagment__errorContext,OS_ProcessManagment__ErrorContextDesc);
-  Msg__InitContext((Msg__Context)OS_ProcessManagment__errorContext, 
-		   (const Msg__String)"OS:ProcessManagment", 20);
+  NEW_REC(OS_ProcessManagement__errorContext,OS_ProcessManagement__ErrorContextDesc);
+  Msg__InitContext((Msg__Context)OS_ProcessManagement__errorContext, 
+		   (const Msg__String)"OS:ProcessManagement", 21);
 }

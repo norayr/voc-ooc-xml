@@ -1,6 +1,6 @@
-(* 	$Id: ProcessManagment.Mod,v 1.1.1.1 2000/07/10 15:24:44 mva Exp $	 *)
-MODULE OS:ProcessManagment [FOREIGN "C"; LINK FILE "OS_ProcessManagment.c" END];
-(*  Creation and managment of processes.
+(* 	$Id: ProcessManagement.Mod,v 1.1.1.2 2000/07/10 20:31:52 mva Exp $	 *)
+MODULE OS:ProcessManagement [FOREIGN "C"; LINK FILE "OS_ProcessManagement.c" END];
+(*  Creation and management of processes.
     Copyright (C) 2000  Michael van Acken
 
     This module is free software; you can redistribute it and/or
@@ -19,7 +19,7 @@ MODULE OS:ProcessManagment [FOREIGN "C"; LINK FILE "OS_ProcessManagment.c" END];
 *)
 <* Warnings := FALSE *>
 
-(**This is a subset of the @samp{Process Managment} section of Python's
+(**This is a subset of the @samp{Process Management} section of Python's
    @samp{os} package.  If you want to add to this module, use the Python
    function signature and add a parameter @samp{res} instead of raising
    an exception.  *)
@@ -54,4 +54,4 @@ POSIX does not specify the meaning of the return value of the C
 @samp{system()} function, so the return value of this Oberon-2 
 function system-dependent.  *)
 
-END OS:ProcessManagment.
+END OS:ProcessManagement.
