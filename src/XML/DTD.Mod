@@ -1,7 +1,7 @@
-(* 	$Id: DTD.Mod,v 1.6 2000/10/15 10:16:30 mva Exp $	 *)
+(* 	$Id: DTD.Mod,v 1.7 2000/10/29 20:25:50 mva Exp $	 *)
 MODULE XML:DTD [OOC_EXTENSIONS];
 (*  Implements the internal representation of a document DTD.
-    Copyright (C) 2000  Michael van Acken
+    Copyright (C) 2000, 2001  Michael van Acken
 
     This module is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License
@@ -552,7 +552,7 @@ PROCEDURE (attValue: AttValue) Length* (): LONGINT;
 
 PROCEDURE (attValue: AttValue) FlattenValue* (normalizeWhitespace: BOOLEAN): String;
 (**Returns the string representation of the attribute value
-   @oparam{attrDecl}.  If @oparam{normalizeWhitespace} is @code{TRUE}, then
+   @oparam{attValue}.  If @oparam{normalizeWhitespace} is @code{TRUE}, then
    sequences of spaces are collapsed into a single space, and leading and
    trailing whitespace is removed from the string.  *)
    

@@ -103,7 +103,7 @@ PROCEDURE InitElement* (elem: Element);
   END InitElement;
 
 PROCEDURE (elem: Element) IsChildName* (localName: String): BOOLEAN;
-(**Determines if @oparam{name} is a valid name for a child element of
+(**Determines if @oparam{localName} is a valid name for a child element of
    @oparam{elem}.  If result is @code{FALSE}, the parser will generate an
    appropriate error message.  By default, all child names are rejected.  *)
   BEGIN
@@ -139,7 +139,7 @@ PROCEDURE (elem: Element) AddChild* (child: Element);
 
 
 PROCEDURE (elem: Element) IsAttributeName* (localName: String): BOOLEAN;
-(**Determines if @oparam{name} is a valid name for an attribute of
+(**Determines if @oparam{localName} is a valid name for an attribute of
    @oparam{elem}.  If result is @code{FALSE}, the parser will generate an
    appropriate error message.  By default, all attribute names are rejected.  *)
   BEGIN

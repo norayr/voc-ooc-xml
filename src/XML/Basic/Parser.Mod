@@ -1,5 +1,5 @@
 MODULE XML:Basic:Parser [OOC_EXTENSIONS];
-(**This parser builds on the non-validating parser @omodule{XML:Parser}.  It
+(**This parser builds on the non-validating parser @omodule{*XML:Parser}.  It
    uses the element description facilities from @omodule{*XML:Basic:Element} to
    perform syntactical and semantical checks, as well as to construct a data
    structure from an XML document.  It is intended for small XML documents,
