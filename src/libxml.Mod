@@ -1,4 +1,4 @@
-MODULE libxml [LIBRARY "oo2c_xml" "0:0:0"; INTERFACE "C"];
+MODULE libxml [LIBRARY "oo2c_xml" "1:0:0"; INTERFACE "C"];
 <* Warnings := FALSE *>
 
 IMPORT
@@ -26,6 +26,7 @@ IMPORT
   XML:Builder:Canonical,
   XML:Builder:ParserProtocol,
   XML:Builder:Namespaces,
+  XML:Builder:Validator,
   XML:Builder,
   XMLError := XML:Error,
   XML:InputBuffer,
