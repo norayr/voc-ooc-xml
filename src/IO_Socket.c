@@ -1,4 +1,4 @@
-/*	$Id: IO_Socket.c,v 1.7 2000/11/24 08:49:43 mva Exp $	*/
+/*	$Id: IO_Socket.c,v 1.8 2000/12/08 21:38:10 mva Exp $	*/
 /*  Interface to socket facilities.
     Copyright (C) 2000  Michael van Acken
 
@@ -27,7 +27,7 @@
 #include <string.h>
 #include <fcntl.h>
 
-#ifdef __CYGWIN__
+#if defined(__CYGWIN__) || defined(__APPLE__)
 typedef unsigned short uint16_t;
 #endif
 
