@@ -1,4 +1,4 @@
-(*      $Id: Canonical.Mod,v 1.3 2000/07/12 22:28:05 mva Exp $   *)
+(*      $Id: Canonical.Mod,v 1.4 2000/07/22 16:18:31 mva Exp $   *)
 MODULE XML:Builder:Canonical [OOC_EXTENSIONS];
 (*  Translates XML document to canonical XML.
     Copyright (C) 2000  Michael van Acken
@@ -193,10 +193,10 @@ PROCEDURE (b: Builder) EndDocument*;
     b. out. Flush
   END EndDocument;
 
-PROCEDURE (b: Builder) StartElement* (namespaceURI: DTD.NamespaceURI;
+PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
                                       localName: DTD.String);
   BEGIN
-    ASSERT (namespaceURI = NIL);
+    ASSERT (namespaceDecl = NIL);
     IF (b. notationList # NIL) & (b. format # firstCanonicalForm) THEN
       WriteDTD (b, localName)
     END;
@@ -207,7 +207,7 @@ PROCEDURE (b: Builder) StartElement* (namespaceURI: DTD.NamespaceURI;
 (*    IF b. writePosition THEN WritePos (b. writer, b) END*)
   END StartElement;
 
-PROCEDURE (b: Builder) Attribute* (namespaceURI: DTD.NamespaceURI; 
+PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration; 
                                    localName: DTD.String;
                                    attrDecl: DTD.AttrDecl;
                                    value: DTD.AttValue;
@@ -216,7 +216,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceURI: DTD.NamespaceURI;
     newList: AttributeList;
     i: LONGINT;
   BEGIN
-    ASSERT (namespaceURI = NIL);
+    ASSERT (namespaceDecl = NIL);
     IF (b. lenAttrList = LEN (b. attrList^)) THEN
       NEW (newList, LEN (b. attrList^)+incrAttrList);
       FOR i := 0 TO LEN (b. attrList^)-1 DO
@@ -262,7 +262,7 @@ PROCEDURE (b: Builder) AttributesDone*;
     b. out. WriteLatin1 (">")
   END AttributesDone;
 
-PROCEDURE (b: Builder) EndElement* (namespaceURI: DTD.NamespaceURI;
+PROCEDURE (b: Builder) EndElement* (namespaceDecl: DTD.NamespaceDeclaration;
                                     localName: DTD.String);
   BEGIN
     b. out. WriteLatin1 ("</");
