@@ -1,0 +1,153 @@
+# ==================== Things `configure' Might Edit ====================
+
+OOC=@OOC@
+OFLAGS=@OFLAGS@
+OOCONFIG=@OOCONFIG@
+
+### The compiler's installation directory, and its primary initialization file.
+OOC_LIBDIR=@OOC_LIBDIR@
+OOC_INIT=@OOC_INIT@
+
+### Does the compiler support creating libraries (yes/no)?
+ooc_have_libs=no  # disabled for now, otherwise use @ooc_have_libs@
+
+### Name of this package.
+package=XML
+
+### Transformation applied to program names when installing.
+transform=@program_transform_name@
+
+# ==================== Where To Install Things ====================
+
+# The default location for installation.  Everything is placed in
+# subdirectories of this directory.  The default values for many of
+# the variables below are expressed in terms of this one, so you may
+# not need to change them.  This defaults to dirname(dirname($OOC_LIBDIR)).
+prefix=@prefix@
+
+# Like `prefix', but used for architecture-specific files.
+exec_prefix=@exec_prefix@
+
+# Where to install binaries that people will want to run directly.
+bindir=@bindir@
+
+# Where to install library and other files to run the package.
+libdir=@libdir@
+
+# The default location for installation of compiler specific files
+# (symbol files, header files, etc) and the module source code.
+ooc_pkgdir=${OOC_LIBDIR}/${package}
+
+subdirs=IO OS URI URI/Authority URI/Fragment URI/Query URI/Scheme
+
+# ==================== Utility Programs for the Build ====================
+
+# Allow the user to specify the install program.
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_SCRIPT = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
+
+# ============================= Targets ==============================
+
+
+.PHONY: all clean test
+
+all: libxml
+
+libxml: oo2crc localdirs
+	if test $(ooc_have_libs) = yes; then \
+	  $(OOC) --config oo2crc --make-lib $(OFLAGS) --lib-path $(libdir) libxml && touch libxml; \
+	else \
+	  $(OOC) --config oo2crc -Mv $(OFLAGS) libxml && touch libxml; \
+	fi
+
+install: all mkdir config.ooc
+	(cd src; for dir in . ${subdirs}; do \
+	  for i in $$dir/*.Mod; do \
+            (cd .. && $(INSTALL_DATA) src/$$i ${ooc_pkgdir}/$$dir); \
+	  done; \
+	done)
+	for i in src/*.[ch]; do \
+          $(INSTALL_DATA) $$i ${ooc_pkgdir}; \
+	done; \
+	cat config.ooc | xargs  $(OOCONFIG) $(OOC_INIT) --remove-line "*:$(package):*" \
+	  --append-line PATHS:$(package):SRC "GET *.Mod,*.c FROM $(ooc_pkgdir);" \
+	  --append-line PATHS:$(package):SYM "GET *.Sym,*.Lib FROM $(ooc_pkgdir)/sym;" \
+	  --append-line PATHS:$(package):OBJ "GET *.h,*.c,*.d,*.o FROM $(ooc_pkgdir)/obj;"
+	for i in sym/*.Sym; do \
+          $(INSTALL_DATA) $$i ${ooc_pkgdir}/sym; \
+	done
+	for i in obj/*.[cdh]; do \
+	  $(INSTALL_DATA) $$i ${ooc_pkgdir}/obj; \
+	done
+	if test $(ooc_have_libs) = yes; then \
+	  for i in sym/*.Lib; do \
+            $(INSTALL_DATA) $$i ${ooc_pkgdir}/sym; \
+	  done; \
+          umask 022; $(OOC) --install-lib --config oo2crc --lib-path $(libdir) libxml; \
+	else \
+	  sleep 1; \
+	  for i in obj/*.o; do \
+	    $(INSTALL_DATA) $$i ${ooc_pkgdir}/obj; \
+	  done; \
+	fi
+
+installlib: all mkdir config.ooc
+	if test $(ooc_have_libs) = yes; then \
+          umask 022; $(OOC) --install-lib --config oo2crc --lib-path $(libdir) libxml; \
+	fi
+
+# ======================== Auxiliary Targets =========================
+
+oo2crc: config.ooc
+	cp $(OOC_INIT) oo2crc.tmp
+	cat config.ooc | xargs $(OOCONFIG) oo2crc.tmp --fix-includes --remove-line "*:$(package):*" \
+	  --prepend-line "PATHS:$(package):SRC" "GET *.Mod,*.c FROM src;" \
+	  --prepend-line "PATHS:$(package):OBJ" "GET *.h,*.c,*.d,*.o FROM obj;" \
+	  --prepend-line "PATHS:$(package):SYM" "GET *.Sym,*.Lib FROM sym;"
+	mv oo2crc.tmp oo2crc
+
+FRC:
+
+localdirs:
+	for i in sym obj; do if test ! -d $$i; then mkdir $$i; fi; done
+
+mkdir: FRC
+	(umask 022; \
+          ./mkinstalldirs ${ooc_pkgdir} ${ooc_pkgdir}/IO \
+	                  ${ooc_pkgdir}/sym ${ooc_pkgdir}/obj; \
+	  for i in ${subdirs}; do ./mkinstalldirs ${ooc_pkgdir}/$$i; done )
+
+Makefile: Makefile.in config.status
+	./config.status
+
+test: localdirs
+	${OOC} -MOv TestGet
+	${OOC} -MOv TestServer
+	cd tests && ${MAKE} test
+
+dist: distclean
+	f="ooc-libxml-`date +%Y%m%d`.tar"; cd .. && tar -c -v -f $$f libxml && bzip2 -9 $$f
+
+# ==================== Cleaning up and miscellanea ====================
+
+.PHONY: clean distclean
+
+### `clean'
+###      Delete all files from the current directory that are normally
+###      created by building the program.  Don't delete the files that
+###      record the configuration.  Also preserve files that could be made
+###      by building, but normally aren't because the distribution comes
+###      with them.
+clean: FRC
+	rm -Rf sym obj doc .libs TestCodecs TestParser TestURI TestGet TestServer oo2crc oo2crc.tmp.orig libxml
+	cd tests && ${MAKE} clean
+
+### `distclean'
+###      Delete all files from the current directory that are created by
+###      configuring or building the program.  If you have unpacked the
+###      source and built the program without creating any other files,
+###      `make distclean' should leave only the files that were in the
+distclean: clean
+	rm -f config.status config.cache config.log config.ooc Makefile
