@@ -1,4 +1,4 @@
-(*      $Id: Builder.Mod,v 1.5 2000/07/17 07:41:00 mva Exp $   *)
+(*      $Id: Builder.Mod,v 1.6 2000/07/22 16:18:08 mva Exp $   *)
 MODULE XML:Builder [OOC_EXTENSIONS];
 (*  Low-level builder interface to the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -60,8 +60,8 @@ TYPE
 TYPE
   Attribute* = POINTER TO AttributeDesc;
   AttributeDesc = RECORD
-    namespaceURI-: DTD.NamespaceURI; 
-    localName-: DTD.String;
+    namespaceDecl*: DTD.NamespaceDeclaration; 
+    localName*: DTD.String;
     attrDecl-: DTD.AttrDecl;
     value-: DTD.AttValue;
     specified-: BOOLEAN;
@@ -78,7 +78,25 @@ TYPE
 
 
 PROCEDURE (b: Builder) SetLocator* (locator: Locator.Locator);
+(**Indicates which locator object the parser uses to communicate positional
+   information.  If this method is not called before
+   @oproc{Builder.StartDocument}, the builder should assume that no 
+   locator is available during processing.  This method may be called 
+   several times during processing of a document.
+   
+   @precond
+   @samp{locator} is not @code{NIL}.
+   @end precond  *)
   END SetLocator;
+
+PROCEDURE (b: Builder) SetErrorListener* (el: Locator.ErrorListener);
+(**Indicates the parser object that the builder should use for error
+   signalling.  Any errors will subsequently be reported through 
+   @oproc{Parser.Parser.Error}.  This method is called by the parser before
+   it begins processing of the document.  *)
+  END SetErrorListener;
+
+
 
 PROCEDURE (b: Builder) StartDocument* (documentEntity: DTD.ExternalEntity);
 (**Marks the start of the document.  This method is called just before 
@@ -115,16 +133,16 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity);
 
 
 
-PROCEDURE (b: Builder) StartElement* (namespaceURI: DTD.NamespaceURI; 
+PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration; 
                                       localName: DTD.String);
 (**Called whenever a start tag is being parsed.  For a namespace aware parser,
-   @oparam{namespaceURI} refers to the namespace URI of the element name.  If
+   @oparam{namespaceDecl} refers to the namespace URI of the element name.  If
    the name has no namespace part, the argument is @code{NIL}.
    @oparam{localName} is the element minus the namespace prefix and the colon.
    The locator is positioned at the beginning of the start tag's name.  *)
   END StartElement;
 
-PROCEDURE (b: Builder) EndElement* (namespaceURI: DTD.NamespaceURI; 
+PROCEDURE (b: Builder) EndElement* (namespaceDecl: DTD.NamespaceDeclaration; 
                                     localName: DTD.String);
 (**Called when an end tag is parsed.  See @oproc{Builder.StartElement} for
    a description of the arguments.  The locator is positioned at the beginning
@@ -132,13 +150,13 @@ PROCEDURE (b: Builder) EndElement* (namespaceURI: DTD.NamespaceURI;
    placed after the closing @samp{/>} of the empty element tag.  *)
   END EndElement;
 
-PROCEDURE (b: Builder) Attribute* (namespaceURI: DTD.NamespaceURI; 
+PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration; 
                                    localName: DTD.String;
                                    attrDecl: DTD.AttrDecl;
                                    value: DTD.AttValue;
                                    specified: BOOLEAN);
 (**Called for every attribute (specified or defaulted) of the current element.
-   For a namespace aware parser, @oparam{namespaceURI} refers to the namespace
+   For a namespace aware parser, @oparam{namespaceDecl} refers to the namespace
    URI of the element name.  If the name has no namespace part, the argument is
    @code{NIL}.  @oparam{localName} is the element minus the namespace prefix
    and the colon.  If an attribute declaration for this attribute is known to
@@ -161,7 +179,15 @@ PROCEDURE (b: Builder) Attribute* (namespaceURI: DTD.NamespaceURI;
    @oparam{specified} is @code{TRUE}.  For defaulted attributes, the locator
    is undefined.  *)
   END Attribute;
-  
+
+PROCEDURE (b: Builder) NamespaceDeclaration* (namespaceDecl: DTD.NamespaceDeclaration);
+(**Called for namespace declarations in an attribute list.  Note: The parser
+   implementation @otype{XML:Parser.Parser} does not know about namespaces and
+   never calls this method.  Use the adapter builder
+   @otype{XML:Builder:Namespaces.Builder} to introduce namespace information
+   into the event stream.  The locator position is undefined.  *)
+  END NamespaceDeclaration;
+
 PROCEDURE (b: Builder) AttributesDone*;
 (**Called when the all attributes of a start tag, specified or defaulted,
    have been reported to the application.  The locator is positioned at
@@ -256,22 +282,22 @@ PROCEDURE New*(): Builder;
    ------------------------------------------------------------------------ *)
 
 PROCEDURE InitAttribute* (attr: Attribute;
-                          namespaceURI: DTD.NamespaceURI; 
+                          namespaceDecl: DTD.NamespaceDeclaration; 
                           localName: DTD.String;
                           attrDecl: DTD.AttrDecl;
                           value: DTD.AttValue;
                           specified: BOOLEAN;
                           locator: Locator.Locator);
   BEGIN
-    attr. namespaceURI := namespaceURI;
+    attr. namespaceDecl := namespaceDecl;
     attr. localName := localName;
     attr. attrDecl := attrDecl;
     attr. value := value;
     attr. specified := specified;
-    locator. StorePosition (attr. pos)
+    attr. pos := locator^
   END InitAttribute;
 
-PROCEDURE NewAttribute* (namespaceURI: DTD.NamespaceURI; 
+PROCEDURE NewAttribute* (namespaceDecl: DTD.NamespaceDeclaration; 
                          localName: DTD.String;
                          attrDecl: DTD.AttrDecl;
                          value: DTD.AttValue;
@@ -284,7 +310,7 @@ PROCEDURE NewAttribute* (namespaceURI: DTD.NamespaceURI;
     IF ~specified THEN
       locator := NIL
     END;
-    InitAttribute (attr, namespaceURI, localName, attrDecl, value,
+    InitAttribute (attr, namespaceDecl, localName, attrDecl, value,
                    specified, locator);
     RETURN attr
   END NewAttribute;
