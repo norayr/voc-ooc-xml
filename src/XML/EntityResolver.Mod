@@ -1,4 +1,4 @@
-(*      $Id: EntityResolver.Mod,v 1.1 2000/07/12 22:28:05 mva Exp $   *)
+(*      $Id: EntityResolver.Mod,v 1.2 2000/07/22 16:18:08 mva Exp $   *)
 MODULE XML:EntityResolver;
 (*  Locates and opens external entities for the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -19,7 +19,7 @@ MODULE XML:EntityResolver;
 *)
 
 IMPORT
-  LongStrings, Msg, Strings, URI, URI:Parser,
+  LongStrings, Msg, Strings, URI, URI:Parser, URI:CharClass,
   XML:DTD, Codec := XML:UnicodeCodec, XML:UnicodeCodec:UTF8;
 
 
@@ -27,6 +27,68 @@ TYPE
   Resolver* = POINTER TO ResolverDesc;
   ResolverDesc* = RECORD
   END;
+
+
+PROCEDURE URItoASCII* (uri: DTD.String): DTD.StringURI;
+(**Converts a URI string represented as a sequence of Unicode characters to
+   an ASCII URI string.  The Unicode string is encoded into a UTF-8 byte
+   sequence.  Then, any resulting bytes that are not reserved or unreserved
+   URI characters, or represent that character "#", are replaced with URI
+   escape sequences.  In particular, all non-ASCII characters are escaped.  *)
+  VAR
+    len16, i: INTEGER;
+    codec: Codec.Codec;
+    str8: ARRAY 8*1024 OF CHAR;
+    repl: ARRAY 4 OF CHAR;
+    srcDone, destDone: LONGINT;
+
+  PROCEDURE ToHex (i: INTEGER): CHAR;
+    BEGIN
+      IF (i < 10) THEN
+        RETURN CHR (i+ORD ("0"))
+      ELSE
+        RETURN CHR (i+(ORD ("A")-10))
+      END
+    END ToHex;
+
+  BEGIN
+    len16 := LongStrings.Length (uri^);
+    codec := UTF8.factory. NewCodec();
+
+    (* encode UCS-2 character sequence as UTF-8 character sequence *)
+    IF (len16 # 0) THEN
+      codec. Encode (uri^, 0, len16, str8, 0, LEN (str8), srcDone, destDone);
+      IF (srcDone # len16) THEN
+        codec. Encode (uri^, srcDone, len16, str8, destDone, LEN (str8),
+                       srcDone, destDone);
+        ASSERT (srcDone = len16)
+      END;
+      str8[destDone] := 0X
+    ELSE
+      COPY ("", str8)
+    END;
+
+    (* encode every non-ASCII character in the UTF-8 string to %HH *)
+    i := 0;
+    WHILE (str8[i] # 0X) DO
+      IF (str8[i] >= 80X) OR
+         ~(CharClass.IsReserved (str8[i]) OR
+           CharClass.IsUnreserved (str8[i]) OR
+           (str8[i] = "#")) THEN
+        repl := "%HH";
+        repl[1] := ToHex (ORD (str8[i]) DIV 16);
+        repl[2] := ToHex (ORD (str8[i]) MOD 16);
+        Strings.Delete (str8, i, 1);
+        Strings.Insert (repl, i, str8);
+        INC (i, 3)
+      ELSE
+        INC (i)
+      END
+    END;
+
+    RETURN DTD.GetStringURI (str8, 0, i)
+  END URItoASCII;
+
 
 PROCEDURE (r: Resolver) GetURI* (public, system: DTD.String; baseURI: URI.URI;
                                  VAR uri: URI.URI; VAR res: Msg.Msg);
@@ -41,63 +103,14 @@ PROCEDURE (r: Resolver) GetURI* (public, system: DTD.String; baseURI: URI.URI;
    @code{NIL} if no system identifier is present, which is permitted for
    notation declarations.  *)
   VAR
-    len16, len8, i: INTEGER;
-    codec: Codec.Codec;
-    str8: POINTER TO ARRAY OF CHAR;
-    repl: ARRAY 4 OF CHAR;
-    srcDone, destDone: LONGINT;
-
-  PROCEDURE ToHex (i: INTEGER): CHAR;
-    BEGIN
-      IF (i < 10) THEN
-        RETURN CHR (i+ORD ("0"))
-      ELSE
-        RETURN CHR (i+(ORD ("A")-10))
-      END
-    END ToHex;
-
+    str8: DTD.StringURI;
   BEGIN
     IF (system = NIL) THEN               (* notation declaration *)
       uri := NIL; res := NIL;
       RETURN
     END;
     
-    len16 := LongStrings.Length (system^);
-    len8 := len16*9+1;
-    NEW (str8, len8);
-    (* conservative approximation: UCS-2 character code is mapped to at
-       most 3 bytes, a UCS-2 surrogate pair to 2 characters each; then,
-       a non-ASCII character is encoded as %HH *)
-    codec := UTF8.factory. NewCodec();
-
-    (* encode UCS-2 character sequence as UTF-8 character sequence *)
-    IF (len16 # 0) THEN
-      codec. Encode (system^, 0, len16, str8^, 0, len8, srcDone, destDone);
-      IF (srcDone # len16) THEN
-        codec. Encode (system^, srcDone, len16, str8^, destDone, len8,
-                       srcDone, destDone);
-        ASSERT (srcDone = len16)
-      END;
-      str8[destDone] := 0X
-    ELSE
-      COPY ("", str8^)
-    END;
-
-    (* encode every non-ASCII character in the UTF-8 string to %HH *)
-    i := 0;
-    WHILE (str8[i] # 0X) DO
-      IF (str8[i] >= 80X) THEN
-        repl := "%HH";
-        repl[1] := ToHex (ORD (str8[i]) DIV 16);
-        repl[2] := ToHex (ORD (str8[i]) MOD 16);
-        Strings.Delete (str8^, i, 1);
-        Strings.Insert (str8^, i, repl);
-        INC (i, 3)
-      ELSE
-        INC (i)
-      END
-    END;
-
+    str8 := URItoASCII (system);
     IF (baseURI # NIL) & (baseURI IS URI.HierarchicalURI) THEN
       uri := Parser.NewURI (str8^, baseURI(URI.HierarchicalURI), res)
     ELSE
