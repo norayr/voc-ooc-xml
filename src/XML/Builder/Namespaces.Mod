@@ -1,4 +1,4 @@
-(*      $Id: Namespaces.Mod,v 1.4 2000/08/16 08:23:50 mva Exp $   *)
+(*      $Id: Namespaces.Mod,v 1.5 2001/02/07 10:37:12 mva Exp $   *)
 MODULE XML:Builder:Namespaces;
 (*  Provides namespace support for XML:Parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -53,7 +53,7 @@ TYPE
      @example
      builder := Namespaces.New (builder);
      p := Parser.NewFile (arg, NIL, NIL, NIL, builder, res);
-     p. enforceQNames := namespaceSupport;
+     p. enforceQNames := TRUE;
      @end example  *)
   
     (B.BuilderDesc)
