@@ -1,4 +1,4 @@
-(* 	$Id: DTD.Mod,v 1.11 2001/03/18 14:27:05 mva Exp $	 *)
+(* 	$Id: DTD.Mod,v 1.12 2001/03/18 17:02:02 mva Exp $	 *)
 MODULE XML:DTD [OOC_EXTENSIONS];
 (*  Implements the internal representation of a document DTD.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -325,7 +325,16 @@ CONST
   cpOptional* = 1;
   cpRepeat0* = 2;
   cpRepeat1* = 3;
-  
+
+TYPE
+  ContentType* = SHORTINT;
+
+CONST
+  contentEMPTY* = 0;
+  contentANY* = 1;
+  contentMixed* = 2;
+  contentChildren* = 3;
+
 TYPE
   CP* = POINTER TO CPDesc;
   CPDesc = RECORD
@@ -357,6 +366,8 @@ TYPE
     (DeclarationDesc)
     contentModel-: CP;
     (**The content model of the element.  *)
+    contentType-: ContentType;
+    (**Type of the content model.  *)
     attrNamespace-: Namespace;
     (**The attribute namespace of the element.  *)
     idAttr-: AttrDecl;
@@ -1028,6 +1039,24 @@ PROCEDURE InitElementDecl (elemDecl: ElementDecl; name: String; contentModel: CP
   BEGIN
     InitDeclaration (elemDecl, name);
     elemDecl. contentModel := contentModel;
+    WITH contentModel: NameCP DO
+      IF (contentModel. name^ = "EMPTY") THEN
+        elemDecl. contentType := contentEMPTY
+      ELSIF (contentModel. name^ = "ANY") THEN
+        elemDecl. contentType := contentANY
+      ELSE
+        elemDecl. contentType := contentANY  (* only possible after wf error *)
+      END
+    | contentModel: ChoiceCP DO
+      IF (contentModel. list IS NameCP) &
+         (contentModel. list(NameCP). name^ = "#PCDATA") THEN
+        elemDecl. contentType := contentMixed
+      ELSE
+        elemDecl. contentType := contentChildren
+      END
+    ELSE
+      elemDecl. contentType := contentChildren
+    END;
     elemDecl. attrNamespace := attrNamespace;
     elemDecl. idAttr := NIL;
     elemDecl. notationAttr := NIL;
@@ -1044,17 +1073,13 @@ PROCEDURE (b: Builder) NewElementDecl* (name: String; contentModel: CP): Element
 
 PROCEDURE (elemDecl: ElementDecl) IsEmpty* (): BOOLEAN;
   BEGIN
-    RETURN (elemDecl. contentModel IS NameCP) &
-           (elemDecl. contentModel(NameCP). name^ = "EMPTY")
+    RETURN (elemDecl. contentType = contentEMPTY)
   END IsEmpty;
 
 PROCEDURE (elemDecl: ElementDecl) IsElementContent* (): BOOLEAN;
   BEGIN
     (* element content is equivalent to not having mixed content *)
-    RETURN 
-      ~((elemDecl. contentModel IS ChoiceCP) &
-        (elemDecl. contentModel(ChoiceCP). list IS NameCP) &
-        (elemDecl. contentModel(ChoiceCP). list(NameCP). name^ = "#PCDATA"))
+    RETURN (elemDecl. contentType # contentMixed)
   END IsElementContent;
 
 

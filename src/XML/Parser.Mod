@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.23 2001/03/18 14:27:05 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.24 2001/03/18 17:02:02 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -90,15 +90,22 @@ TYPE
        targets, and notation names contain no colon.  This enables parts of the
        checks required from namespace aware parsers.  The default is
        @code{FALSE}.  *)
-    enforceGroupNesting*: BOOLEAN;
-    (**If @code{TRUE}, then the parser checks that parameter entity references
-       do not violate the nesting requirements imposed by the various validity
-       constraints.  This enables parts of the checks required from validating
-       parsers.  The default is @code{FALSE}.  *)
-    enforceRequiredAttr*: BOOLEAN;
-    (**If @code{TRUE}, then the parser checks that required attributes are 
-       present in an element's attribute list.  This enables parts of the
-       checks required from validating parsers.  The default is @code{FALSE}.*)
+    validating*: BOOLEAN;
+    (**If @code{TRUE}, then the parser checks that
+
+       @itemize @bullet
+       @item
+       parameter entity references do not violate the nesting requirements
+       imposed by the various validity constraints,
+
+       @item
+       required attributes are present in an element's attribute list,
+
+       @item
+       @dots{}
+       @end itemize
+
+       The default value of this field is @code{FALSE}.*)
     processDeclarations: BOOLEAN;
     (* if FALSE, then entity declarations and attribute declarations must not
        be processed; this field starts out TRUE, and is set to FALSE after
@@ -1143,6 +1150,15 @@ PROCEDURE (p: Parser) ParseDocument*;
   PROCEDURE ^ XMLDecl (entity: DTD.ExternalEntity);
   PROCEDURE ^ extSubsetDecl;
   
+  PROCEDURE SkippedEntity (name: DTD.String);
+  (* if name=NIL, then the external subset of the DTD is skipped *)
+    BEGIN
+      p. readCompleteDTD := FALSE;
+      IF (p. documentEntity. standalone # DTD.standaloneYes) THEN
+        p. processDeclarations := FALSE
+      END
+    END SkippedEntity;
+  
   PROCEDURE PEReference (declSep: BOOLEAN);
     VAR
       name: DTD.String;
@@ -1161,9 +1177,14 @@ PROCEDURE (p: Parser) ParseDocument*;
       cstart := oldCStart-p. in. offsetFromPos0;
       CheckChar (";");
       decl := dtd. peNamespace. Get (name);
-      IF (decl = NIL) THEN
-        Err (noSuchParameterEntity);
-        p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (name^))
+      IF (decl = NIL) THEN  (* FIXME... the WFC/VC rules are quite hairy *)
+        IF p. validating OR
+           (p. processDeclarations & p. followExternalRef) THEN
+          Err (noSuchParameterEntity);
+          p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (name^))
+        ELSE
+          SkippedEntity (name)
+        END
       ELSE
         entity := decl(DTD.Entity);
         IF declSep THEN
@@ -1196,10 +1217,7 @@ PROCEDURE (p: Parser) ParseDocument*;
               PopEntity
             END
           ELSE
-            p. readCompleteDTD := FALSE;
-            IF (p. documentEntity. standalone # DTD.standaloneYes) THEN
-              p. processDeclarations := FALSE
-            END
+            SkippedEntity (name)
           END
         ELSE
           (* not in DeclSep: must be within entity value definition *)
@@ -1527,7 +1545,7 @@ PROCEDURE (p: Parser) ParseDocument*;
   
   PROCEDURE CheckCurrentEntity (reference: DTD.Entity);
     BEGIN
-      IF p. enforceGroupNesting & (reference # CurrentEntity()) THEN
+      IF p. validating & (reference # CurrentEntity()) THEN
         ErrNF (nestingViolation)
       END
     END CheckCurrentEntity;
@@ -2166,7 +2184,7 @@ PROCEDURE (p: Parser) ParseDocument*;
               Expand (attrDecl. defaultValue);
               p. builder. Attribute (NIL, decl. name, attrDecl,
                                      attrDecl. defaultValue, FALSE)
-            ELSIF p. enforceRequiredAttr &
+            ELSIF p. validating &
                   (attrDecl. default = DTD.attrRequired) THEN
               ErrPos (requiredAttrMissing, p. l^);
               p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (attrDecl. name^))
@@ -2348,6 +2366,7 @@ PROCEDURE (p: Parser) ParseDocument*;
               CheckChar ("|");
               OptS (FALSE);
               last. SetNext (dtd. NewNameCP (DTD.cpOnce, Name (FALSE)));
+              last := last. next;
               OptS (FALSE)
             END;
             CheckCurrentEntity (currentEntity);
@@ -2420,6 +2439,7 @@ PROCEDURE (p: Parser) ParseDocument*;
                   CheckChar (SHORT (class));
                   OptS (FALSE);
                   last. SetNext (cp());
+                  last := last. next;
                   OptS (FALSE)
                 ELSE                   (* end of document, or other char *)
                   EXIT
@@ -2930,18 +2950,22 @@ PROCEDURE (p: Parser) ParseDocument*;
         CheckChar (">");
         
         IF (public # NIL) OR (system # NIL) THEN
-          externalSubset := dtd. NewExternalDTD (public, system, baseURI);
-          PushEntity (externalSubset, TRUE);
-          p. inExternalSubset := TRUE;
-          IF LookingAt ("<?xml", followedByNonName) THEN
-            XMLDecl (externalSubset)
-          END;
-          extSubsetDecl;
-          p. inExternalSubset := FALSE;
-          IF (chars[cpos] # Buffer.markerEOD) THEN
-            Err (junkAfterExtSubset)
-          END;
-          PopEntity
+          IF p. followExternalRef THEN
+            externalSubset := dtd. NewExternalDTD (public, system, baseURI);
+            PushEntity (externalSubset, TRUE);
+            p. inExternalSubset := TRUE;
+            IF LookingAt ("<?xml", followedByNonName) THEN
+              XMLDecl (externalSubset)
+            END;
+            extSubsetDecl;
+            p. inExternalSubset := FALSE;
+            IF (chars[cpos] # Buffer.markerEOD) THEN
+              Err (junkAfterExtSubset)
+            END;
+            PopEntity
+          ELSE
+            SkippedEntity (NIL)
+          END
         ELSE
           externalSubset := NIL;
         END;
@@ -3026,8 +3050,7 @@ PROCEDURE Init (p: Parser; new: BOOLEAN;
     
     p. followExternalRef := TRUE;
     p. enforceQNames := FALSE;
-    p. enforceGroupNesting := FALSE;
-    p. enforceRequiredAttr := FALSE;
+    p. validating := FALSE;
     p. processDeclarations := TRUE;
     p. readCompleteDTD := TRUE;
     

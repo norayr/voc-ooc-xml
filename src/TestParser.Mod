@@ -1,4 +1,4 @@
-(*      $Id: TestParser.Mod,v 1.6 2001/03/17 21:34:02 mva Exp $   *)
+(*      $Id: TestParser.Mod,v 1.7 2001/03/18 00:09:32 mva Exp $   *)
 MODULE TestParser;
 (*  Converts XML document into its canonical representation.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -31,7 +31,7 @@ CONST
   
 VAR
   mode: SHORTINT;
-  namespaceSupport, validating: BOOLEAN;
+  namespaceSupport, validating, dontFollowEntityRefs: BOOLEAN;
   format: SHORTINT;
   canon: Parser.Parser;
   builder: Builder.Builder;
@@ -49,7 +49,7 @@ PROCEDURE CreateParser(): Parser.Parser;
     
     (* write usage text and exit if no arguments are given *)
     IF (ProgramArgs.args. ArgNumber() = 0) THEN
-      Err.String ("usage: TestParser [-1|-2|-3|-p] [-n] <file>"); Err.Ln;
+      Err.String ("usage: TestParser [-1|-2|-3|-p] [-i|-v] [-n] <file>"); Err.Ln;
       HALT(1)
     END;
     
@@ -57,6 +57,7 @@ PROCEDURE CreateParser(): Parser.Parser;
     mode := modeCanonical;
     namespaceSupport := FALSE;
     validating := FALSE;
+    dontFollowEntityRefs := FALSE;
     format := Canonical.firstCanonicalForm;
     argReader := TextRider.ConnectReader (ProgramArgs.args);
     argReader. ReadLine (arg);           (* skip command name *)
@@ -74,6 +75,8 @@ PROCEDURE CreateParser(): Parser.Parser;
         namespaceSupport := TRUE
       ELSIF (arg = "-v") THEN
         validating := TRUE
+      ELSIF (arg = "-i") THEN
+        dontFollowEntityRefs := TRUE
       ELSE
         EXIT;
       END;
@@ -87,6 +90,7 @@ PROCEDURE CreateParser(): Parser.Parser;
     END;
     
     IF validating THEN
+      dontFollowEntityRefs := FALSE;
       validatingBuilder := Validation.New (builder);
       builder := validatingBuilder
     END;
@@ -96,9 +100,9 @@ PROCEDURE CreateParser(): Parser.Parser;
     END;
     
     p := Parser.NewFile (arg, NIL, NIL, NIL, builder, res);
+    p. followExternalRef := ~dontFollowEntityRefs;
     p. enforceQNames := namespaceSupport; (* enable QName and NCName checks *)
-    p. enforceGroupNesting := validating; (* enable PE nesting checks *)
-    p. enforceRequiredAttr := validating; (* enfore required attributes *)
+    p. validating := validating;          (* enable parser-level validation *)
     ASSERT (res = NIL);
     RETURN p
   END CreateParser;

@@ -1,0 +1,3 @@
+In file invalid/dtd02.xml: 
+line=3, column=2
+112: Unparsed entity `Brittannica' refers to undeclared notation `Encyclopaedia'

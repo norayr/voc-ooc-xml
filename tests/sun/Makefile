@@ -1,6 +1,6 @@
 TEST_PROG=../../TestParser
-scripts=./invalid.sh
-#scripts=./not-wf.sh ./valid.sh ./invalid.sh
+#scripts=./invalid.sh
+scripts=./not-wf.sh ./valid.sh ./invalid.sh
 
 .PHONY: all clean test ${TEST_PROG}
 

@@ -1,4 +1,4 @@
-(*      $Id: Validation.Mod,v 1.4 2001/03/18 14:27:48 mva Exp $   *)
+(*      $Id: Validation.Mod,v 1.5 2001/03/18 17:02:37 mva Exp $   *)
 MODULE XML:Builder:Validation;
 (*  Adds validation services to the XML:Parser.
     Copyright (C) 2001  Michael van Acken
@@ -84,6 +84,8 @@ CONST  (* error codes *)
   invalidStandaloneElemEntityRef = 24;
   invalidCharacterContent = 25;
   rootMismatch = 26;
+  mixedTypeDuplicate = 27;
+  unknownUnparsedEntityNotation = 28;
   
 VAR
   validationContext: Error.Context;
@@ -315,6 +317,7 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
     decl: DTD.Declaration;
     elemDecl: DTD.ElementDecl;
     nameNode: DTD.NameNode;
+    cp: DTD.CP;
     
   PROCEDURE CheckAttributes (list: DTD.Declaration);
     VAR
@@ -381,17 +384,29 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
       END
     END CheckAttributes;
   
+  PROCEDURE InList (name: DTD.String; list: DTD.CP): BOOLEAN;
+    BEGIN
+      WHILE (list # NIL) & (list(DTD.NameCP). name^ # name^) DO
+        list := list. next
+      END;
+      RETURN (list # NIL)
+    END InList;
+  
   BEGIN
+    (* check VCs on attributes that could not be attached to any element *)
     CheckAttributes (b. dtd. attributeList);
     
     decl := b. dtd. elementNamespace. declList;
     WHILE (decl # NIL) DO
       elemDecl := decl(DTD.ElementDecl);
+      
       IF (elemDecl. idAttr = DTD.undefAttr) THEN
+        (* an element may have at most one ID attribute *)
         ErrString (b, multipleIDAttr, "element", elemDecl. name)
       END;
       
       IF (elemDecl. notationAttr = DTD.undefAttr) THEN
+        (* an element may have at most one NOTATION attribute *)
         ErrString (b, multipleNOTATIONAttr, "element", elemDecl. name)
       ELSIF (elemDecl. notationAttr # NIL) & elemDecl. IsEmpty() THEN
 (*        ErrString2 (b, emptyElemWithNOTATION,
@@ -399,7 +414,32 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
                     "attribute", elemDecl. notationAttr. name) ... *)
       END;
       
+      IF (elemDecl. contentType = DTD.contentMixed) THEN
+        (* check that every child entry in a Mixed type is unique *)
+        cp := elemDecl. contentModel(DTD.ChoiceCP). list;
+        WHILE (cp # NIL) DO
+          IF InList (cp(DTD.NameCP). name, cp. next) THEN
+            ErrString2 (b, mixedTypeDuplicate,
+                        "element", elemDecl. name,
+                        "child", cp(DTD.NameCP). name)
+          END;
+          cp := cp. next
+        END
+      END;
+      
+      (* check VCs on attributes attached to the current element *)
       CheckAttributes (elemDecl. attrNamespace. declList);
+      decl := decl. next
+    END;
+    
+    decl := b. dtd. geNamespace. declList;
+    WHILE (decl # NIL) DO
+      IF (decl(DTD.Entity). type = DTD.entityUnparsed) &
+         (b. notationNamespace. Get (decl(DTD.ExternalEntity). ndata) = NIL) THEN
+        ErrString2 (b, unknownUnparsedEntityNotation,
+                    "entity", decl. name,
+                    "notation", decl(DTD.ExternalEntity). ndata)
+      END;
       decl := decl. next
     END;
     
@@ -802,6 +842,10 @@ PROCEDURE SetErrorMessages;
         t := "`${element}' does not have character content"
       | rootMismatch:
         t := "Element name does not match root name `${name}' from the DTD"
+      | mixedTypeDuplicate:
+        t := "In element `${element}', child `${child}' appears multiple times in the Mixed declaration"
+      | unknownUnparsedEntityNotation:
+        t := "Unparsed entity `${entity}' refers to undeclared notation `${notation}'"
       ELSE
         t := ""
       END;
