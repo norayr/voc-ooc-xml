@@ -1,4 +1,4 @@
-/*	$Id: IO_PFD.c,v 1.19 1999/10/31 13:59:36 ooc-devel Exp $	*/
+/*	$Id: IO_PFD.c,v 1.1 2000/08/27 15:12:41 mva Exp $	*/
 /*  Generalized access to POSIX-style file descriptors.
     Copyright (C) 1997-2000  Michael van Acken
 
@@ -413,8 +413,11 @@ int IO_PFD__ReaderDesc_Available(IO_PFD__Reader r) {
     }
   } else {
 #ifdef FIONREAD
-    ioctl(ch->fd, FIONREAD, &len);
-    return len;
+    if (ioctl(ch->fd, FIONREAD, &len) < 0) {
+      return -1;
+    } else {
+      return len;
+    }
 #else
     /* something else, like terminal or socket */
     fd_set set;

@@ -1,4 +1,4 @@
-(*	$Id: PosixFileDescr.Mod,v 1.10 1999/10/31 13:58:05 ooc-devel Exp $	*)
+(*	$Id: PFD.Mod,v 1.1 2000/08/27 15:13:27 mva Exp $	*)
 MODULE IO:PFD [FOREIGN "C"; LINK FILE "IO_PFD.c" END];
 (*  Generalized access to POSIX-style file descriptors.
     Copyright (C) 1997-2000  Michael van Acken
@@ -19,14 +19,9 @@ MODULE IO:PFD [FOREIGN "C"; LINK FILE "IO_PFD.c" END];
 *)
 <* Warnings := FALSE; ConformantMode := FALSE *>
 
-(*
-Warning:
-This module is not part of the "official" OOC suit of library modules.  It
-provides an abstract class containing the features that are used by all channel
-implementations based on Unix-style file descriptors.  It will not be available
-for all implementations of OOC.  Usage of of this module should be restricted 
-to derived modules like StdChannels or Files.  It should never be used directly
-by a programmer.
+(** Note: This module is a stripped down version of @oproc{PosixFileDescr}.
+All buffering code has been removed.  The function @oproc{Reader.Available}
+uses the @samp{ioctl()} function @samp{FIONREAD} if this macro is defined.
 *)
 
 IMPORT
