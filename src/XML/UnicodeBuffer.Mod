@@ -303,22 +303,22 @@ PROCEDURE (in: Input) SetCodec* (cf: Codec.Factory; autoDetect: BOOLEAN);
     in. autoDetectedCodec := autoDetect
   END SetCodec;
 
-PROCEDURE NewInput* (ch: Channel.Channel; codecFactory: Codec.Factory;
-                     errList: Msg.MsgList): Input;
-(**Create new input buffer for channel @oparam{ch} and try to read the first
-   block of data from it.  If this fails, return @code{NIL} as result.
-   Otherwise, return an initialized input buffer with up to 
-   @oconst{sizeOfInputBuffer} characters of input.  *)
+PROCEDURE InitInput* (input: Input; new: BOOLEAN;
+                      reader: Channel.Reader; codecFactory: Codec.Factory;
+                      errList: Msg.MsgList);
   VAR
-    input: Input;
     encoding: ARRAY 256 OF CHAR;
     skip: LONGINT;
     autoDetect: BOOLEAN;
   BEGIN
-    NEW (input);
-    input. byteBuffer := InputBuffer.New (ch, errList);
+    IF new THEN
+      input. byteBuffer := InputBuffer.New (reader, errList);
+      NEW (input. chars, sizeOfInputBuffer);
+    ELSE
+      input. byteBuffer. Reset (reader, errList)
+    END;
+    
     input. byteEndOfData := FALSE;
-    NEW (input. chars, sizeOfInputBuffer);
     input. errList := errList;
     
     autoDetect := FALSE;
@@ -329,12 +329,34 @@ PROCEDURE NewInput* (ch: Channel.Channel; codecFactory: Codec.Factory;
       autoDetect := TRUE
     END;
     
-    IF (input. byteBuffer = NIL) THEN
-      RETURN NIL
-    ELSE
-      input. SetCodec (codecFactory, autoDetect);
-      RETURN input
-    END
+    input. SetCodec (codecFactory, autoDetect);
+  END InitInput;
+
+PROCEDURE (input: Input) Reset* (reader: Channel.Reader; 
+                                 codecFactory: Codec.Factory;
+                                 errList: Msg.MsgList);
+(**Resets the buffer @oparam{b} to its initial state.  This has the same effect
+   as calling @oproc{NewInput} with the same parameters, except that some of
+   the resources allocated by @oparam{b} are reused.
+   
+   Note: This method does not change the state of the reader @oparam{reader}.
+   For example, if the reader should continue reading a file from its
+   beginning, then it must be positioned @emph{before} this method is called.*)
+  BEGIN
+    InitInput (input, FALSE, reader, codecFactory, errList)
+  END Reset;
+
+PROCEDURE NewInput* (reader: Channel.Reader; codecFactory: Codec.Factory;
+                     errList: Msg.MsgList): Input;
+(**Create new input buffer for reader @oparam{reader} and try to read the first
+   block of data from it.  Returns an initialized input buffer with up to
+   @oconst{sizeOfInputBuffer} characters of input.  *)
+  VAR
+    input: Input;
+  BEGIN
+    NEW (input);
+    InitInput (input, TRUE, reader, codecFactory, errList);
+    RETURN input
   END NewInput;
 
 (* ------------------------------------------------------------------------ *)

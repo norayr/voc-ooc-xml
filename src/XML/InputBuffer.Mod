@@ -1,4 +1,4 @@
-(* 	$Id: InputBuffer.Mod,v 1.1.1.2 2000/07/10 20:31:56 mva Exp $	 *)
+(* 	$Id: InputBuffer.Mod,v 1.2 2000/08/16 08:23:43 mva Exp $	 *)
 MODULE XML:InputBuffer;
 (*  Defines input buffer for OOC's scanner.
     Copyright (C) 2000  Michael van Acken
@@ -150,30 +150,45 @@ PROCEDURE (b: Buffer) Close*;
     b. chars := NIL;
   END Close;
 
-PROCEDURE New* (ch: Channel.Channel; errList: Msg.MsgList): Buffer;
-(**Creates a new input buffer for channel @oparam{ch} and tries to read the
-   first block of data from it.  If the reader cannot be attached, return
-   @code{NIL} as result.  Otherwise, return an initialized input buffer with
-   up to @oconst{sizeOfBuffer} characters of input.  *)
+PROCEDURE Init (b: Buffer; new: BOOLEAN;
+                reader: Channel.Reader; errList: Msg.MsgList);
   VAR
-    b: Buffer;
     dummy: BOOLEAN;
   BEGIN
-    NEW (b);
-    b. r := ch. NewReader();
+    b. r := reader;
     b. discardable := 0;
     b. offsetFromPos0 := 0;
     b. endOfBuffer := 0;
     b. errList := errList;
-    IF (ch. res = Channel.done) THEN
-      NEW (b. chars, sizeOfBuffer);
-      b. chars[0] := markerEOB;
-      dummy := b. NextBlock();
-      RETURN b
-    ELSE
-      errList. Append (ch. res);
-      RETURN NIL
-    END
+    IF new THEN
+      NEW (b. chars, sizeOfBuffer)
+    END;
+    b. chars[0] := markerEOB;
+    dummy := b. NextBlock();
+  END Init;
+
+PROCEDURE (b: Buffer) Reset* (reader: Channel.Reader; errList: Msg.MsgList);
+(**Resets the buffer @oparam{b} to its initial state.  This has the same effect
+   as calling @oproc{New} with the same parameters, except that some of the
+   resources allocated by @oparam{b} are reused.
+   
+   Note: This method does not change the state of the reader @oparam{reader}.
+   For example, if the reader should continue reading a file from its
+   beginning, then it must be positioned @emph{before} this method is called.*)
+  BEGIN
+    Init (b, FALSE, reader, errList)
+  END Reset;
+
+PROCEDURE New* (reader: Channel.Reader; errList: Msg.MsgList): Buffer;
+(**Creates a new input buffer for reader @oparam{reader} and tries to read the
+   first block of data from it.  Returns an initialized input buffer with up to
+   @oconst{sizeOfBuffer} characters of input.  *)
+  VAR
+    b: Buffer;
+  BEGIN
+    NEW (b);
+    Init (b, TRUE, reader, errList);
+    RETURN b
   END New;
 
 END XML:InputBuffer.
