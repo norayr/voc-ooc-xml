@@ -1,7 +1,6 @@
 MODULE XML:DTD [OOC_EXTENSIONS];
 
 IMPORT
-Log,
   LongStrings, URI, XML:UnicodeBuffer;
 
 
@@ -267,10 +266,19 @@ CONST
 
 
 TYPE
-  NamespaceURI* = POINTER TO NamespaceURIDesc;
-  NamespaceURIDesc = RECORD
+  NamespaceDeclaration* = POINTER TO NamespaceDeclarationDesc;
+  StringURI* = POINTER TO ARRAY OF CHAR;
+  NamespaceDeclarationDesc = RECORD
+    (**This class describes notation declaration items of the XML Information
+       Set.  *)
     prefix-: String;
-    uri-: URI.URI;
+    (**The prefix being declared.  Syntactically, this is the part of the
+       attribute name following the @code{xmlns:} prefix.  If the attribute
+       name is simply @code{xmlns}, this field is @code{NIL}.  *)
+    uri-: StringURI;
+    (**The absolute URI (plus optional fragment identifier) of the namespace
+        being declared.  It may be @code{NIL} if the attribute name
+        is @code{xmlns}.  *)
   END;
 
 
@@ -829,7 +837,53 @@ PROCEDURE (b: Builder) NewElementDecl* (name: String; contentModel: CP): Element
   END NewElementDecl;
 
 
+(* Namespace Declaration
+   ------------------------------------------------------------------------ *)
+
+PROCEDURE InitNamespaceDeclaration (namespaceDecl: NamespaceDeclaration;
+                                    prefix: String; uri: StringURI);
+  BEGIN
+    namespaceDecl. prefix := prefix;
+    namespaceDecl. uri := uri
+  END InitNamespaceDeclaration;
+
+PROCEDURE NewNamespaceDeclaration* (prefix: String; uri: StringURI): NamespaceDeclaration;
+  VAR
+    namespaceDecl: NamespaceDeclaration;
+  BEGIN
+    NEW (namespaceDecl);
+    InitNamespaceDeclaration (namespaceDecl, prefix, uri);
+    RETURN namespaceDecl
+  END NewNamespaceDeclaration;
+
+
 (* ------------------------------------------------------------------------ *)
+
+PROCEDURE GetString* (VAR string: ARRAY OF Char; start, end: LONGINT): String;
+  VAR
+    s: String;
+    i: LONGINT;
+  BEGIN
+    NEW (s, end-start+1);
+    FOR i := 0 TO end-start-1 DO
+      s[i] := string[start+i]
+    END;
+    s[end-start] := 0X;
+    RETURN s
+  END GetString;
+
+PROCEDURE GetStringURI* (VAR string: ARRAY OF CHAR; start, end: LONGINT): StringURI;
+  VAR
+    s: StringURI;
+    i: LONGINT;
+  BEGIN
+    NEW (s, end-start+1);
+    FOR i := 0 TO end-start-1 DO
+      s[i] := string[start+i]
+    END;
+    s[end-start] := 0X;
+    RETURN s
+  END GetStringURI;
 
 PROCEDURE Init* (b: Builder);
   PROCEDURE PredefEntity (name, replacement: ARRAY OF LONGCHAR);
