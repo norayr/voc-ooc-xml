@@ -1,4 +1,4 @@
-(* 	$Id: Error.Mod,v 1.4 2000/07/31 18:37:07 mva Exp $	 *)
+(* 	$Id: Error.Mod,v 1.5 2001/03/24 12:23:34 mva Exp $	 *)
 MODULE XML:Error;
 (*  Creates lists of error messages and converts them to text.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -177,6 +177,7 @@ PROCEDURE (errList: List) Write* (ch: Channel.Channel);
     uriAttr: M.Attribute;
     uri, prevURI: URI.URI;
     repl1, repl2: ARRAY 1024 OF CHAR;
+    i: LONGINT;
 
   PROCEDURE Replace (VAR text: ARRAY OF CHAR; pattern, repl: ARRAY OF CHAR);
     VAR
@@ -228,6 +229,23 @@ PROCEDURE (errList: List) Write* (ch: Channel.Channel);
         IF (uriAttr(URI.URIAttribute). uri # prevURI) THEN
           uri := uriAttr(URI.URIAttribute). uri. MakeRelative (errList. cwdURI);
           uri. GetString (text);
+          
+          i := 0;
+          WHILE (text[i] = ".") OR (text[i] = "/") DO
+            INC (i)
+          END;
+          IF (i > 6) THEN
+            (* string begins with ../../..; with this many steps back in the
+               directory hierarchy, a relative file name is pretty useless,
+               so we use the original absolue one *)
+            uri. GetString (text);
+            Strings.Extract (text, 0, 5, repl1);
+            Strings.Capitalize (repl1);
+            IF (repl1 = "FILE:") THEN
+              Strings.Delete (text, 0, 5)
+            END;
+          END;
+          
           writer. WriteString ("In file ");
           writer. WriteString (text);
           writer. WriteString (": ");
