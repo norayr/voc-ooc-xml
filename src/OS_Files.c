@@ -7,6 +7,8 @@
 #include <sys/stat.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <dirent.h>
 #include "__mini_gc.h"
 
 /* begin -- #include "OS:Files.d" */
@@ -148,6 +150,81 @@ static Msg__Msg get_error(const OS_Files__Path path) {
   return msg;
 }
 
+
+static void extend_result(OS_Files__NameArray *result, int *result_len,
+			  OS_Files__Name buffer[], int buffer_len) {
+  int len=*result_len+buffer_len;
+  char* ptr;
+  int i;
+  OS_Files__NameArray newResult;
+  
+  ptr = GC_malloc(len*sizeof(OS_Files__Name)+8);
+  *((LONGINT*)ptr) = len;
+  newResult = (OS_Files__NameArray)(ptr+8);
+  
+  if (*result != NULL) {
+    for(i = 0; i != *result_len; i++) {
+      newResult[i] = *result[i];
+    }
+  }
+  for(i = 0; i != buffer_len; i++) {
+    newResult[i + *result_len] = buffer[i];
+  }
+  
+  *result = newResult;
+  *result_len += buffer_len;
+}
+
+#define DIRENT_BUFFER 1024
+OS_Files__NameArray OS_Files__listdir(const OS_Files__Path path__ref,
+				      LONGINT path_0d, Msg__Msg *res) {
+  DIR* dir;
+
+  dir = opendir(path__ref);
+  if (dir != NULL) {
+    union {
+      struct dirent d;
+      char b[offsetof (struct dirent, d_name) + NAME_MAX + 1];
+    } u;
+    OS_Files__Name buffer[DIRENT_BUFFER];
+    OS_Files__NameArray result = NULL;
+    int result_len = 0;
+    struct dirent *de;
+    
+    int i=0;
+    while (readdir_r(dir, &u.d, &de) == 0) {
+      int len;
+      char* ptr;
+      
+      if (de == NULL) {  /* read all entries */
+	break;
+      } else if ((de->d_name[0] == '.') && 
+	  ((de->d_name[1] == '\000') ||
+	   ((de->d_name[1] == '.') && (de->d_name[2] == '\000')))) {
+	/* omit "." and ".." */
+      } else {
+	if (i == DIRENT_BUFFER) {
+	  extend_result(&result, &result_len, buffer, i);
+	  i = 0;
+	}
+	len = strlen(de->d_name);
+	ptr = GC_malloc(len+1+8);
+	*((LONGINT*)ptr) = len+1;
+	buffer[i] = (OS_Files__Name)(ptr+8);
+	strcpy(buffer[i], de->d_name);
+	i++;
+      }
+    }
+    closedir(dir);
+
+    *res = OS_Files__done;
+    extend_result(&result, &result_len, buffer, i);
+    return result;
+  } else {
+    *res = get_error(Msg__GetStringPtr(path__ref, path_0d));
+    return NULL;
+  }
+}
 
 void OS_Files__mkdir(const OS_Files__Path path, LONGINT path_0d,
                      OS_Files__Mode mode, Msg__Msg *res) {
