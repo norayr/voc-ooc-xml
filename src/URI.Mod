@@ -1,4 +1,4 @@
-(* 	$Id: URI.Mod,v 1.1.1.1 2000/07/10 15:24:29 mva Exp $	 *)
+(* 	$Id: URI.Mod,v 1.1.1.2 2000/07/10 20:31:52 mva Exp $	 *)
 MODULE URI [OOC_EXTENSIONS];
 (*  Implements RFC2396 "Uniform Resource Identifiers: Generic Syntax"
     Copyright (C) 2000  Michael van Acken
@@ -102,6 +102,20 @@ TYPE
   END;
 
 
+CONST
+  channelNew* = 0;
+  (**Open the channel on a new file, truncating any existing file of the
+     same name.  Both read and write access is enabled.  *)
+  channelTmp* = 1;
+  (**Open the channel on a new file, but do not register the file yet.
+     Both read and write access is enabled.  *)
+  channelOld* = 2;
+  (**Open the channel on an old file.  Only read access is enabled.  *)
+
+TYPE
+  ChannelMode* = SHORTINT;
+  (**One of @oconst{channelNew}, @oconst{channelTmp}, or @oconst{channelOld}.*)
+
 TYPE
   List = POINTER TO ListDesc;
   ListDesc = RECORD
@@ -204,7 +218,7 @@ PROCEDURE (uri: URI) MakeRelative* (baseURI: HierarchicalURI): URI;
     RETURN uri
   END MakeRelative;
 
-PROCEDURE (uri: URI) GetChannel* (new: BOOLEAN; VAR res: Msg.Msg): Channel.Channel;
+PROCEDURE (uri: URI) GetChannel* (mode: ChannelMode; VAR res: Msg.Msg): Channel.Channel;
 (**Opens a channel to the resource indicated by URI @oparam{uri}.  If
    @oparam{new} is TRUE, a new resource is created with read and write access,
    e.g. by calling @oproc{Files.New}.  Otherwise, a read only channel is
