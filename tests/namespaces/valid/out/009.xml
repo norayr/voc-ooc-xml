@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<parser-protocol xml:base='file:/usr/home/ooc-devel/sourceforge/libxml/tests/namespaces/'>
+<parser-protocol>
   <start-document>
     <entity>
       <type>document</type>

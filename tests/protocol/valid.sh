@@ -12,12 +12,10 @@ for d in $SUBDIR; do
       else
 	err_count=`expr $err_count + 1`
 	echo "failed: $i"
-        exit 1
       fi
     else
       err_count=`expr $err_count + 1`
       echo "failed: $i (exit code is non-zero)"
-      exit 1
     fi
   done
 done
