@@ -1,4 +1,4 @@
-(*	$Id: PosixFileDescr.Mod,v 1.10 1999/10/31 13:58:05 ooc-devel Exp $	*)
+(*	$Id: Socket.Mod,v 1.1 2000/08/27 15:13:27 mva Exp $	*)
 MODULE IO:Socket [FOREIGN "C"; LINK FILE "IO_Socket.c" END];
 (*  Interface to socket facilities.
     Copyright (C) 2000  Michael van Acken
@@ -222,8 +222,8 @@ PROCEDURE (s: Socket) GetChannel* (): Channel.Channel;
    can and must be closed independently.  *)
 
 
-PROCEDURE (s: Socket) Accept* (VAR cliaddr[NIL_COMPAT]: SockAddrParam;
-                               VAR addrlen[NIL_COMPAT]: socklen_t): Socket;
+PROCEDURE (s: Socket) Accept* (VAR cliaddr: SockAddrParam;
+                               VAR addrlen: socklen_t): Socket;
 (**Accepts a connection on socket @oparam{s}.  The socket must be bound to an
    address and listening for connections.
 
@@ -239,8 +239,7 @@ PROCEDURE (s: Socket) Accept* (VAR cliaddr[NIL_COMPAT]: SockAddrParam;
    connection.  Before the call, @oparam{addrlen} must be set to the size of
    the socket address structure passed to @oparam{cliaddr}, and on return this
    variable contains the actual number of bytes stored in the socket address
-   structure.  If you are not interested in the protocol address of the client,
-   pass @code{NIL} to @oparam{cliaddr} and @oparam{addrlen}.  *)
+   structure.  *)
 
 PROCEDURE (s: Socket) Bind* (VAR myaddr: SockAddrParam;
                              addrlen: socklen_t);
