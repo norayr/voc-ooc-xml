@@ -1,4 +1,4 @@
-(*	$Id: Socket.Mod,v 1.3 2000/08/29 14:36:12 mva Exp $	*)
+(*	$Id: Socket.Mod,v 1.4 2000/08/30 08:11:39 mva Exp $	*)
 MODULE IO:Socket [FOREIGN "C"; 
                   LINK
                     FILE "IO_Socket.c"
@@ -231,7 +231,7 @@ PROCEDURE (s: Socket) Accept* (VAR cliaddr: SockAddrParam;
 (**Accepts a connection on socket @oparam{s}.  The socket must be bound to an
    address and listening for connections.
 
-   The @oproc{Socket.Accpet} function waits if there are no connections
+   The @oproc{Socket.Accept} function waits if there are no connections
    pending, unless the socket @oparam{s} has nonblocking mode set.
 
    The return value is a new socket object usable to send and receive data on
@@ -329,7 +329,7 @@ PROCEDURE (s: Socket) SetBlocking* (blocking: BOOLEAN);
 (**Set blocking or non-blocking mode of the socket: if @oparam{blocking} is
    @code{FALSE}, the socket is set to non-blocking, else to blocking mode.
    Initially all sockets are in blocking mode. In non-blocking mode, if a
-   @oproc{Socket.recv} call doesn't find any data, or if a @oproc{Socket.send}
+   @oproc{Socket.Recv} call doesn't find any data, or if a @oproc{Socket.Send}
    call can't immediately dispose of the data, an error is is signalled in
    @ofield{s.res}.  In blocking mode, the calls block until they can proceed.  *)
 

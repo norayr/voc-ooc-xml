@@ -1,4 +1,4 @@
-(*	$Id: PFD.Mod,v 1.1 2000/08/27 15:13:27 mva Exp $	*)
+(*	$Id: PFD.Mod,v 1.2 2000/08/28 07:25:29 mva Exp $	*)
 MODULE IO:PFD [FOREIGN "C"; LINK FILE "IO_PFD.c" END];
 (*  Generalized access to POSIX-style file descriptors.
     Copyright (C) 1997-2000  Michael van Acken
@@ -19,7 +19,7 @@ MODULE IO:PFD [FOREIGN "C"; LINK FILE "IO_PFD.c" END];
 *)
 <* Warnings := FALSE; ConformantMode := FALSE *>
 
-(** Note: This module is a stripped down version of @oproc{PosixFileDescr}.
+(** Note: This module is a stripped down version of @omodule{*PosixFileDescr}.
 All buffering code has been removed.  The function @oproc{Reader.Available}
 uses the @samp{ioctl()} function @samp{FIONREAD} if this macro is defined.
 *)
