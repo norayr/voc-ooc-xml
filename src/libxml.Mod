@@ -26,7 +26,7 @@ IMPORT
   XML:Builder:Canonical,
   XML:Builder:ParserProtocol,
   XML:Builder:Namespaces,
-  XML:Builder:Validator,
+  XML:Builder:Validation,
   XML:Builder,
   XMLError := XML:Error,
   XML:InputBuffer,
