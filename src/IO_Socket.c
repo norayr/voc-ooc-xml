@@ -1,4 +1,4 @@
-/*	$Id: IO_Socket.c,v 1.6 2000/10/24 21:49:40 mva Exp $	*/
+/*	$Id: IO_Socket.c,v 1.7 2000/11/24 08:49:43 mva Exp $	*/
 /*  Interface to socket facilities.
     Copyright (C) 2000  Michael van Acken
 
@@ -659,6 +659,25 @@ void IO_Socket__SocketDesc_SetReuseAddress(IO_Socket__Socket s) {
   s->res = get_error(setsockopt(s->fd, SOL_SOCKET, SO_REUSEADDR,
                      (void*)&i, sizeof(i)));
 }
+
+void IO_Socket__SocketDesc_ConnectDone(IO_Socket__Socket s) {
+  int error, len, rc;
+  
+  len = sizeof(error);
+  if ((rc = getsockopt(s->fd, SOL_SOCKET, SO_ERROR, &error, &len)) < 0) {
+    s->res = get_error(rc);	/* Solaris pending error */
+  } else {
+    /* Berkeley-derived implementations return an rc of 0, with the
+       pending error returned in error */
+    if (error) {
+      errno = error;
+      s->res = get_error(-1);
+    } else {
+      s->res = IO_Socket__done;
+    }
+  }
+}
+
 
 void IO_Socket_init(void) {
   _mid = _register_module(&IO_Socket_md.md, &IO_Socket__ErrorContextDesc_td.td);

@@ -1,4 +1,4 @@
-(*	$Id: Socket.Mod,v 1.7 2000/10/09 19:37:25 mva Exp $	*)
+(*	$Id: Socket.Mod,v 1.8 2000/11/24 08:49:52 mva Exp $	*)
 MODULE IO:Socket [FOREIGN "C"; 
                   LINK
                     FILE "IO_Socket.c"
@@ -24,7 +24,7 @@ MODULE IO:Socket [FOREIGN "C";
 <* Warnings := FALSE *>
 
 IMPORT
-  SYSTEM, C, Channel, CharClass, LongStrings, Msg, IO:PFD;
+  SYSTEM, C, Channel, CharClass, LongStrings, Msg, IO:PFD, IO:Select;
 
 TYPE
   Result* = Channel.Result;
@@ -386,5 +386,25 @@ PROCEDURE (s: Socket) Shutdown* (howto: C.int);
    be one of @ovar{SHUT_RD}, @ovar{SHUT_WR}, or @ovar{SHUT_RDWR}.
 
    Depending on the result of the operation, @ofield{s.res} is changed.  *)
+
+PROCEDURE (s: Socket) ConnectDone*;
+(**When doing a non-blocking @oproc{Socket.Connect}, this procedure is
+   used to determine the result of the connect call.  The usage scenario
+   goes like this:
+   
+   @example
+   allocate socket
+   set socket to non-blocking mode
+   call socket.Connect()
+   
+   IF (socket.res # done) & (socket.res.code # connectInProgress) THEN
+     call Select(), with socket fd set in both read and write masks
+     IF (read or write flag is set) THEN
+       call ConnectDone()
+       test result code in socket.res
+     END
+   END
+   @end example
+   *)
 
 END IO:Socket.
