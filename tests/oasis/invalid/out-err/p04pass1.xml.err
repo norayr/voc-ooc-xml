@@ -1,0 +1,9 @@
+In file p04pass1.xml: 
+line=0, column=1
+1: Element type `doc' is not declared
+line=2, column=1
+39: Element type `ABCDEFGHIJKLMNOPQRSTUVWXYZ' is not declared
+line=3, column=1
+70: Element type `A01234567890' is not declared
+line=4, column=1
+87: Element type `A.-:?·' is not declared

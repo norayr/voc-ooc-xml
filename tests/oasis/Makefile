@@ -1,5 +1,5 @@
 TEST_PROG=../../TestParser
-scripts=./not-wf.sh ./valid.sh
+scripts=./not-wf.sh ./valid.sh ./invalid.sh
 
 .PHONY: all clean test ${TEST_PROG}
 
@@ -10,7 +10,7 @@ valid.list: oasis.xml
 	perl ../filter_tests.pl oasis.xml
 
 test-output:
-	mkdir test-output test-output/valid
+	mkdir test-output test-output/valid test-output/invalid
 
 ${TEST_PROG}:
 	cd `dirname ${TEST_PROG}` && ${OOC} -MOv `basename ${TEST_PROG}`
