@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.30 2001/03/22 22:04:58 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.31 2001/03/24 01:11:21 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -48,7 +48,13 @@ TYPE
   (**This class implements the actual XML parser.  It depends on
      @otype{DTD.Builder} to store and maintain the information gathered from a
      document's DTD, and on an instance of @otype{Builder.Builder} to pass on
-     any data retrieved from the document content.  *)
+     any data retrieved from the document content.
+
+     The parser implementation is intended to be compliant to the specification
+     ``Extensible Markup Language (XML) 1.0 (Second Edition)''
+     @url{http://www.w3.org/TR/2000/REC-xml-20001006}, upto and including the
+     erratas listed in @url{http://www.w3.org/XML/xml-V10-2e-errata} as of
+     2001-03-07 (that is, upto and including E14).  *)
     
     errList-: Error.List;
     (**Holds all error messages related to the currently parsed XML document.
@@ -513,9 +519,9 @@ PROCEDURE (el: ErrorListener) Error* (context: Error.Context; code: Error.Code;
   BEGIN
     p := el. p;
     err := Error.New (context, code);
-    err. SetIntAttrib ("char", pos. charIndex);
-    err. SetIntAttrib ("line", pos. line);
-    err. SetIntAttrib ("column", pos. column);
+    err. SetIntAttrib ("char", pos. charIndex+Error.errMsgCharPosBase);
+    err. SetIntAttrib ("line", pos. line+Error.errMsgLineBase);
+    err. SetIntAttrib ("column", pos. column+Error.errMsgColumnBase);
     err. SetAttribute (URI.NewURIAttribute ("baseURI", p. fileEntity. baseURI));
     IF (pos. inInternalEntity # NIL) THEN
       err. SetLStringAttrib ("entity_name", 
@@ -631,24 +637,29 @@ PROCEDURE (p: Parser) ParseDocument*;
     END SetFileEntity;
   
   
-  PROCEDURE ErrPos (code: Error.Code; VAR pos: Locator.Position);
+  PROCEDURE ErrPosNF (code: Error.Code; VAR pos: Locator.Position);
     VAR
       i: LONGINT;
     BEGIN
       p. lastError := Error.New (parserContext, code);
-      p. lastError. SetIntAttrib ("char", pos. charIndex);
-      p. lastError. SetIntAttrib ("line", pos. line);
-      p. lastError. SetIntAttrib ("column", pos. column);
+      p. lastError. SetIntAttrib ("char", pos. charIndex+Error.errMsgCharPosBase);
+      p. lastError. SetIntAttrib ("line", pos. line+Error.errMsgLineBase);
+      p. lastError. SetIntAttrib ("column", pos. column+Error.errMsgColumnBase);
       p. lastError. SetAttribute (URI.NewURIAttribute ("baseURI", p. fileEntity. baseURI));
       IF (chars # p. in. chars) THEN
         i := p. lenPEStack-1;
         p. lastError. SetLStringAttrib ("entity_name", 
                               Msg.GetLStringPtr (p. peStack[i]. entity. name^))
       END;
-      p. errList. Append (p. lastError);
+      p. errList. Append (p. lastError)
+    END ErrPosNF;
+  
+  PROCEDURE ErrPos (code: Error.Code; VAR pos: Locator.Position);
+    BEGIN
+      ErrPosNF (code, pos);
       IF (p. builder = p. initialBuilder) THEN
         p. builder := Builder.New()
-      END;
+      END
     END ErrPos;
   
   PROCEDURE WriteBuffer (msg: ARRAY OF CHAR);
@@ -670,17 +681,20 @@ PROCEDURE (p: Parser) ParseDocument*;
       Out.Ln;
     END WriteBuffer;
   
-  PROCEDURE Err (code: Error.Code);
-    BEGIN
-      (*WriteBuffer ("ERROR");*)
-      StorePosition (p. errorPos);
-      ErrPos (code, p. errorPos)
-    END Err;
-  
   PROCEDURE ErrNF (code: Error.Code);
     BEGIN  (* non-fatal error *)
-      Err (code)
+      (*WriteBuffer ("ERROR");*)
+      StorePosition (p. errorPos);
+      ErrPosNF (code, p. errorPos)
     END ErrNF;
+  
+  PROCEDURE Err (code: Error.Code);
+    BEGIN
+      ErrNF (code);
+      IF (p. builder = p. initialBuilder) THEN
+        p. builder := Builder.New()
+      END
+    END Err;
   
   (* ---------------------------------------------------------------------- *)
   
@@ -730,6 +744,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           RETURN NIL
         ELSE
           in := Buffer.NewInput (ch. NewReader(), NIL, p. errList);
+          entity. SetCodecFactory (in. codecFactory);
           RETURN in
         END
       END
@@ -2210,7 +2225,7 @@ PROCEDURE (p: Parser) ParseDocument*;
                                      attrDecl. defaultValue, FALSE)
             ELSIF p. validating &
                   (attrDecl. default = DTD.attrRequired) THEN
-              ErrPos (requiredAttrMissing, p. l^);
+              ErrPosNF (requiredAttrMissing, p. l^);
               p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (attrDecl. name^))
             END
           END;
@@ -3125,6 +3140,7 @@ PROCEDURE Init (p: Parser; new: BOOLEAN;
     
     p. dtd := DTD.New();
     p. documentEntity := p. dtd. NewDocumentEntity (baseURI);
+    p. documentEntity. SetCodecFactory (p. in. codecFactory);
     p. builder := builder;
     p. initialBuilder := builder;
     IF (entityResolver = NIL) THEN
