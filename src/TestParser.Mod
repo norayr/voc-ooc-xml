@@ -1,4 +1,4 @@
-(*      $Id: TestParser.Mod,v 1.2 2000/07/12 22:28:05 mva Exp $   *)
+(*      $Id: TestParser.Mod,v 1.3 2000/07/13 21:04:29 mva Exp $   *)
 MODULE TestParser;
 (*  Converts XML document into its canonical representation.
     Copyright (C) 2000  Michael van Acken
@@ -21,7 +21,7 @@ MODULE TestParser;
 IMPORT
   ProgramArgs, TextRider, StdChannels, Channel, Err, Msg,
   XML:Builder, XML:Parser, XML:UnicodeCodec:UTF8, XML:UnicodeCodec:ImportAll,
-  XML:Builder:Canonical, XML:Builder:ParserProtocol;
+  XML:Builder:Canonical, XML:Builder:ParserProtocol, XML:Builder:Namespaces;
 
 
 CONST
@@ -30,6 +30,7 @@ CONST
   
 VAR
   mode: SHORTINT;
+  namespaceSupport: BOOLEAN;
   format: SHORTINT;
   canon: Parser.Parser;
   builder: Builder.Builder;
@@ -40,6 +41,7 @@ PROCEDURE CreateParser(): Parser.Parser;
     arg: ARRAY 256 OF CHAR;
     argReader: TextRider.Reader;
     p: Parser.Parser;
+    namespaceBuilder: Builder.Builder;
     
     res: Msg.Msg;
   BEGIN
@@ -47,12 +49,13 @@ PROCEDURE CreateParser(): Parser.Parser;
     
     (* write usage text and exit if no arguments are given *)
     IF (ProgramArgs.args. ArgNumber() = 0) THEN
-      Err.String ("usage: TestParser [-1|-2|-3|-p] <file>"); Err.Ln;
+      Err.String ("usage: TestParser [-1|-2|-3|-p] [-n] <file>"); Err.Ln;
       HALT(1)
     END;
     
     (* parse command line arguments *)
     mode := modeCanonical;
+    namespaceSupport := FALSE;
     format := Canonical.firstCanonicalForm;
     argReader := TextRider.ConnectReader (ProgramArgs.args);
     argReader. ReadLine (arg);           (* skip command name *)
@@ -66,6 +69,8 @@ PROCEDURE CreateParser(): Parser.Parser;
         mode := modeCanonical; format := Canonical.thirdCanonicalForm
       ELSIF (arg = "-p") THEN
         mode := modeParserProtocol
+      ELSIF (arg = "-n") THEN
+        namespaceSupport := TRUE
       ELSE
         EXIT;
       END;
@@ -78,7 +83,13 @@ PROCEDURE CreateParser(): Parser.Parser;
       builder := ParserProtocol.New (StdChannels.stdout, UTF8.factory)
     END;
     
+    IF namespaceSupport THEN
+      namespaceBuilder := Namespaces.New (builder);
+      builder := namespaceBuilder
+    END;
+    
     p := Parser.NewFile (arg, NIL, NIL, NIL, builder, res);
+    p. enforceQNames := namespaceSupport; (* enable QName and NCName checks *)
     ASSERT (res = NIL);
     RETURN p
   END CreateParser;
