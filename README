@@ -29,7 +29,7 @@ Similar to namespace support, validation is implemented as a separate
 builder module XML:Builder:Validation, with only a few low-level
 scanner and parser related checks in XML:Parser.
 
-Compared to the old XML parser, this implementation's design is
+Compared to the old 1.x XML parser, this implementation's design is
 simpler and the new parser is much faster (2-4 times faster, depending
 on the type of input).  Besides the speed improvement, it is much more
 widely tested and should be compliant to the XML 1.0 spec (Second
