@@ -1,4 +1,4 @@
-(*      $Id: Validation.Mod,v 1.7 2001/03/19 23:54:20 mva Exp $   *)
+(*      $Id: Validation.Mod,v 1.8 2001/03/20 22:16:44 mva Exp $   *)
 MODULE XML:Builder:Validation;
 (*  Adds validation services to the XML:Parser.
     Copyright (C) 2001  Michael van Acken
@@ -95,10 +95,12 @@ CONST  (* error codes *)
   invalidContentInEMPTY = 32;
   multipleElemDecl = 33;
   invalidElementContentCDATA = 34;
+  duplicateToken = 35;
   
 VAR
   validationContext: Error.Context;
-
+  dummyElement: DTD.ElementDecl;
+  
 
 PROCEDURE (b: Builder) SetLocator* (locator: Locator.Locator);
   BEGIN
@@ -283,7 +285,7 @@ PROCEDURE PushElement (b: Builder; elemDecl: DTD.Declaration);
     END;
     INC (b. currLevel);
     IF (elemDecl = NIL) THEN
-      b. stack[b. currLevel]. elem := NIL;
+      b. stack[b. currLevel]. elem := dummyElement;
       b. stack[b. currLevel]. regexp := NIL;
     ELSE
       b. stack[b. currLevel]. elem := elemDecl(DTD.ElementDecl);
@@ -348,6 +350,25 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
       attrDecl: DTD.AttrDecl;
       default: DTD.String;
       match, didNormalization: BOOLEAN;
+    
+    PROCEDURE DuplicateToken (list: DTD.NameNode): DTD.String;
+      VAR
+        ptr1, ptr2: DTD.NameNode;
+      BEGIN
+        ptr1 := list;
+        WHILE (ptr1 # NIL) DO
+          ptr2 := ptr1. next;
+          WHILE (ptr2 # NIL) DO
+            IF (ptr1. name^ = ptr2. name^) THEN
+              RETURN ptr1. name
+            END;
+            ptr2 := ptr2. next
+          END;
+          ptr1 := ptr1. next
+        END;
+        RETURN NIL
+      END DuplicateToken;
+  
     BEGIN
       decl := list;
       WHILE (decl # NIL) DO
@@ -401,6 +422,16 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
             END;
             nameNode := nameNode. next
           END
+        END;
+        
+        (* the tokens in a enumeration/NOTATION declaration must be unique *)
+        IF ((attrDecl. type = DTD.attrENUMERATED) OR
+            (attrDecl. type = DTD.attrNOTATION)) &
+           (DuplicateToken (attrDecl. enumeration. nameList) # NIL) THEN
+          ErrString3 (b, duplicateToken, 
+                      "name", DuplicateToken (attrDecl.enumeration.nameList),
+                      "element", attrDecl. elementName,
+                      "attribute", attrDecl. name)
         END;
     
         decl := decl. next
@@ -820,8 +851,7 @@ PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
     elemDecl: DTD.ElementDecl;
   BEGIN
     CheckEmpty (b);
-    IF (b. stack[b. currLevel]. elem # NIL) &
-       b. stack[b. currLevel]. elem. IsElementContent() THEN
+    IF b. stack[b. currLevel]. elem. IsElementContent() THEN
       elemDecl := b. stack[b. currLevel]. elem;
       IF (elementWhitespace = DTD.elementWhitespaceNo) THEN
         ErrString (b, invalidElementContentCDATA, "element", elemDecl. name)
@@ -845,7 +875,6 @@ PROCEDURE (b: Builder) StartCDATA*;
     (* an element with element content cannot include non-whitespace character
        data; a CDATA section does not match S and is therefore forbidden *)
     IF IsStandalone (b) &
-       (b. stack[b. currLevel]. elem # NIL) &
        b. stack[b. currLevel]. elem. IsElementContent() THEN
       ErrString (b, invalidCharacterContent,
                  "element", b. stack[b. currLevel]. elem. name)
@@ -1016,6 +1045,8 @@ PROCEDURE SetErrorMessages;
         t := "Element `${element}' is declared more than once"
       | invalidElementContentCDATA:
         t := "Element `${element}' is restricted to element content"
+      | duplicateToken:
+        t := "Duplicate token `${name}' in enumerated attribute type `${element}/@${attribute}'"
       ELSE
         t := ""
       END;
@@ -1027,5 +1058,8 @@ PROCEDURE SetErrorMessages;
 
 BEGIN
   validationContext := Error.NewContext ("XML:Builder:Validation");
-  SetErrorMessages
+  SetErrorMessages;
+  NEW (dummyElement);
+  DTD.InitElementDecl (dummyElement, DTD.GetStringValue ("&validation-dummy"),
+                       NIL, NIL, FALSE);
 END XML:Builder:Validation.
