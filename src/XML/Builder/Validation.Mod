@@ -1,4 +1,4 @@
-(*      $Id: Validation.Mod,v 1.9 2001/03/21 21:14:03 mva Exp $   *)
+(*      $Id: Validation.Mod,v 1.10 2001/03/24 01:11:35 mva Exp $   *)
 MODULE XML:Builder:Validation;
 (*  Adds validation services to the XML:Parser.
     Copyright (C) 2001  Michael van Acken
@@ -20,7 +20,6 @@ MODULE XML:Builder:Validation;
 
 
 IMPORT
-Log,
   Ascii, Msg, LongStrings, URI, 
   XML:Error, XML:DTD, XML:Locator, XML:Parser, XML:Regexp, B := XML:Builder;
 
@@ -42,7 +41,7 @@ TYPE
 
      @example
      builder := Validator.New (builder);
-     p := Parser.NewFile (arg, NIL, NIL, NIL, builder, res);
+     p := Parser.NewFile (filePath, NIL, NIL, NIL, builder, res);
      p. validating := TRUE;
      @end example  *)
     (B.BuilderDesc)

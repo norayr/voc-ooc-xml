@@ -254,17 +254,18 @@ PROCEDURE Parse* (byteReader: Ch.Reader;
                   flags: SET;
                   VAR errList: XMLError.List): Element.Element;
 (**Parses an XML document from reader @samp{byteReader} request.  If
-   @oparam{baseURI} is not @code{NIL}, or if @oparam{validate} is @code{TRUE},
-   external references in the XML document are followed.  In this case,
-   relative URIs are interpreted using the base URI @oparam{baseURI}.  If
-   @oparam{unicodeFactory} is given, then the document is assumed to use its
-   character encoding.
+   @oparam{baseURI} is not @code{NIL}, or if @oconst{validate} is in
+   @oparam{flags}, external references in the XML document are followed.  In
+   this case, relative URIs are interpreted using the base URI
+   @oparam{baseURI}.  If @oparam{unicodeFactory} is given, then the document is
+   assumed to use its character encoding.
 
    The root element of the document is created by selecting the matching
    factory function from @oparam{rootFactory}.  An error is signalled if the
-   nesting level of an element exceeds @oparam{maxNestingLevel}.
+   nesting level of an element exceeds @oparam{maxNestingDepth}.
 
-   The parser acts as a validating parser if @oparam{validate} is @code{TRUE}.
+   The parser acts as a validating parser if @oconst{validate} is in
+   @oparam{flags}.
 
    In case of an error, @oparam{errList} refers to the error list and result is
    @code{NIL}.  Otherwise, @oparam{errList} is @code{NIL} and an instance of
