@@ -1,3 +1,3 @@
 In file not-wf/sa/116.xml: 
-line=3, column=5
-49: While expanding entity `e': Expected character `;'
+line=2, column=2
+42: While expanding entity `e': Expected character `;'

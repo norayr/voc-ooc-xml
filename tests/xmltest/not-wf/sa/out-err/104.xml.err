@@ -1,3 +1,5 @@
 In file not-wf/sa/104.xml: 
-line=3, column=5
-47: While expanding entity `e': Expected end tag </foo>
+line=2, column=2
+40: While expanding entity `e': Expected end tag </foo>
+line=3, column=14
+56: Junk after document element

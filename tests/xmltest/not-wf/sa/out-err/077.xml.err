@@ -1,3 +1,5 @@
 In file not-wf/sa/077.xml: 
-line=3, column=9
-53: While expanding entity `foo': General entity `bar' not defined
+line=2, column=2
+42: While expanding entity `foo': General entity `bar' not defined
+line=3, column=14
+58: General entity `bar' not defined

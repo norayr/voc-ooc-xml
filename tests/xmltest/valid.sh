@@ -6,7 +6,9 @@ err_count=0
 for d in $SUBDIR; do
   for i in $d/???.xml; do
     rm -f test-output/$i
-    if $TEST_PROG "$i" >test-output/$i; then
+    if test $i = valid/sa/065.xml; then
+      echo "skipping: $i [invalid, replacement text does not match content]"
+    elif $TEST_PROG "$i" >test-output/$i; then
       if $DIFF "$d/out/`basename $i`" test-output/$i; then
 	echo "ok: $i [wf]"
       else
@@ -23,6 +25,8 @@ for d in $SUBDIR; do
     rm -f test-output/$i
     if test $i = valid/not-sa/022.xml; then
       echo "skipping: $i [invalid, not proper conditional section/PE nesting]"
+    elif test $i = valid/sa/065.xml; then
+      echo "skipping: $i [invalid, replacement text does not match content]"
     elif $TEST_PROG -v "$i" >test-output/$i; then
       if $DIFF "$d/out/`basename $i`" test-output/$i; then
 	echo "ok: $i [valid]"
