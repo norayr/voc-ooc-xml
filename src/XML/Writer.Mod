@@ -1,4 +1,4 @@
-(*      $Id: Writer.Mod,v 1.9 2001/06/17 22:34:04 mva Exp $   *)
+(*      $Id: Writer.Mod,v 1.10 2001/06/19 20:41:03 mva Exp $   *)
 MODULE XML:Writer [OOC_EXTENSIONS];
 (*  Support for generating XML documents.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -239,6 +239,14 @@ PROCEDURE (w: Writer) WriteURI* (uri: URI.URI; absolute: BOOLEAN);
     uri. GetString (str);
     w. WriteLatin1 (str)
   END WriteURI;
+
+PROCEDURE (w: Writer) WriteLongInt* (value: LONGINT);
+  VAR
+    val: ARRAY 32 OF CHAR;
+  BEGIN
+    IntStr.IntToStr (value, val);
+    w. WriteLatin1 (val)
+  END WriteLongInt;
 
 
 PROCEDURE GetString (VAR str: ARRAY OF Char): String;
