@@ -1,4 +1,4 @@
-(*      $Id: Builder.Mod,v 1.12 2001/03/17 21:34:43 mva Exp $   *)
+(*      $Id: Builder.Mod,v 1.13 2001/03/20 22:16:31 mva Exp $   *)
 MODULE XML:Builder [OOC_EXTENSIONS];
 (*  Low-level builder interface to the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -27,8 +27,8 @@ TYPE
   BuilderDesc* = RECORD
   (**This abstract class defines the interface of the XML parser to the
      application.  It is based on the W3C Working Draft @samp{XML Information
-     Set}, dated February 2001.  This specification can be obtained at
-     @url{http://www.w3.org/TR/2001/WD-xml-infoset-20010202}.  All information
+     Set}, dated March 2001.  This specification can be obtained at
+     @url{http://www.w3.org/TR/2001/WD-xml-infoset-20010316/}.  All information
      items required by the XML Information Set are made available by the
      parser.
 

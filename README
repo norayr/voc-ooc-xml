@@ -49,6 +49,10 @@ only want to browse the source code,
 
 is probably the interface of your choice.
 
+As a starting point, you might look at the program src/TestParser.Mod.
+It is a simple command line tool acting as a wrapper around the parser
+modules.
+
 
 Due to changes in the installation process, "make test" will currently
 only work _after_ "make install" has been done once.  Otherwise,

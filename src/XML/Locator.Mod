@@ -1,7 +1,7 @@
-(*      $Id: Locator.Mod,v 1.4 2000/07/23 17:45:15 mva Exp $   *)
+(*      $Id: Locator.Mod,v 1.5 2000/07/31 18:37:07 mva Exp $   *)
 MODULE XML:Locator [OOC_EXTENSIONS];
 (*  Provides access to position information for XML parser callbacks.
-    Copyright (C) 2000  Michael van Acken
+    Copyright (C) 2000, 2001  Michael van Acken
 
     This module is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License
@@ -28,15 +28,23 @@ TYPE
     (**The character index of the starting position associated with a callback
        event, based on the UCS-2 character encoding.  This position is relative
        to the beginning of the current file (document entity, external DTD
-       subset, or external entity), and begins with character index 0.  Please
-       note that this number may differ from the number of Unicode characters
-       before the given index, if the file contains characters with code values
-       over 0xFFFF, which are encoded as two Unicode characters.  *)
+       subset, or external entity), and begins with character index 0.
+
+       Please note that this number may differ from the number of Unicode
+       characters before the given index, if the file contains characters with
+       code values over 0xFFFF, which are encoded as two Unicode characters.
+
+       For a character position reported in an error message, the actual value
+       is incremented by @ovar{Error.errMsgCharPosBase}.  *)
     line*: Buffer.CharPos;
-    (**Line number of the character.  Counting begins at zero.  *)
+    (**Line number of the character.  Counting begins at zero.  For a line
+       number reported in an error message, the actual value is incremented by
+       @ovar{Error.errMsgLineBase}.  *)
     column*: Buffer.CharPos;
     (**Column number of the character.  Counting begins at zero.  Currently,
-       surrogate pairs are counted as two separate characters.  *)
+       surrogate pairs are counted as two separate characters.  For a column
+       number reported in an error message, the actual value is incremented by
+       @ovar{Error.errMsgColumnBase}.  *)
     
     entity*: DTD.ExternalEntity;
     (**The current file entity (document entity, external DTD subset, or
