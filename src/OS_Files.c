@@ -182,20 +182,17 @@ OS_Files__NameArray OS_Files__listdir(const OS_Files__Path path__ref,
 
   dir = opendir(path__ref);
   if (dir != NULL) {
-    union {
-      struct dirent d;
-      char b[offsetof (struct dirent, d_name) + NAME_MAX + 1];
-    } u;
     OS_Files__Name buffer[DIRENT_BUFFER];
     OS_Files__NameArray result = NULL;
     int result_len = 0;
     struct dirent *de;
     
     int i=0;
-    while (readdir_r(dir, &u.d, &de) == 0) {
+    while (1) {
       int len;
       char* ptr;
       
+      de = readdir(dir);
       if (de == NULL) {  /* read all entries */
 	break;
       } else if ((de->d_name[0] == '.') && 
