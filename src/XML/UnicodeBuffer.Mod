@@ -378,8 +378,8 @@ PROCEDURE Encode (out: Output; all: BOOLEAN);
     END
   END Encode;
 
-PROCEDURE (out: Output) WriteI* (str[NO_COPY]: ARRAY OF Char;
-                                 start, end: CharPos);
+PROCEDURE (out: Output) Write16I* (str[NO_COPY]: ARRAY OF Char;
+                                         start, end: CharPos);
   VAR
     len: LONGINT;
   BEGIN
@@ -398,14 +398,14 @@ PROCEDURE (out: Output) WriteI* (str[NO_COPY]: ARRAY OF Char;
         IF (len > end-start) THEN
           len := end-start
         END;
-        out. WriteI (str, start, start+len);
+        out. Write16I (str, start, start+len);
         INC (start, len)
       END
     END
-  END WriteI;
+  END Write16I;
 
-PROCEDURE (out: Output) WriteLatin1I* (str[NO_COPY]: ARRAY OF CHAR;
-                                       start, end: CharPos);
+PROCEDURE (out: Output) Write8I* (str[NO_COPY]: ARRAY OF CHAR;
+                                  start, end: CharPos);
   VAR
     pos, len: LONGINT;
   BEGIN
@@ -426,21 +426,21 @@ PROCEDURE (out: Output) WriteLatin1I* (str[NO_COPY]: ARRAY OF CHAR;
         IF (len > end-start) THEN
           len := end-start
         END;
-        out. WriteLatin1I (str, start, start+len);
+        out. Write8I (str, start, start+len);
         INC (start, len)
       END
     END
-  END WriteLatin1I;
+  END Write8I;
 
-PROCEDURE (out: Output) Write* (str[NO_COPY]: ARRAY OF Char);
+PROCEDURE (out: Output) Write16* (str[NO_COPY]: ARRAY OF Char);
   BEGIN
-    out. WriteI (str, 0, LongStrings.Length (str))
-  END Write;
+    out. Write16I (str, 0, LongStrings.Length (str))
+  END Write16;
 
-PROCEDURE (out: Output) WriteLatin1* (str[NO_COPY]: ARRAY OF CHAR);
+PROCEDURE (out: Output) Write8* (str[NO_COPY]: ARRAY OF CHAR);
   BEGIN
-    out. WriteLatin1I (str, 0, Strings.Length (str))
-  END WriteLatin1;
+    out. Write8I (str, 0, Strings.Length (str))
+  END Write8;
 
 PROCEDURE (out: Output) Flush*;
 (**Flushes the contents of the output buffer to the channel.  Then, flush is
