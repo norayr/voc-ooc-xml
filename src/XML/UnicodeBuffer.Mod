@@ -38,6 +38,7 @@ TYPE
   InputDesc = RECORD
     byteBuffer: InputBuffer.Buffer;
     byteEndOfData: BOOLEAN;
+    codecFactory-: Codec.Factory;
     codec-: Codec.Codec;
     autoDetectedCodec-: BOOLEAN;
     
@@ -292,6 +293,7 @@ PROCEDURE (in: Input) SetCodec* (cf: Codec.Factory; autoDetect: BOOLEAN);
     dummy: BOOLEAN;
   BEGIN
     ASSERT (in. byteBuffer. offsetFromPos0 = 0);
+    in. codecFactory := cf;
     in. codec := cf. NewCodecBOM
       (in. byteBuffer. chars^, 0, in. byteBuffer. endOfBuffer,
        in. byteBuffer. discardable);
