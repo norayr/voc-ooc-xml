@@ -12,12 +12,7 @@ To install the files into the compiler's installation directory, do
 The socket modules are known to work under Linux, Solaris 2.6, and
 CygWin.  I would like to get some feedback for other platforms.
 
-
-IMPORTANT: You'll need oo2c-1.5.3.4 or later to compile the sources.
-At the moment, no there is no 1.5.4 release of the compiler.  the
-patch against oo2c-1.5.3 can be found at
-
-  http://pweb.de/vanacken.do/ooc/oo2c-patches/
+IMPORTANT: You'll need oo2c-1.5.4 or later to compile the sources.
 
 --------
 
@@ -59,10 +54,14 @@ Due to changes in the installation process, "make test" will currently
 only work _after_ "make install" has been done once.  Otherwise,
 compilation will complain about undefined pragma variables.  Anyway,
 to run the tests set the environment variable OOC to point to your
-oo2c compiler.  Then, do "make test" in the root directory.  (I'm not
-sure what happens if your make is not of the GNU persuasion.  I've
-tried this setup under both Linux and SunOS 5.6.  Under CygWin, there
-seems to be a problem with patching the Sun tests.  Ignore it.)
+oo2c compiler.  For bash, this is done with something along the lines of 
+
+  export OOC=/usr/local/bin/oo2c
+
+Then, do "make test" in the root directory.  (I'm not sure what
+happens if your make is not of the GNU persuasion.  I've tried this
+setup under both Linux and SunOS 5.6.  Under CygWin, there seems to be
+a problem with patching the Sun tests.  Ignore it.)
 
 "make test" requires GNU patch to modify the Sun tests.
 
@@ -75,8 +74,8 @@ Socket Access and HTTP GET
 ==========================
 
 Since v2.3, this library includes support for Unix sockets.  There are
-no automated tests for these, but the distribution includes two
-example programs that are build as part of "make test".
+no automated tests for these modules, but the distribution includes
+two example programs that are build as part of "make test".
 
 MODULE TestGet:
 This program takes a single argument, an "http" URI.  It tries to retrieve
