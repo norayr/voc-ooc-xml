@@ -147,7 +147,7 @@ dist: distclean
 	autoconf
 	(d="ooc-libxml-${version}"; f="$$d.tar"; \
 	  cd .. && ln -s libxml $$d && \
-	  tar -c -h -v --exclude=CVS --exclude='*~' -f $$f $$d && bzip2 -9 $$f && rm -f $$d)
+	  tar -c -h -v --exclude=CVS --exclude='*~' --exclude='.#*' -f $$f $$d && bzip2 -9 $$f && rm -f $$d)
 
 # ==================== Cleaning up and miscellanea ====================
 
