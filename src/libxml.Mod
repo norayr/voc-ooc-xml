@@ -41,6 +41,10 @@ IMPORT
   XML:Locator,
   XML:EntityResolver,
   
+  BasicElement := XML:Basic:Element,
+  BasicParser := XML:Basic:Parser,
+  BasicDataType := XML:Basic:DataType,
+  
   ChannelMemory := IO:Memory,
   IO:PFD,
   IO:Socket,
