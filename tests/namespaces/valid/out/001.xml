@@ -41,8 +41,7 @@
     </locator>
   </start-element>
   
-  <namespace-declaration>
-  </namespace-declaration>
+  <namespace-declaration/>
   
   <attributes-done>
     <locator>

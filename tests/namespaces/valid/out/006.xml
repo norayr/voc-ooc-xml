@@ -60,7 +60,8 @@
   </attributes-done>
   
   <characters>
-    <chars>&#10;  </chars>
+    <chars>
+  </chars>
     <element-whitespace>unknown</element-whitespace>
     <locator>
       <char-index>138</char-index>
@@ -113,7 +114,8 @@
   </end-element>
   
   <characters>
-    <chars>&#10;  </chars>
+    <chars>
+  </chars>
     <element-whitespace>unknown</element-whitespace>
     <locator>
       <char-index>179</char-index>
@@ -161,7 +163,8 @@
   </end-element>
   
   <characters>
-    <chars>&#10;</chars>
+    <chars>
+</chars>
     <element-whitespace>unknown</element-whitespace>
     <locator>
       <char-index>190</char-index>

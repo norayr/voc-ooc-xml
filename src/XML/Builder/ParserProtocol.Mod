@@ -1,4 +1,4 @@
-(*      $Id: ParserProtocol.Mod,v 1.7 2000/07/23 18:03:24 mva Exp $   *)
+(*      $Id: ParserProtocol.Mod,v 1.8 2000/07/31 18:38:31 mva Exp $   *)
 MODULE XML:Builder:ParserProtocol [OOC_EXTENSIONS];
 (*  Translates XML document to canonical XML.
     Copyright (C) 2000  Michael van Acken
@@ -39,9 +39,9 @@ TYPE
 PROCEDURE String (w: Writer.Writer; name: ARRAY OF LONGCHAR; string: DTD.String);
   BEGIN
     IF (string # NIL) THEN
-      w. StartTag (name);
+      w. StartTag (name, TRUE);
       w. Write (string^);
-      w. EndTag (name, FALSE)
+      w. EndTag
     END
   END String;
 
@@ -49,42 +49,42 @@ PROCEDURE Int (w: Writer.Writer; name: ARRAY OF LONGCHAR; value: LONGINT);
   VAR
     val: ARRAY 32 OF CHAR;
   BEGIN
-    w. StartTag (name);
+    w. StartTag (name, TRUE);
     IntStr.IntToStr (value, val);
     w. WriteLatin1 (val);
-    w. EndTag (name, FALSE)
+    w. EndTag
   END Int;
 
 PROCEDURE Boolean (w: Writer.Writer; name: ARRAY OF LONGCHAR; value: BOOLEAN);
   BEGIN
-    w. StartTag (name);
+    w. StartTag (name, TRUE);
     IF value THEN
-      w. WriteLatin1 ("yes")
+      w. Write ("yes")
     ELSE
-      w. WriteLatin1 ("no")
+      w. Write ("no")
     END;
-    w. EndTag (name, FALSE)
+    w. EndTag
   END Boolean;
 
 PROCEDURE WriteURI (w: Writer.Writer; name: ARRAY OF LONGCHAR; uri: URI.URI);
   BEGIN
     IF (uri # NIL) THEN
-      w. StartTag (name);
+      w. StartTag (name, TRUE);
       w. WriteURI (uri, FALSE);
-      w. EndTag (name, FALSE)
+      w. EndTag
     END
   END WriteURI;
 
 PROCEDURE WritePos (b: Builder);
   BEGIN
-    b. w. StartTag ("locator");
+    b. w. StartTag ("locator", FALSE);
     IF (b. locator. entity. baseURI # NIL) THEN
       Int (b. w, "char-index", b. locator. charIndex);
       Int (b. w, "line", b. locator. line);
       Int (b. w, "column", b. locator. column);
       WriteURI (b. w, "base-uri", b. locator. entity. baseURI)
     END;
-    b. w. EndTag ("locator", TRUE)
+    b. w. EndTag
   END WritePos;
 
 
@@ -94,7 +94,7 @@ PROCEDURE Notation (b: Builder; notation: DTD.Notation; writePos: BOOLEAN);
   BEGIN
     IF (notation # NIL) THEN
       w := b. w;
-      w. StartTag ("notation");
+      w. StartTag ("notation", FALSE);
       String (w, "name", notation. name);
       String (w, "system-identifier", notation. system);
       String (w, "public-identifier", notation. public);
@@ -102,7 +102,7 @@ PROCEDURE Notation (b: Builder; notation: DTD.Notation; writePos: BOOLEAN);
       IF writePos THEN
         WritePos (b)
       END;
-      w. EndTag ("notation", TRUE);
+      w. EndTag
     END
   END Notation;
 
@@ -111,9 +111,9 @@ PROCEDURE Entity (b: Builder; entity: DTD.Entity; writePos: BOOLEAN);
     w: Writer.Writer;
   BEGIN
     w := b. w;
-    w. StartTag ("entity");
+    w. StartTag ("entity", FALSE);
     
-    w. StartTag ("type");
+    w. StartTag ("type", TRUE);
     CASE entity. type OF
     | DTD.entityInternalGeneral: w. WriteLatin1 ("internal general")
     | DTD.entityInternalParameter: w. WriteLatin1 ("internal parameter")
@@ -123,7 +123,7 @@ PROCEDURE Entity (b: Builder; entity: DTD.Entity; writePos: BOOLEAN);
     | DTD.entityDocument: w. WriteLatin1 ("document")
     | DTD.entityExternalDTDSubset: w. WriteLatin1 ("external DTD subset")
     END;
-    w. EndTag ("type", FALSE);
+    w. EndTag;
     
     String (w, "name", entity. name);
     WITH entity: DTD.ExternalEntity DO
@@ -132,27 +132,27 @@ PROCEDURE Entity (b: Builder; entity: DTD.Entity; writePos: BOOLEAN);
       WriteURI (w, "base-uri", entity. baseURI);
       String (w, "notation", entity. ndata);
     | entity: DTD.InternalEntity DO
-      w. StartTag ("content");
-      w. WriteQuotedI (entity. entityValue^, 0, entity. LengthValue());
-      w. EndTag ("content", FALSE)
+      w. StartTag ("content", TRUE);
+      w. WriteI (entity. entityValue^, 0, entity. LengthValue());
+      w. EndTag
     END;
     
     IF writePos THEN
       WritePos (b)
     END;
-    w. EndTag ("entity", TRUE);
+    w. EndTag
   END Entity;
 
 PROCEDURE NamespaceDeclaration (w: Writer.Writer; namespaceDecl: DTD.NamespaceDeclaration);
   BEGIN
-    w. StartTag ("namespace-declaration");
+    w. StartTag ("namespace-declaration", FALSE);
     String (w, "prefix", namespaceDecl. prefix);
     IF (namespaceDecl. uri # NIL) THEN
-      w. StartTag ("namespace-uri");
+      w. StartTag ("namespace-uri", TRUE);
       w. WriteLatin1 (namespaceDecl. uri^);
-      w. EndTag ("namespace-uri", FALSE)
+      w. EndTag
     END;
-    w. EndTag ("namespace-declaration", TRUE)
+    w. EndTag
   END NamespaceDeclaration;
 
 
@@ -163,23 +163,22 @@ PROCEDURE (b: Builder) SetLocator* (locator: Locator.Locator);
 
 PROCEDURE (b: Builder) StartDocument* (documentEntity: DTD.ExternalEntity);
   BEGIN
-    b. w. StartAttr ("parser-protocol");
+    b. w. StartTag ("parser-protocol", FALSE);
     (*b. w. AttrURI ("xml:base", b. w. baseURI, TRUE);
         this breaks the simple minded diff tests, so I leave it out for now *)
-    b. w. EndAttr (FALSE);
-    b. w. StartTag ("start-document");
+    b. w. StartTag ("start-document", FALSE);
     Entity (b, documentEntity, FALSE);
     WritePos (b);
-    b. w. EndTag ("start-document", TRUE);
+    b. w. EndTag
   END StartDocument;
 
 PROCEDURE (b: Builder) EndDocument*;
   BEGIN
     b. w. NewLine;
-    b. w. StartTag ("end-document");
+    b. w. StartTag ("end-document", FALSE);
     WritePos (b);
-    b. w. EndTag ("end-document", TRUE);
-    b. w. EndTag ("parser-protocol", TRUE);
+    b. w. EndTag;
+    b. w. EndTag;
     b. w. EndOfText
   END EndDocument;
 
@@ -187,20 +186,20 @@ PROCEDURE (b: Builder) EndDocument*;
 PROCEDURE (b: Builder) StartDTD*;
   BEGIN
     b. w. NewLine;
-    b. w. StartTag ("start-dtd");
+    b. w. StartTag ("start-dtd", FALSE);
     WritePos (b);
-    b. w. EndTag ("start-dtd", TRUE);
+    b. w. EndTag
   END StartDTD;
 
 PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity);
   BEGIN
     b. w. NewLine;
-    b. w. StartTag ("end-dtd");
+    b. w. StartTag ("end-dtd", FALSE);
     IF (externalDTD # NIL) THEN
       Entity (b, externalDTD, FALSE)
     END;
     WritePos (b);
-    b. w. EndTag ("end-dtd", TRUE);
+    b. w. EndTag
   END EndDTD;
 
 
@@ -209,13 +208,13 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
                                       localName: DTD.String);
   BEGIN
     b. w. NewLine;
-    b. w. StartTag ("start-element");
+    b. w. StartTag ("start-element", FALSE);
     IF (namespaceDecl # NIL) THEN
       NamespaceDeclaration (b. w, namespaceDecl)
     END;
     String (b. w, "local-name", localName);
     WritePos (b);
-    b. w. EndTag ("start-element", TRUE);
+    b. w. EndTag
   END StartElement;
 
 PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration; 
@@ -225,13 +224,13 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
                                    specified: BOOLEAN);
   BEGIN
     b. w. NewLine;
-    b. w. StartTag ("attribute");
+    b. w. StartTag ("attribute", FALSE);
     IF (namespaceDecl # NIL) THEN
       NamespaceDeclaration (b. w, namespaceDecl)
     END;
     String (b. w, "local-name", localName);
     IF (attrDecl # NIL) THEN
-      b. w. StartTag ("attr-type");
+      b. w. StartTag ("attr-type", TRUE);
       CASE attrDecl. type OF
       | DTD.attrID: b. w. WriteLatin1 ("ID")
       | DTD.attrIDREF: b. w. WriteLatin1 ("IDREF")
@@ -244,22 +243,22 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
       | DTD.attrENUMERATED: b. w. WriteLatin1 ("ENUMERATED")
       | DTD.attrCDATA: b. w. WriteLatin1 ("CDATA")
       END;
-      b. w. EndTag ("attr-type", FALSE);
-      b. w. StartTag ("default-type");
+      b. w. EndTag;
+      b. w. StartTag ("default-type", TRUE);
       CASE attrDecl. default OF
       | DTD.attrRequired: b. w. WriteLatin1 ("#REQUIRED")
       | DTD.attrImplied: b. w. WriteLatin1 ("#IMPLIED")
       | DTD.attrDefault: b. w. WriteLatin1 ("#DEFAULT")
       | DTD.attrFixed: b. w. WriteLatin1 ("#FIXED")
       END;
-      b. w. EndTag ("default-type", FALSE)
+      b. w. EndTag
     END;
     String (b. w, "value", value. Flatten (attrDecl));
     Boolean (b. w, "specified", specified);
     IF specified THEN
       WritePos (b)
     END;
-    b. w. EndTag ("attribute", TRUE);
+    b. w. EndTag
   END Attribute;
 
 PROCEDURE (b: Builder) NamespaceDeclaration* (namespaceDecl: DTD.NamespaceDeclaration);
@@ -271,34 +270,34 @@ PROCEDURE (b: Builder) NamespaceDeclaration* (namespaceDecl: DTD.NamespaceDeclar
 PROCEDURE (b: Builder) AttributesDone*;
   BEGIN
     b. w. NewLine;
-    b. w. StartTag ("attributes-done");
+    b. w. StartTag ("attributes-done", FALSE);
     WritePos (b);
-    b. w. EndTag ("attributes-done", TRUE)
+    b. w. EndTag
   END AttributesDone;
 
 PROCEDURE (b: Builder) SkippedEntity* (name: DTD.String; referent: DTD.Entity);
   BEGIN
     b. w. NewLine;
-    b. w. StartTag ("skipped-entity");
+    b. w. StartTag ("skipped-entity", FALSE);
     String (b. w, "name", name);
     IF (referent # NIL) THEN
       Entity (b, referent, FALSE)
     END;
     WritePos (b);
-    b. w. EndTag ("skipped-entity", TRUE);
+    b. w. EndTag
   END SkippedEntity;
 
 PROCEDURE (b: Builder) EndElement* (namespaceDecl: DTD.NamespaceDeclaration; 
                                     localName: DTD.String);
   BEGIN
     b. w. NewLine;
-    b. w. StartTag ("end-element");
+    b. w. StartTag ("end-element", FALSE);
     IF (namespaceDecl # NIL) THEN
       NamespaceDeclaration (b. w, namespaceDecl)
     END;
     String (b. w, "local-name", localName);
     WritePos (b);
-    b. w. EndTag ("end-element", TRUE);
+    b. w. EndTag
   END EndElement;
 
 PROCEDURE (b: Builder) EntityDecl* (entity: DTD.Entity);
@@ -318,55 +317,53 @@ PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
                                     elementWhitespace: DTD.ElementWhitespaceType);
   BEGIN
     b. w. NewLine;
-    b. w. StartTag ("characters");
-    b. w. StartTag ("chars");
-    b. w. WriteQuotedI (chars, charsStart, charsEnd);
-    b. w. EndTag ("chars", FALSE);
-    b. w. StartTag ("element-whitespace");
+    b. w. StartTag ("characters", FALSE);
+    b. w. StartTag ("chars", TRUE);
+    b. w. WriteI (chars, charsStart, charsEnd);
+    b. w. EndTag;
+    b. w. StartTag ("element-whitespace", TRUE);
     CASE elementWhitespace OF
     | DTD.elementWhitespaceYes: b. w. WriteLatin1 ("yes")
     | DTD.elementWhitespaceNo: b. w. WriteLatin1 ("no")
     | DTD.elementWhitespaceUnknown: b. w. WriteLatin1 ("unknown")
     END;
-    b. w. EndTag ("element-whitespace", FALSE);
+    b. w. EndTag;
     WritePos (b);
-    b. w. EndTag ("characters", TRUE);
+    b. w. EndTag
   END Characters;
 
 PROCEDURE (b: Builder) StartCDATA*;
   BEGIN
     b. w. NewLine;
-    b. w. StartTag ("start-cdata");
+    b. w. StartTag ("start-cdata", FALSE);
     WritePos (b);
-    b. w. EndTag ("start-cdata", TRUE);
+    b. w. EndTag
   END StartCDATA;
 
 PROCEDURE (b: Builder) EndCDATA*;
   BEGIN
     b. w. NewLine;
-    b. w. StartTag ("end-cdata");
+    b. w. StartTag ("end-cdata", FALSE);
     WritePos (b);
-    b. w. EndTag ("end-cdata", TRUE);
+    b. w. EndTag
   END EndCDATA;
 
 PROCEDURE (b: Builder) StartEntity* (entity: DTD.Entity);
   BEGIN
     b. w. NewLine;
-    b. w. StartAttr ("start-entity");
+    b. w. StartTag ("start-entity", FALSE);
     b. w. AttrString ("name", entity. name^);
-    b. w. EndAttr (FALSE);
     WritePos (b);
-    b. w. EndTag ("start-entity", TRUE);
+    b. w. EndTag
   END StartEntity;
 
 PROCEDURE (b: Builder) EndEntity* (entity: DTD.Entity);
   BEGIN
     b. w. NewLine;
-    b. w. StartAttr ("end-entity");
+    b. w. StartTag ("end-entity", FALSE);
     b. w. AttrString ("name", entity. name^);
-    b. w. EndAttr (FALSE);
     WritePos (b);
-    b. w. EndTag ("end-entity", TRUE);
+    b. w. EndTag
   END EndEntity;
 
 
@@ -375,26 +372,26 @@ PROCEDURE (b: Builder) ProcessingInstruction* (
                       contentStart, contentEnd: DTD.CharPos; baseURI: URI.URI);
   BEGIN
     b. w. NewLine;
-    b. w. StartTag ("processing-instruction");
+    b. w. StartTag ("processing-instruction", FALSE);
     String (b. w, "target", target);
-    b. w. StartTag ("content");
-    b. w. WriteQuotedI (content, contentStart, contentEnd);
-    b. w. EndTag ("content", FALSE);
+    b. w. StartTag ("content", TRUE);
+    b. w. WriteI (content, contentStart, contentEnd);
+    b. w. EndTag;
     WriteURI (b. w, "base-uri", baseURI);
     WritePos (b);
-    b. w. EndTag ("processing-instruction", TRUE)
+    b. w. EndTag
   END ProcessingInstruction;
 
 PROCEDURE (b: Builder) Comment* (VAR chars: DTD.StringVar;
                                  start, end: DTD.CharPos);
   BEGIN
     b. w. NewLine;
-    b. w. StartTag ("comment");
-    b. w. StartTag ("content");
-    b. w. WriteQuotedI (chars, start, end);
-    b. w. EndTag ("content", FALSE);
+    b. w. StartTag ("comment", FALSE);
+    b. w. StartTag ("content", TRUE);
+    b. w. WriteI (chars, start, end);
+    b. w. EndTag;
     WritePos (b);
-    b. w. EndTag ("comment", TRUE)
+    b. w. EndTag
   END Comment;
 
 
@@ -405,7 +402,7 @@ PROCEDURE New* (outputChannel: Channel.Channel;
   BEGIN
     NEW (b);
     B.Init (b);
-    b. w := Writer.New (outputChannel, codecFactory, TRUE);
+    b. w := Writer.New (outputChannel, codecFactory, TRUE, 2);
     b. w. WriteTextDecl ("1.0", "");
     b. w. SetBaseURI (File.GetCwd());
     RETURN b

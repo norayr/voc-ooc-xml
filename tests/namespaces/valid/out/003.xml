@@ -58,7 +58,8 @@
   </attributes-done>
   
   <characters>
-    <chars>&#10;  </chars>
+    <chars>
+  </chars>
     <element-whitespace>unknown</element-whitespace>
     <locator>
       <char-index>74</char-index>
@@ -78,8 +79,7 @@
     </locator>
   </start-element>
   
-  <namespace-declaration>
-  </namespace-declaration>
+  <namespace-declaration/>
   
   <attributes-done>
     <locator>
@@ -101,7 +101,8 @@
   </end-element>
   
   <characters>
-    <chars>&#10;</chars>
+    <chars>
+</chars>
     <element-whitespace>unknown</element-whitespace>
     <locator>
       <char-index>93</char-index>

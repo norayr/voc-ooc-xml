@@ -51,7 +51,8 @@
   </attributes-done>
   
   <characters>
-    <chars>&#10;  </chars>
+    <chars>
+  </chars>
     <element-whitespace>unknown</element-whitespace>
     <locator>
       <char-index>212</char-index>
@@ -121,7 +122,8 @@
   </end-element>
   
   <characters>
-    <chars>&#10;  </chars>
+    <chars>
+  </chars>
     <element-whitespace>unknown</element-whitespace>
     <locator>
       <char-index>227</char-index>
@@ -205,7 +207,8 @@
   </end-element>
   
   <characters>
-    <chars>&#10;  </chars>
+    <chars>
+  </chars>
     <element-whitespace>unknown</element-whitespace>
     <locator>
       <char-index>256</char-index>
@@ -295,7 +298,8 @@
   </end-element>
   
   <characters>
-    <chars>&#10;</chars>
+    <chars>
+</chars>
     <element-whitespace>unknown</element-whitespace>
     <locator>
       <char-index>301</char-index>
