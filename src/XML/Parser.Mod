@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.11 2000/07/31 18:37:07 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.12 2000/08/08 13:59:34 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -179,7 +179,7 @@ CONST  (* error codes *)
   expectedYesNo = 24;
   xmlDeclNotAtBeginning = 25;
   reservedPITarget = 26;
-  invalidCharacterEncodings = 27;
+  invalidCharacterEncodings = 27;        (* E79 says: this is a fatal error *)
   junkAfterExtSubset = 28;
   unknownCharacterEncoding = 29;
   invalidNCName = 30;
@@ -198,8 +198,7 @@ CONST  (* error codes *)
   expectedPIEnd = 114;
   nonMarkupDeclPERef = 115;
   expectedEncodingDecl = 116;
-  invalidLangCode = 117;
-  malformedURI = 118;
+  malformedURI = 117;
   
   (* document errors *)
   expectedElement = 208;
@@ -1255,17 +1254,29 @@ PROCEDURE (p: Parser) ParseDocument*;
       | " ":
         chars[cend] := " "; INC (cpos)
       | Ascii.lf:
-        chars[cend] := eolReplacement; INC (cpos); EndOfLine
+        IF (chars = p. in. chars) THEN
+          chars[cend] := eolReplacement; INC (cpos); EndOfLine
+        ELSE
+          (* no EOL handling in replacement text of internal entities;
+             see E86 for more information *)
+          chars[cend] := chars[cpos]; INC (cpos)
+        END
       | Ascii.cr:
-        chars[cend] := eolReplacement;
-        INC (cpos);
-        IF (chars[cpos] = Buffer.markerEOB) THEN
-          NextBlock
-        END;
-        IF (chars[cpos] = Ascii.lf) THEN
-          INC (cpos); INC (cdelta)
-        END;
-        EndOfLine
+        IF (chars = p. in. chars) THEN
+          chars[cend] := eolReplacement;
+          INC (cpos);
+          IF (chars[cpos] = Buffer.markerEOB) THEN
+            NextBlock
+          END;
+          IF (chars[cpos] = Ascii.lf) THEN
+            INC (cpos); INC (cdelta)
+          END;
+          EndOfLine
+        ELSE
+          (* no EOL handling in replacement text of internal entities;
+             see E86 for more information *)
+          chars[cend] := chars[cpos]; INC (cpos)
+        END
       | Ascii.ht:
         IF (eolReplacement = " ") THEN
           chars[cend] := " "
@@ -1725,15 +1736,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           | "&":
             IF LookingAt ("&#", followedByAny) THEN
               (* looking at character reference: replace on the spot *)
-              CharRef();
-              IF (chars[cpos-cdelta-1] <= " ") &
-                 (chars[cpos-cdelta-1] # Ascii.ht) THEN
-                (* character reference expanded to a whitespace character;
-                   replace it with a space; I'm not 100% sure that this is
-                   correct; see xmltest/valid/sa/10[67].xml and the comments
-                   in xmltest.xml from the OASIS tests *)
-                chars[cpos-cdelta-1] := " "
-              END
+              CharRef()
             ELSE
               Flush;
               attValue. Append (EntityRef (TRUE, FALSE));
@@ -2061,66 +2064,6 @@ PROCEDURE (p: Parser) ParseDocument*;
         RETURN FALSE
       END AttributeNameUsed;
     
-    PROCEDURE CheckXmlLang (attrValue: DTD.AttValue);
-      VAR
-        string: DTD.String;
-        err: BOOLEAN;
-        langCode: SHORTINT;
-        pos: LONGINT;
-      CONST
-        langCodeIana = 0;
-        langCodeUser = 1;
-        langCodeISO639 = 2;
-      
-      PROCEDURE IsLetter (ch: DTD.Char): BOOLEAN;
-        BEGIN
-          RETURN ("A" <= CAP (ch)) & (CAP (ch) <= "Z")
-        END IsLetter;
-      
-      BEGIN
-        string := attrValue. Flatten (NIL);
-        err := FALSE;
-        pos := 0;
-        (* parse language code *)
-        IF (CAP (string[pos]) = "I") & (string[pos+1] = "-") THEN
-          langCode := langCodeIana;
-          INC (pos, 2);
-          WHILE IsLetter (string[pos]) DO
-            INC (pos)
-          END;
-          err := (pos = 2)               (* not letter after "-" *)
-        ELSIF (CAP (string[pos]) = "X") & (string[pos+1] = "-") THEN
-          langCode := langCodeUser;
-          INC (pos, 2);
-          WHILE IsLetter (string[pos]) DO
-            INC (pos)
-          END;
-          err := (pos = 2)               (* not letter after "-" *)
-        ELSIF IsLetter (string[pos]) & IsLetter (string[pos+1]) THEN
-          langCode := langCodeISO639;
-          INC (pos, 2)
-        ELSE
-          err := TRUE
-        END;
-        
-        (* parse list of subcodes *)
-        WHILE ~err & (string[pos] = "-") DO
-          INC (pos);
-          IF IsLetter (string[pos]) THEN
-            REPEAT
-              INC (pos)
-            UNTIL ~IsLetter (string[pos])
-          ELSE
-            err := TRUE
-          END
-        END;
-        
-        err := err OR (string[pos] # 0X);
-        IF err THEN
-          Err (invalidLangCode)
-        END
-      END CheckXmlLang;
-    
     PROCEDURE AddDefaultAttributes (elemDecl: DTD.ElementDecl);
       VAR
         decl: DTD.Declaration;
@@ -2147,9 +2090,6 @@ PROCEDURE (p: Parser) ParseDocument*;
           IF (attrDecl. default >= DTD.attrDefault) & 
              ~AttributeDefined (attrDecl. name) THEN
             Expand (attrDecl. defaultValue);
-            IF (attrDecl. name^ = "xml:lang") THEN
-              CheckXmlLang (attrDecl. defaultValue)
-            END;
             p. builder. Attribute (NIL, decl. name, attrDecl,
                                    attrDecl. defaultValue, FALSE)
           END;
@@ -2205,9 +2145,6 @@ PROCEDURE (p: Parser) ParseDocument*;
           END;
           attrValue := AttValue (TRUE);
           Expand (attrValue);
-          IF (attrName^ = "xml:lang") THEN
-            CheckXmlLang (attrValue)
-          END;
           p. builder. Attribute (NIL, attrName, attrDecl, attrValue, TRUE) (* callback *)
         END;
         
@@ -3178,8 +3115,6 @@ PROCEDURE SetErrorMessages;
         t := "Parameter entity references are restricted to markup declarations in the internal subset of the DTD"
       | expectedEncodingDecl:
         t := "Expected token `encoding'"
-      | invalidLangCode:
-        t := "Malformed language code in `xml:lang' attribute"
       | malformedURI:
         t := "Malformed URI: ${uri_error}"
         
