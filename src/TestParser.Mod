@@ -1,29 +1,28 @@
-(*      $Id: TestParser.Mod,v 1.1.1.1 2000/07/10 15:24:30 mva Exp $   *)
+(*      $Id: TestParser.Mod,v 1.1.1.2 2000/07/10 20:31:50 mva Exp $   *)
 MODULE TestParser;
 (*  Converts XML document into its canonical representation.
     Copyright (C) 2000  Michael van Acken
 
-    This library is free software; you can redistribute it and/or
-    modify it under the terms of the GNU General Public License as
-    published by the Free Software Foundation; either version 2 of the
-    License, or (at your option) any later version.
+    This module is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public License
+    as published by the Free Software Foundation; either version 2 of
+    the License, or (at your option) any later version.
 
-    This library is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    This module is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-    General Public License for more details.
+    Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with this library. If not, write to the Free Software
-    Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307,
-    USA.
+    You should have received a copy of the GNU Lesser General Public
+    License along with OOC. If not, write to the Free Software Foundation,
+    59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 *)
 
 IMPORT
   ProgramArgs, TextRider, StdChannels, Channel, Err, Msg,
   URI, URIParser := URI:Parser, URI:Scheme:File,
   XML:Builder, XML:Parser, XML:UnicodeCodec:UTF8, XML:UnicodeCodec:ImportAll,
-  XML:Builder:Canonical, XML:Builder:ParserProtocol;
+  XML:EntityResolver, XML:Builder:Canonical, XML:Builder:ParserProtocol;
 
 
 CONST
@@ -46,7 +45,7 @@ PROCEDURE CreateParser(): Parser.Parser;
     documentURI: URI.URI;
     ch: Channel.Channel;
     res: Msg.Msg;
-    
+    entityResolver: EntityResolver.Resolver;
   BEGIN
     NEW (canon);
     
@@ -89,8 +88,9 @@ PROCEDURE CreateParser(): Parser.Parser;
     ELSIF (mode = modeParserProtocol) THEN
       builder := ParserProtocol.New (StdChannels.stdout, UTF8.factory)
     END;
+    entityResolver := EntityResolver.New();
     
-    RETURN Parser.New (ch, NIL, documentURI, builder)
+    RETURN Parser.New (ch, NIL, documentURI, entityResolver, builder)
   END CreateParser;
 
 BEGIN

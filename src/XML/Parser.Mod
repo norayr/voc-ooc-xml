@@ -1,18 +1,30 @@
+(*      $Id: Builder.Mod,v 1.3 2000/07/11 22:26:09 mva Exp $   *)
 MODULE XML:Parser;
+(*  Implements the XML parser.
+    Copyright (C) 2000  Michael van Acken
+
+    This module is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public License
+    as published by the Free Software Foundation; either version 2 of
+    the License, or (at your option) any later version.
+
+    This module is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with OOC. If not, write to the Free Software Foundation,
+    59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+*)
+
 
 IMPORT
-  Log, Out, Ascii, Channel, Msg, Strings, LongStrings, URI, URI:Scheme:File,
-  URIParser := URI:Parser,
-  Codec := XML:UnicodeCodec, XML:UnicodeCodec:UTF8,
-  Buffer := XML:UnicodeBuffer, XML:Error, DTD := XML:BuilderDTD, XML:Builder;
-(* should import UTF8 and UTF16 ... FIXME *)
-
-TYPE
-  Position = RECORD
-    char: Buffer.CharPos;
-    line: Buffer.CharPos;
-    column: Buffer.CharPos;
-  END;
+  Log, Out, Ascii, Channel, Msg, LongStrings, URI, URI:Scheme:File,
+  AbstrLocator := XML:Locator,
+  Codec := XML:UnicodeCodec, XML:UnicodeCodec:UTF8, XML:UnicodeCodec:UTF16,
+  Buffer := XML:UnicodeBuffer, XML:Error, DTD := XML:BuilderDTD, XML:Builder,
+  XML:EntityResolver;
 
 TYPE
   PEInfo = RECORD
@@ -27,11 +39,26 @@ TYPE
 
 TYPE
   Parser* = POINTER TO ParserDesc;
+  
+TYPE
+  LocatorDesc = RECORD
+    (AbstrLocator.LocatorDesc)
+    p: Parser;
+  END;
+  Locator = POINTER TO LocatorDesc;
+
+TYPE
   NameList = POINTER TO ARRAY OF DTD.String;
   PEInfoList = POINTER TO ARRAY OF PEInfo;
   ParserDesc = RECORD
     errList-: Error.List;
-       
+    
+    l: Locator;
+    (* This object keeps track of file position (character index, line and
+       column number).  It is passed to the builder to enable it to access
+       this information for callback events.  *)
+    errorPos: LocatorDesc;
+    er: EntityResolver.Resolver;
     in: Buffer.Input;
     initialBuilder, builder: Builder.Builder;
     (* When parsing starts, both @ofield{initialBuilder} and @ofield{builder}
@@ -84,6 +111,10 @@ TYPE
     lenPEStack: LONGINT;
     (* stack of currently being expanded entity declarations; maintained by
        PushEntity/PopEntity *)
+       
+    currLine, currLinePos, currLineTab: Buffer.CharPos;
+    (* marker for a character position that stays accross NextBlock() calls *)
+    lastError: Error.Msg;
   END;
 
 CONST
@@ -175,6 +206,16 @@ VAR
   parserContext: Error.Context;
 
 
+PROCEDURE (l: Locator) InInternalEntity*(): DTD.Entity;
+  BEGIN
+    IF (l. p. fileEntity # l. p. peStack[l. p. lenPEStack-1]. entity) THEN
+      RETURN l. p. peStack[l. p. lenPEStack-1]. entity
+    ELSE
+      RETURN NIL
+    END
+  END InInternalEntity;
+
+(* ------------------------------------------------------------------------ *)
 
 PROCEDURE IsCharUCS4 (ch: LONGINT): BOOLEAN;
   BEGIN
@@ -431,23 +472,23 @@ PROCEDURE IsEncNameChar (ch: Buffer.Char; first: BOOLEAN): BOOLEAN;
 PROCEDURE document (p: Parser);
   VAR
     dtd: DTD.Builder;
-    cpos, currLine, currLinePos, currLineTab: Buffer.CharPos;
-    cstart, cdelta: Buffer.CharPos;
+    cpos: Buffer.CharPos;
+    cstart: Buffer.CharPos;
+    cdelta: Buffer.CharPos;
     chars: Buffer.CharArray;
-    lastError: Error.Msg;
   
   CONST
     followedByAny = 0;
-    followedByNonName = 2;
+    followedByNonName = 1;
   
   (*
   Character Information            Value
   ------------------------------   -----------------------------
   current file position            in. offsetFromPos0+cpos
-  current line                     currLine
-  current column                   cpos-currLinePos+currLineTab
-  file position of current line    currLinePos
-  column delta because of tabs     currLineTab
+  current line                     p. l. currLine
+  current column                   cpos-p. l. currLinePos+p. l. currLineTab
+  file position of current line    p. l. currLinePos
+  column delta because of tabs     p. l. currLineTab
   marked file position             cstart
   
   All numbering (file position, line, column) starts at zero.
@@ -455,9 +496,10 @@ PROCEDURE document (p: Parser);
   
   Handling of control characters is slightly tricky.  There are three end of
   line variants (LF, CR, CR+LF) to handle, and the end of a line requires
-  adjustment of @ovar{currLine}, @ovar{currLinePos}, and @ovar{currLineTab}.
-  A tab character means adjustment of @ovar{currLineTab}.  All other control
-  characters are invalid and must be reported as such.  The special character
+  adjustment of @ofield{p.currLine}, @ofield{p.currLinePos}, and
+  @ofield{p.currLineTab}.  A tab character means adjustment of
+  @ovar{p.currLineTab}.  All other control characters are invalid and must
+  be reported as such.  The special character
   @oconst{Buffer.markedEOB} means that the end of the current buffer has been
   reached and new characters must be retrieved from file.  The other special,
   @oconst{Buffer.markedEOD}, means that the end of the document has been 
@@ -474,20 +516,20 @@ PROCEDURE document (p: Parser);
   for this are CR+LF end of line marker, or character references.
   *)
   
-  PROCEDURE DecLength (VAR pos: Position; len: DTD.CharPos);
+  PROCEDURE DecLength (VAR pos: LocatorDesc; len: DTD.CharPos);
     BEGIN
-      DEC (pos. char, len);
+      DEC (pos. charIndex, len);
       DEC (pos. column, len)
     END DecLength;
   
-  PROCEDURE StorePosition (VAR pos: Position);
+  PROCEDURE StorePosition (VAR pos: LocatorDesc);
     VAR
       i: LONGINT;
     BEGIN
       IF (p. in # NIL) & (chars = p. in. chars) THEN
-        pos. char := cpos+p. in. offsetFromPos0;
-        pos. line := currLine;
-        pos. column := cpos-currLinePos+currLineTab
+        pos. charIndex := cpos+p. in. offsetFromPos0;
+        pos. line := p. currLine;
+        pos. column := cpos-p. currLinePos+p. currLineTab
       ELSE
         (* go down the stack of pushed entities, until the external entity
            is found that represents the most recently opened file *)
@@ -499,50 +541,51 @@ PROCEDURE document (p: Parser);
             DEC (i)
           END
         END;
-        pos. char := p. peStack[i]. oldCPos+p. peStack[i]. in. offsetFromPos0;
-        pos. line := currLine;
-        pos. column := p. peStack[i]. oldCPos-currLinePos+currLineTab;
+        pos. charIndex := p. peStack[i]. oldCPos+p. peStack[i]. in. offsetFromPos0;
+        pos. line := p. currLine;
+        pos. column := p. peStack[i]. oldCPos - 
+                       p. currLinePos+p. currLineTab;
         IF (p. peStack[i]. entity. name # NIL) THEN
           DecLength (pos, LongStrings.Length (p. peStack[i]. entity. name^)+2)
         END
       END
     END StorePosition;
   
-  PROCEDURE ErrPos (code: Error.Code; pos: Position);
+  PROCEDURE ResetLocator;
+    BEGIN
+      p. currLine := 0;
+      p. currLinePos := 0;
+      p. currLineTab := 0;
+      cpos := 0;
+      cdelta := 0;
+      cstart := 0
+    END ResetLocator;
+  
+  PROCEDURE SetFileEntity (new: DTD.ExternalEntity);
+    BEGIN
+      p. fileEntity := new;
+      p. l. entity := new;
+    END SetFileEntity;
+  
+  
+  PROCEDURE ErrPos (code: Error.Code; VAR pos: LocatorDesc);
     VAR
       i: LONGINT;
     BEGIN
-      lastError := Error.New (parserContext, code);
-      lastError. SetIntAttrib ("char", pos. char);
-      lastError. SetIntAttrib ("line", pos. line);
-      lastError. SetIntAttrib ("column", pos. column);
-      lastError. SetAttribute (URI.NewURIAttribute ("baseURI", p. fileEntity. baseURI));
+      p. lastError := Error.New (parserContext, code);
+      p. lastError. SetIntAttrib ("char", pos. charIndex);
+      p. lastError. SetIntAttrib ("line", pos. line);
+      p. lastError. SetIntAttrib ("column", pos. column);
+      p. lastError. SetAttribute (URI.NewURIAttribute ("baseURI", p. fileEntity. baseURI));
       IF (chars # p. in. chars) THEN
         i := p. lenPEStack-1;
-        (*WHILE (p. peStack[i]. oldChars # p. in. chars) DO
-          DEC (i)
-        END;*)
-        lastError. SetLStringAttrib ("entity_name", 
+        p. lastError. SetLStringAttrib ("entity_name", 
                               Msg.GetLStringPtr (p. peStack[i]. entity. name^))
       END;
-      (*IF (pos. systemId # NIL) THEN
-        lastError. SetLStringAttrib ("systemId", pos. systemId)
-      END;
-      IF (pos. publicId # NIL) THEN
-        lastError. SetLStringAttrib ("publicId", pos. publicId)
-      END*)
-      p. errList. Append (lastError);
+      p. errList. Append (p. lastError);
       IF (p. builder = p. initialBuilder) THEN
         p. builder := Builder.New()
       END;
-      
-(*      Log.LongInt ("ERROR CODE", code);
-      Log.Msg ("Position: ");
-      FOR i := cpos TO p. in. endOfBuffer-1 DO
-        E.Char (SHORT (chars[i]))
-      END;
-      E.Ln;
-      ASSERT (FALSE)*)
     END ErrPos;
   
   PROCEDURE WriteBuffer (msg: ARRAY OF CHAR);
@@ -565,12 +608,10 @@ PROCEDURE document (p: Parser);
     END WriteBuffer;
   
   PROCEDURE Err (code: Error.Code);
-    VAR
-      pos: Position;
     BEGIN
-(*      WriteBuffer ("ERROR");*)
-      StorePosition (pos);
-      ErrPos (code, pos)
+      (*WriteBuffer ("ERROR");*)
+      StorePosition (p. errorPos);
+      ErrPos (code, p. errorPos)
     END Err;
   
   (* ---------------------------------------------------------------------- *)
@@ -616,8 +657,8 @@ PROCEDURE document (p: Parser);
         IF (ch = NIL) THEN
           Err (accessError);
           entity. baseURI. GetString (str);
-          lastError. SetStringAttrib ("uri", Msg.GetStringPtr (str));
-          lastError. SetMsgAttrib ("channel_error", res);
+          p. lastError. SetStringAttrib ("uri", Msg.GetStringPtr (str));
+          p. lastError. SetMsgAttrib ("channel_error", res);
           RETURN NIL
         ELSE
           in := Buffer.NewInput (ch, NIL, p. errList);
@@ -650,17 +691,17 @@ PROCEDURE document (p: Parser);
       p. peStack[p. lenPEStack]. entity := entity;
       p. peStack[p. lenPEStack]. oldChars := chars;
       p. peStack[p. lenPEStack]. oldCPos := cpos;
-      p. peStack[p. lenPEStack]. oldCurrLine := currLine;
-      p. peStack[p. lenPEStack]. oldCurrLinePos := currLinePos;
-      p. peStack[p. lenPEStack]. oldCurrLineTab := currLineTab;
+      p. peStack[p. lenPEStack]. oldCurrLine := p. currLine;
+      p. peStack[p. lenPEStack]. oldCurrLinePos := p. currLinePos;
+      p. peStack[p. lenPEStack]. oldCurrLineTab := p. currLineTab;
       p. peStack[p. lenPEStack]. in := p. in;
       INC (p. lenPEStack);
       
       IF syncEntity & (entity IS DTD.ExternalEntity) THEN
         (* external entity read from file *)
         p. in := GetBuffer (entity(DTD.ExternalEntity));
-        p. fileEntity := entity(DTD.ExternalEntity);
-        currLine := 0; currLinePos := 0; currLineTab := 0;
+        SetFileEntity (entity(DTD.ExternalEntity));
+        ResetLocator;
         IF (p. in = NIL) THEN            (* read error: simulate empty file *)
           NEW (chars, 2);
           chars[0] := Buffer.markerEOD
@@ -700,8 +741,8 @@ PROCEDURE document (p: Parser);
       IF (p. in. codec. invalidChars # 0) THEN
         Err (invalidCharacterEncodings);
         p. fileEntity. baseURI. GetString (str);
-        lastError. SetStringAttrib ("uri", Msg.GetStringPtr (str));
-        lastError. SetIntAttrib ("encodings", p. in. codec. invalidChars)
+        p. lastError. SetStringAttrib ("uri", Msg.GetStringPtr (str));
+        p. lastError. SetIntAttrib ("encodings", p. in. codec. invalidChars)
       END
     END CheckInvalidChars;
   
@@ -722,17 +763,17 @@ PROCEDURE document (p: Parser);
       END;
       chars := p. peStack[p. lenPEStack]. oldChars;
       cpos := p. peStack[p. lenPEStack]. oldCPos;
-      currLine := p. peStack[p. lenPEStack]. oldCurrLine;
-      currLinePos := p. peStack[p. lenPEStack]. oldCurrLinePos;
-      currLineTab := p. peStack[p. lenPEStack]. oldCurrLineTab;
+      p. currLine := p. peStack[p. lenPEStack]. oldCurrLine;
+      p. currLinePos := p. peStack[p. lenPEStack]. oldCurrLinePos;
+      p. currLineTab := p. peStack[p. lenPEStack]. oldCurrLineTab;
       i := p. lenPEStack-1;
       WHILE (i >= 0) & ~(p. peStack[i]. entity IS DTD.ExternalEntity) DO
         DEC (i)
       END;
       IF (i >= 0) THEN
-        p. fileEntity := p. peStack[i]. entity(DTD.ExternalEntity)
+        SetFileEntity (p. peStack[i]. entity(DTD.ExternalEntity))
       ELSE
-        p. fileEntity := p. documentEntity
+        SetFileEntity (p. documentEntity)
       END;
       p. in := p. peStack[p. lenPEStack]. in;
       cstart := cpos; cdelta := 0;
@@ -767,7 +808,7 @@ PROCEDURE document (p: Parser);
         chars := p. in. chars;
         DEC (cpos, p. in. offsetFromPos0-oldOffset);
         DEC (cstart, p. in. offsetFromPos0-oldOffset);
-        DEC (currLinePos, p. in. offsetFromPos0-oldOffset);
+        DEC (p. currLinePos, p. in. offsetFromPos0-oldOffset);
       END
     END NextBlock;
   
@@ -830,9 +871,9 @@ PROCEDURE document (p: Parser);
      or CR+LF).  *)
     BEGIN
       IF (chars = p. in. chars) THEN
-        INC (currLine);
-        currLinePos := cpos;
-        currLineTab := 0
+        INC (p. currLine);
+        p. currLinePos := cpos;
+        p. currLineTab := 0
       END
     END EndOfLine;
   
@@ -842,8 +883,8 @@ PROCEDURE document (p: Parser);
       currColumn: Buffer.CharPos;
     BEGIN
       IF (chars = p. in. chars) THEN
-        currColumn := cpos-currLinePos+currLineTab;
-        INC (currLineTab, tabWidth-currColumn MOD tabWidth-1)
+        currColumn := cpos-p. currLinePos+p. currLineTab;
+        INC (p. currLineTab, tabWidth-currColumn MOD tabWidth-1)
       END
     END Tab;
   
@@ -986,7 +1027,7 @@ PROCEDURE document (p: Parser);
         Err (expectedChar);
         str := "X";
         str[0] := ch;
-        lastError. SetStringAttrib ("symbol", Msg.GetStringPtr (str))
+        p. lastError. SetStringAttrib ("symbol", Msg.GetStringPtr (str))
       END;
       IF (chars[cpos] # Buffer.markerEOD) THEN
         INC (cpos);
@@ -1005,10 +1046,8 @@ PROCEDURE document (p: Parser);
       decl: DTD.Declaration;
       entity: DTD.Entity;
       oldCStart: DTD.CharPos;
-      pos: Position;
       oldFlag: BOOLEAN;
     BEGIN  (* pre: (chars[cpos] = "%") *)
-      StorePosition (pos);
       IF ~markupDecl & 
          (~p. inExternalSubset & ~p. inExternalEntity) THEN
         Err (nonMarkupDeclPERef)
@@ -1021,7 +1060,7 @@ PROCEDURE document (p: Parser);
       decl := dtd. peNamespace. Get (name);
       IF (decl = NIL) THEN
         Err (noSuchParameterEntity);
-        lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (name^))
+        p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (name^))
       ELSE
         entity := decl(DTD.Entity);
         IF (entity. type = DTD.entityExternalParameter) THEN
@@ -1170,7 +1209,7 @@ PROCEDURE document (p: Parser);
   
   PROCEDURE String (type: SHORTINT): DTD.String;
     VAR
-      pos: Position;
+      pos: LocatorDesc;
       endChar: DTD.Char;
       string: DTD.String;
     
@@ -1249,7 +1288,7 @@ PROCEDURE document (p: Parser);
                   Err (invalidPubidChar)
                 END
               | stringEncoding:
-                IF ~IsEncNameChar (chars[cpos], cpos=cstart) THEN
+                IF ~IsEncNameChar (chars[cpos], cpos = cstart) THEN
                   Err (invalidEncNameChar)
                 END
               | stringVersion:
@@ -1315,7 +1354,7 @@ PROCEDURE document (p: Parser);
             Err (unknownCharacterEncoding)
           ELSE
             p. in. SetCodec (codecFactory, FALSE);
-            cpos := 0; currLine := 0; currLinePos := 0; currLineTab := 0;
+            ResetLocator;
             XMLDecl (entity);
             RETURN
           END
@@ -1345,7 +1384,6 @@ PROCEDURE document (p: Parser);
   PROCEDURE PI;
   (* pre: looking at "<?" *)
     VAR
-      pos: Position;
       target: DTD.String;
     
     PROCEDURE IsReserved (name: ARRAY OF DTD.Char): BOOLEAN;
@@ -1356,17 +1394,17 @@ PROCEDURE document (p: Parser);
       END IsReserved;
     
     BEGIN
-      StorePosition (pos);
+      StorePosition (p. l^);
       INC (cpos, 2);                     (* skip over "<?" *)
       target := Name();
       IF (target^ = "xml") THEN
-        ErrPos (xmlDeclNotAtBeginning, pos)
+        ErrPos (xmlDeclNotAtBeginning, p. l^)
       ELSIF IsReserved (target^) THEN
-        ErrPos (reservedPITarget, pos)
+        ErrPos (reservedPITarget, p. l^)
       END;
       
       IF LookingAt ("?>", followedByAny) THEN
-        p. builder. ProcessingInstruction (target, chars^, 0, 0, 
+        p. builder. ProcessingInstruction (target, chars^, 0, 0, (* callback *)
                                            p. fileEntity. baseURI);
         INC (cpos, 2)
       ELSE
@@ -1377,12 +1415,12 @@ PROCEDURE document (p: Parser);
           | 00X..1FX, Buffer.markerEOB:
             ControlChar (Ascii.lf)
           | Buffer.markerEOD:
-            ErrPos (piNotClosed, pos);
+            ErrPos (piNotClosed, p. l^);
             EXIT
           | "?":
             IF LookingAt ("?>", followedByAny) THEN
-              p. builder. ProcessingInstruction (target, chars^, cstart,
-                                                 cpos-cdelta,
+              p. builder. ProcessingInstruction (target, chars^, (* callback *)
+                                                 cstart, cpos-cdelta,
                                                  p. fileEntity. baseURI);
               INC (cpos, 2);
               EXIT
@@ -1398,10 +1436,8 @@ PROCEDURE document (p: Parser);
 
   PROCEDURE Comment;
   (* pre: looking at "<!--" *)
-    VAR
-      pos: Position;
     BEGIN
-      StorePosition (pos);
+      StorePosition (p. l^);
       INC (cpos, 4);                     (* skip over "<!--" *)
       cstart := cpos; cdelta := 0;
       LOOP
@@ -1409,11 +1445,11 @@ PROCEDURE document (p: Parser);
         | 00X..1FX, Buffer.markerEOB:
           ControlChar (Ascii.lf)
         | Buffer.markerEOD:
-          ErrPos (commentNotClosed, pos);
+          ErrPos (commentNotClosed, p. l^);
           EXIT
         | "-":
           IF LookingAt ("-->", followedByAny) THEN
-            p. builder. Comment (chars^, cstart, cpos-cdelta);
+            p. builder. Comment (chars^, cstart, cpos-cdelta); (* callback *)
             INC (cpos, 3);
             EXIT
           ELSIF LookingAt ("--", followedByAny) THEN
@@ -1429,11 +1465,9 @@ PROCEDURE document (p: Parser);
 
   PROCEDURE CDSect;
   (* pre: looking at "<![CDATA[" *)
-    VAR
-      pos: Position;
     BEGIN
-      StorePosition (pos);
-      p. builder. StartCDATA;
+      StorePosition (p. l^);
+      p. builder. StartCDATA;            (* callback *)
       INC (cpos, 9);                     (* skip over "<![CDATA[" *)
       cstart := cpos; cdelta := 0;
       LOOP
@@ -1441,14 +1475,16 @@ PROCEDURE document (p: Parser);
         | 00X..1FX, Buffer.markerEOB:
           ControlChar (Ascii.lf)
         | Buffer.markerEOD:
-          ErrPos (cdataNotClosed, pos);
+          ErrPos (cdataNotClosed, p. l^);
           EXIT
         | "]":
           IF LookingAt ("]]>", followedByAny) THEN
-            p. builder. Characters (chars^, cstart, cpos-cdelta,
+            DecLength (p. l^, -9);
+            p. builder. Characters (chars^, cstart, cpos-cdelta, (* callback *)
                                     DTD.elementWhitespaceUnknown, FALSE);
             INC (cpos, 3);
-            p. builder. EndCDATA;
+            StorePosition (p. l^);
+            p. builder. EndCDATA;        (* callback *)
             EXIT
           ELSE
             chars[cpos-cdelta] := chars[cpos]; INC (cpos)
@@ -1471,7 +1507,7 @@ PROCEDURE document (p: Parser);
       errorReplacement = 20H;
     VAR
       cval: LONGINT;
-      pos: Position;
+      pos: LocatorDesc;
     
     PROCEDURE ToUnicode (cval: LONGINT): DTD.CharPos;
       BEGIN
@@ -1546,7 +1582,7 @@ PROCEDURE document (p: Parser);
       decl: DTD.Declaration;
       entity: DTD.Entity;
       localCStart: DTD.CharPos;
-      pos: Position;
+      pos: LocatorDesc;
     BEGIN
       StorePosition (pos);
       CheckChar ("&");
@@ -1560,17 +1596,17 @@ PROCEDURE document (p: Parser);
         entity := NIL;
         IF enforceDecl & p. processDeclarations & (name # noName) THEN
           ErrPos (noSuchGeneralEntity, pos);
-          lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (name^))
+          p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (name^))
         END
       ELSE
         entity := decl(DTD.Entity);
         IF (entity. type = DTD.entityUnparsed) THEN
           ErrPos (referenceToUnparsed, pos);
-          lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (name^));
+          p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (name^));
           name := noName
         ELSIF ~permitExternal & (entity. type = DTD.entityExternalGeneral) THEN
           ErrPos (externalRefInAtttribute, pos);
-          lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (name^));
+          p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (name^));
           name := noName
         END
       END;
@@ -1592,7 +1628,7 @@ PROCEDURE document (p: Parser);
     VAR
       attValue: DTD.AttValue;
       endChar: DTD.Char;
-      pos: Position;
+      pos: LocatorDesc;
     
     PROCEDURE Flush;
       BEGIN
@@ -1663,7 +1699,7 @@ PROCEDURE document (p: Parser);
       attrValue: DTD.AttValue;
       decl, decl0: DTD.Declaration;
       attrDecl: DTD.AttrDecl;
-      pos: Position;
+      pos: LocatorDesc;
       
     PROCEDURE content;
     (* post: chars[cpos] # Buffer.markerEOB *)
@@ -1674,6 +1710,7 @@ PROCEDURE document (p: Parser);
          with embedded character references will cause only a single up 
          call.  *)
         BEGIN
+          StorePosition (p. l^);
           cstart := cpos; cdelta := 0;
           
           LOOP  (* loop invariant: cdelta = 0 *)
@@ -1735,7 +1772,7 @@ PROCEDURE document (p: Parser);
           END;
           
           IF (cpos-cdelta # cstart) THEN
-            p. builder. Characters (chars^, cstart, cpos-cdelta,
+            p. builder. Characters (chars^, cstart, cpos-cdelta, (* callback *)
                                     DTD.elementWhitespaceUnknown, FALSE)
           END
         END CharData;
@@ -1744,31 +1781,31 @@ PROCEDURE document (p: Parser);
         VAR
           decl: DTD.Declaration;
           entity: DTD.Entity;
-          pos: Position;
+          pos: LocatorDesc;
         BEGIN
           decl := dtd. geNamespace. Get (entityRef. name);
           entity := NIL;
           IF (decl # NIL) THEN
             entity := decl(DTD.Entity)
           END;
+          StorePosition (p. l^);
+          IF (chars = p. in. chars) THEN
+            DecLength (p. l^, LongStrings.Length (entityRef. name^)+2)
+          END;
           
           IF (entity = NIL) THEN
-            StorePosition (pos);
-            IF (chars = p. in. chars) THEN
-              DecLength (pos, LongStrings.Length (entityRef. name^)+2)
-            END;
-            ErrPos (noSuchGeneralEntity, pos);
-            lastError. SetLStringAttrib ("name",
+            ErrPos (noSuchGeneralEntity, p. l^);
+            p. lastError. SetLStringAttrib ("name",
                                          Msg.GetLStringPtr (entityRef. name^))
           ELSIF entity. expanding THEN
             Err (recursiveGeneralEntity);
-            lastError. SetLStringAttrib ("name",
+            p. lastError. SetLStringAttrib ("name",
                                          Msg.GetLStringPtr (entityRef. name^))
           ELSIF (entity. type = DTD.entityExternalGeneral) &
                 ~p. followExternalRef THEN
-            p. builder. SkippedEntity (entityRef. name, entity)
+            p. builder. SkippedEntity (entityRef. name, entity) (* callback *)
           ELSE
-            p. builder. StartEntity (entity);
+            p. builder. StartEntity (entity); (* callback *)
             PushEntity (entity, TRUE);
             StorePosition (pos);
             (* recursivly enter replacement; FIXME: endless loop? *)
@@ -1779,11 +1816,12 @@ PROCEDURE document (p: Parser);
             content;
             IF (chars[cpos] # Buffer.markerEOD) THEN
               ErrPos (invalidGEReplacement, pos);
-              lastError. SetLStringAttrib ("name",
+              p. lastError. SetLStringAttrib ("name",
                                           Msg.GetLStringPtr (entityRef. name^))
             END;
             PopEntity;
-            p. builder. EndEntity (entity);
+            StorePosition (p. l^);
+            p. builder. EndEntity (entity); (* callback *)
           END
         END FollowEntityRef;
       
@@ -1907,7 +1945,7 @@ PROCEDURE document (p: Parser);
             decl := dtd. geNamespace. Get (fragment. name);
             IF (decl = NIL) THEN
               Err (noSuchGeneralEntity);
-              lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (fragment. name^))
+              p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (fragment. name^))
             ELSE
               entity := decl(DTD.Entity);
               fragment. entity := entity;
@@ -1918,7 +1956,7 @@ PROCEDURE document (p: Parser);
               
               IF IsRecursive (entity) THEN
                 Err (recursiveGeneralEntity);
-                lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (entity. name^));
+                p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (entity. name^));
                 fragment. entity. attValue. Clear
               END
             END
@@ -2045,8 +2083,8 @@ PROCEDURE document (p: Parser);
             IF (attrDecl. name^ = "xml:lang") THEN
               CheckXmlLang (attrDecl. defaultValue)
             END;
-            p. builder. ElementAttribute (NIL, decl. name, attrDecl,
-                                          attrDecl. defaultValue, FALSE)
+            p. builder. Attribute (NIL, decl. name, attrDecl,
+                                   attrDecl. defaultValue, FALSE)
           END;
           decl := decl. next
         END
@@ -2056,7 +2094,7 @@ PROCEDURE document (p: Parser);
       BEGIN
         IF (startName # noName) THEN
           ErrPos (expectedEndTag, pos);
-          lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (startName^))
+          p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (startName^))
         END
       END ErrEndTag;
     
@@ -2065,9 +2103,10 @@ PROCEDURE document (p: Parser);
         CheckChar ("<");
         p. lenNameList := 0;
         emptyElementTag := FALSE;
+        StorePosition (p. l^);
         startName := Name();
         decl := dtd. elementNamespace. Get (startName);
-        p. builder. StartElement (NIL, startName);
+        p. builder. StartElement (NIL, startName); (* callback *)
         LOOP
           IF (chars[cpos] = Buffer.markerEOD) THEN
             EXIT
@@ -2082,11 +2121,11 @@ PROCEDURE document (p: Parser);
             EXIT
           END;
           
-          StorePosition (pos);
+          StorePosition (p. l^);
           attrName := Name();
           IF AttributeNameUsed (attrName) THEN
-            ErrPos (multipleAttrName, pos);
-            lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (attrName^))
+            ErrPos (multipleAttrName, p. l^);
+            p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (attrName^))
           END;
           NoteName (attrName);
           Eq;
@@ -2102,18 +2141,20 @@ PROCEDURE document (p: Parser);
           IF (attrName^ = "xml:lang") THEN
             CheckXmlLang (attrValue)
           END;
-          p. builder. ElementAttribute (NIL, attrName, attrDecl, attrValue, TRUE)
+          p. builder. Attribute (NIL, attrName, attrDecl, attrValue, TRUE) (* callback *)
         END;
         
         IF (decl # NIL) THEN
           AddDefaultAttributes (decl(DTD.ElementDecl))
         END;
-        p. builder. AttributesDone();
+        StorePosition (p. l^);
+        p. builder. AttributesDone();    (* callback *)
         
         CheckChar (">");
         DiscardPreviousInput;
         IF emptyElementTag THEN
-          p. builder. EndElement (NIL, startName)
+          StorePosition (p. l^);
+          p. builder. EndElement (NIL, startName) (* callback *)
         ELSE
           content;
           StorePosition (pos);
@@ -2121,9 +2162,10 @@ PROCEDURE document (p: Parser);
           CheckChar ("<");
           IF (chars[cpos] # "/") THEN ErrEndTag END;
           CheckChar ("/");
+          StorePosition (p. l^);
           endName := Name();
           IF (endName^ # startName^) THEN ErrEndTag END;
-          p. builder. EndElement (NIL, startName);
+          p. builder. EndElement (NIL, startName); (* callback *)
           OptS (TRUE);
           CheckChar (">")
         END
@@ -2158,77 +2200,9 @@ PROCEDURE document (p: Parser);
   PROCEDURE ExternalID (optionJustPubid: BOOLEAN;
                         VAR public, system: DTD.String; VAR baseURI: URI.URI);
   (* pre: ExternalID is optionally followed by S *)
-    
-    PROCEDURE CheckURI (str16: DTD.String): URI.URI;
-      VAR
-        len16, len8, i: INTEGER;
-        codec: Codec.Codec;
-        str8: POINTER TO ARRAY OF CHAR;
-        repl: ARRAY 4 OF CHAR;
-        srcDone, destDone: LONGINT;
-        uri: URI.URI;
-        res: Msg.Msg;
-        
-      PROCEDURE ToHex (i: INTEGER): CHAR;
-        BEGIN
-          IF (i < 10) THEN
-            RETURN CHR (i+ORD ("0"))
-          ELSE
-            RETURN CHR (i+(ORD ("A")-10))
-          END
-        END ToHex;
-
-      BEGIN
-        len16 := LongStrings.Length (str16^);
-        len8 := len16*9+1;
-        NEW (str8, len8);
-        (* conservative approximation: UCS-2 character code is mapped to at
-           most 3 bytes, a UCS-2 surrogate pair to 2 characters each; then,
-           a non-ASCII character is encoded as %HH *)
-        codec := UTF8.factory. NewCodec();
-        
-        (* encode UCS-2 character sequence as UTF-8 character sequence *)
-        IF (len16 # 0) THEN
-          codec. Encode (str16^, 0, len16, str8^, 0, len8, srcDone, destDone);
-          IF (srcDone # len16) THEN
-            codec. Encode (str16^, srcDone, len16, str8^, destDone, len8,
-                           srcDone, destDone);
-            ASSERT (srcDone = len16)
-          END;
-          str8[destDone] := 0X
-        ELSE
-          COPY ("", str8^)
-        END;
-        
-        (* encode every non-ASCII character in the UTF-8 string to %HH *)
-        i := 0;
-        WHILE (str8[i] # 0X) DO
-          IF (str8[i] >= 80X) THEN
-            repl := "%HH";
-            repl[1] := ToHex (ORD (str8[i]) DIV 16);
-            repl[2] := ToHex (ORD (str8[i]) MOD 16);
-            Strings.Delete (str8^, i, 1);
-            Strings.Insert (str8^, i, repl);
-            INC (i, 3)
-          ELSE
-            INC (i)
-          END
-        END;
-        
-        IF (p. fileEntity. baseURI # NIL) &
-           (p. fileEntity. baseURI IS URI.HierarchicalURI) THEN
-          uri := URIParser.NewURI (str8^, p. fileEntity. baseURI(URI.HierarchicalURI), res)
-        ELSE
-          uri := URIParser.NewURI (str8^, NIL, res)
-        END;
-        IF (res # NIL) THEN
-          Err (malformedURI);
-          lastError. SetMsgAttrib ("uri_error", res)
-        END;
-        RETURN uri
-      END CheckURI;
-    
-    BEGIN                                (* ... needs entity resolver *)
+    VAR
+      res: Msg.Msg;
+    BEGIN
       public := NIL;
       system := NIL;
       baseURI := NIL;
@@ -2236,7 +2210,11 @@ PROCEDURE document (p: Parser);
         INC (cpos, 6);               (* skip over "SYSTEM" *)
         S;
         system := String (stringSystemLiteral);
-        baseURI := CheckURI (system)
+        p. er. GetURI (NIL, system, p. fileEntity. baseURI, baseURI, res);
+        IF (res # NIL) THEN
+          Err (malformedURI);
+          p. lastError. SetMsgAttrib ("uri_error", res)
+        END
       ELSIF LookingAt ("PUBLIC", followedByNonName) THEN
         INC (cpos, 6);               (* skip over "PUBLIC" *)
         S;
@@ -2245,9 +2223,13 @@ PROCEDURE document (p: Parser);
           S;
           IF ~optionJustPubid OR
              (chars[cpos] = "'") OR (chars[cpos] = '"') THEN
-            system := String (stringPubidLiteral);
-            baseURI := CheckURI (system)
+            system := String (stringPubidLiteral)
           END
+        END;
+        p. er. GetURI (public, system, p.fileEntity.baseURI, baseURI, res);
+        IF (res # NIL) THEN
+          Err (malformedURI);
+          p. lastError. SetMsgAttrib ("uri_error", res)
         END
       ELSE
         Err (expectedExternalID)
@@ -2546,7 +2528,7 @@ PROCEDURE document (p: Parser);
       (* pre: chars[cpos] # Buffer.markerEOB *)
         VAR
           endChar: DTD.Char;
-          pos: Position;
+          pos: LocatorDesc;
           storedPos: DTD.CharPos;
           string: DTD.String;
           fragment: DTD.Fragment;
@@ -2633,6 +2615,7 @@ PROCEDURE document (p: Parser);
           CheckChar ("%");
           S
         END;
+        StorePosition (p. l^);
         name := Name();
         S;
         IF (chars[cpos] = "'") OR (chars[cpos] = '"') THEN
@@ -2673,7 +2656,7 @@ PROCEDURE document (p: Parser);
           IF isPEntity THEN
             dummy := dtd. peNamespace. Add (entity)
           ELSIF dtd. geNamespace. Add (entity) THEN
-            p. builder. EntityDecl (entity)
+            p. builder. EntityDecl (entity) (* callback *)
           END
         END
       END EntityDecl;
@@ -2686,11 +2669,15 @@ PROCEDURE document (p: Parser);
       BEGIN
         INC (cpos, 10);                (* skipt over "<!NOTATION" *)
         S;
+        StorePosition (p. l^);
         name := Name();
         S;
         ExternalID (TRUE, public, system, baseURI);
+        (* what should be done if the external id of the notation cannot be
+           resolved to an absolute URI?  Infoset suggestes this is an error
+           ... *)
         OptS (FALSE);
-        p. builder. Notation (dtd. NewNotation (name, public, system, baseURI));
+        p. builder. Notation (dtd. NewNotation (name, public, system, baseURI)); (* callback *)
         CheckChar (">")
       END NotationDecl;
 
@@ -2715,7 +2702,7 @@ PROCEDURE document (p: Parser);
 
   PROCEDURE extSubsetDecl;
     VAR
-      pos: Position;
+      pos: LocatorDesc;
       
     PROCEDURE ignoreSectContents;
       VAR
@@ -2799,7 +2786,10 @@ PROCEDURE document (p: Parser);
         externalSubset: DTD.ExternalEntity;
       BEGIN  (* pre: looking at "<!DOCTYPE"+NonName *)
         p. inDTD := TRUE;
-        p. builder. StartDTD;
+        
+        StorePosition (p. l^);
+        p. builder. StartDTD;            (* callback *)
+        
         INC (cpos, 9);                   (* skip over "<!DOCTYPE" *)
         S;
         rootName := Name();
@@ -2850,7 +2840,9 @@ PROCEDURE document (p: Parser);
         ELSE
           externalSubset := NIL;
         END;
-        p. builder. EndDTD (externalSubset);
+        
+        StorePosition (p. l^);
+        p. builder. EndDTD (externalSubset); (* callback *)
         p. inDTD := FALSE
       END doctypedecl;
     
@@ -2866,14 +2858,15 @@ PROCEDURE document (p: Parser);
     END prolog;
   
   BEGIN
-    cpos := 0; cstart := 0;
-    currLine := 0;
-    currLinePos := cpos;
-    currLineTab := 0;
+    SetFileEntity (p. documentEntity);
+    ResetLocator;
     chars := p. in. chars;
     dtd := p. dtd;
     
-    p. builder. StartDocument (p. documentEntity);
+    StorePosition (p. l^);
+    p. builder. SetLocator (p. l);
+    p. builder. StartDocument (p. documentEntity); (* callback *)
+    
     prolog;
     dtd. AttachAttributes;
     p. inDocumentElement := TRUE;
@@ -2887,7 +2880,9 @@ PROCEDURE document (p: Parser);
       Err (junkAfterDocument)
     END;
     CheckInvalidChars;
-    p. initialBuilder. EndDocument
+    
+    StorePosition (p. l^);
+    p. initialBuilder. EndDocument       (* callback *)
   END document;
 
 
@@ -2897,8 +2892,8 @@ PROCEDURE (p: Parser) ParseDocument*;
   END ParseDocument;
 
 PROCEDURE New* (ch: Channel.Channel; codecFactory: Codec.Factory;
-                baseURI: URI.URI; builder: Builder.Builder
-                ): Parser;
+                baseURI: URI.URI; entityResolver: EntityResolver.Resolver;
+                builder: Builder.Builder): Parser;
 (**@oparam{baseURI} is the absolute URI of the document entity, as computed
    by the method of RFC 2396, if that is known.  If this value is @code{NIL},
    or refers to an opaque URI, then relative URIs in the document cannot be
@@ -2914,13 +2909,14 @@ PROCEDURE New* (ch: Channel.Channel; codecFactory: Codec.Factory;
     ELSE
       p. errList := Error.NewList (baseURI)
     END;
+    NEW (p. l);
     p. in := Buffer.NewInput (ch, codecFactory, p. errList);
+    p. er := entityResolver;
     p. builder := builder;
     p. initialBuilder := builder;
     p. dtd := DTD.New();
     
     p. documentEntity := p. dtd. NewDocumentEntity (baseURI);
-    p. fileEntity := p. documentEntity;
     
     p. followExternalRef := TRUE;
     p. processDeclarations := TRUE;
