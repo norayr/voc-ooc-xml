@@ -1,7 +1,7 @@
-(*      $Id: ParserProtocol.Mod,v 1.9 2000/08/08 13:49:27 mva Exp $   *)
+(*      $Id: ParserProtocol.Mod,v 1.10 2000/11/08 14:15:07 mva Exp $   *)
 MODULE XML:Builder:ParserProtocol [OOC_EXTENSIONS];
 (*  Translates XML document to canonical XML.
-    Copyright (C) 2000  Michael van Acken
+    Copyright (C) 2000, 2001  Michael van Acken
 
     This module is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License
@@ -191,13 +191,15 @@ PROCEDURE (b: Builder) StartDTD*;
     b. w. EndTag
   END StartDTD;
 
-PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity);
+PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
+                                allDeclarationsProcessed: BOOLEAN);
   BEGIN
     b. w. NewLine;
     b. w. StartTag ("end-dtd", FALSE);
     IF (externalDTD # NIL) THEN
       Entity (b, externalDTD, FALSE)
     END;
+    Boolean (b. w, "all-declarations-processed", allDeclarationsProcessed);
     WritePos (b);
     b. w. EndTag
   END EndDTD;

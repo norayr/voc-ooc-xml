@@ -1,7 +1,7 @@
-(*      $Id: Builder.Mod,v 1.9 2000/08/16 08:23:43 mva Exp $   *)
+(*      $Id: Builder.Mod,v 1.10 2000/10/29 20:28:38 mva Exp $   *)
 MODULE XML:Builder [OOC_EXTENSIONS];
 (*  Low-level builder interface to the XML parser.
-    Copyright (C) 2000  Michael van Acken
+    Copyright (C) 2000, 2001  Michael van Acken
 
     This module is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License
@@ -27,8 +27,10 @@ TYPE
   BuilderDesc* = RECORD
   (**This abstract class defines the interface of the XML parser to the
      application.  It is based on the W3C Working Draft @samp{XML Information
-     Set}, dated July 26 1999.  It can be obtained at
-     @url{http://www.w3.org/TR/2000/WD-xml-infoset-20000726}.
+     Set}, dated February 2001.  This specification can be obtained at
+     @url{http://www.w3.org/TR/2001/WD-xml-infoset-20010202}.  All information
+     items required by the XML Information Set are made available by the
+     parser.
 
      The low-level interface to the parser is governed by two requirements: It
      must make all core properties (and, as far as possible, all peripheral
@@ -139,13 +141,18 @@ PROCEDURE (b: Builder) StartDTD*;
    @samp{<!DOCTYPE}.  *)
   END StartDTD;
 
-PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity);
+PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
+                                allDeclarationsProcessed: BOOLEAN);
 (**This method is called by the paser when is done parsing the document type
-   declaration.  If the DTD had an external subset, the reference to the
-   entity is passed in @oparam{externalDTD}.  The public and system identifier
-   of the external subset are available through the entity item.  The locator
-   is positioned after the closing @samp{>} of the DTD, and the external DTD 
-   subset has been processed.  *)
+   declaration.  If the DTD had an external subset, the reference to the entity
+   is passed in @oparam{externalDTD}.  The public and system identifier of the
+   external subset are available through the entity item.
+
+   If @oparam{allDeclarationsProcessed} is @code{TRUE}, then the parser has
+   read the complete DTD.
+
+   The locator is positioned after the closing @samp{>} of the DTD, and the
+   external DTD subset has been processed.  *)
   END EndDTD;
 
 

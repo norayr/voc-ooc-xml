@@ -1,7 +1,7 @@
-(*      $Id: Namespaces.Mod,v 1.3 2000/07/31 18:38:31 mva Exp $   *)
+(*      $Id: Namespaces.Mod,v 1.4 2000/08/16 08:23:50 mva Exp $   *)
 MODULE XML:Builder:Namespaces;
 (*  Provides namespace support for XML:Parser.
-    Copyright (C) 2000  Michael van Acken
+    Copyright (C) 2000, 2001  Michael van Acken
 
     This module is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License
@@ -112,9 +112,10 @@ PROCEDURE (b: Builder) StartDTD*;
     b. delegateBuilder. StartDTD
   END StartDTD;
 
-PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity);
+PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
+                                allDeclarationsProcessed: BOOLEAN);
   BEGIN
-    b. delegateBuilder. EndDTD (externalDTD)
+    b. delegateBuilder. EndDTD (externalDTD, allDeclarationsProcessed)
   END EndDTD;
 
 

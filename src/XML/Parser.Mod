@@ -1,7 +1,7 @@
-(*      $Id: Parser.Mod,v 1.16 2000/10/29 20:32:14 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.17 2000/11/08 14:15:01 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
-    Copyright (C) 2000  Michael van Acken
+    Copyright (C) 2000, 2001  Michael van Acken
 
     This module is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License
@@ -91,10 +91,13 @@ TYPE
        checks required from namespace aware parsers.  The default is
        @code{FALSE}.  *)
     processDeclarations: BOOLEAN;
-    (* if FALSE, then entity declarations and attribute declarations must no
+    (* if FALSE, then entity declarations and attribute declarations must not
        be processed; this field starts out TRUE, and is set to FALSE after
        a reference to a parameter entity that is not read, but only if 
        "standalone" is not "yes".  *)
+    readCompleteDTD: BOOLEAN;
+    (* if this field is TRUE at the end of the DTD, then all declarations have
+       been read *)
     
     inDocumentElement: BOOLEAN;
     (* if TRUE, then the parser is within the document element *)
@@ -1170,8 +1173,11 @@ PROCEDURE (p: Parser) ParseDocument*;
             END;
             
             PopEntity
-          ELSIF (p. documentEntity. standalone # DTD.standaloneYes) THEN
-            p. processDeclarations := FALSE
+          ELSE
+            p. readCompleteDTD := FALSE;
+            IF (p. documentEntity. standalone # DTD.standaloneYes) THEN
+              p. processDeclarations := FALSE
+            END
           END
         ELSE
           (* not in DeclSep: must be within entity value definition *)
@@ -2860,7 +2866,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         END;
         
         StorePosition (p. l^);
-        p. builder. EndDTD (externalSubset); (* callback *)
+        p. builder. EndDTD (externalSubset, p. readCompleteDTD); (* callback *)
         p. inDTD := FALSE
       END doctypedecl;
     
@@ -2940,6 +2946,7 @@ PROCEDURE Init (p: Parser; new: BOOLEAN;
     p. followExternalRef := TRUE;
     p. enforceQNames := FALSE;
     p. processDeclarations := TRUE;
+    p. readCompleteDTD := TRUE;
     
     p. inDocumentElement := FALSE;
     p. inDTD := FALSE;
