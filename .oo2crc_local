@@ -1,0 +1,12 @@
+PATHS
+GET *.Mod [RCS] FROM
+  src;
+GET *.Sym, *.Lib FROM
+  sym; 
+GET *.h, *.d, *.c FROM
+  obj;
+GET *.c FROM
+  src;
+GET *.o FROM
+  obj;
+END
