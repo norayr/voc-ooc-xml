@@ -1,4 +1,4 @@
-/*	$Id: IO_Socket.c,v 1.3 2000/09/12 09:19:04 mva Exp $	*/
+/*	$Id: IO_Socket.c,v 1.4 2000/09/16 08:14:36 mva Exp $	*/
 /*  Interface to socket facilities.
     Copyright (C) 2000  Michael van Acken
 
@@ -343,6 +343,7 @@ int IO_Socket__SHUT_RDWR = 2;
 #endif
 
 static IO_Socket__ErrorContext IO_Socket__errorContext;
+Channel__Result IO_Socket__errorWouldBlock;
 
 static _ModId _mid;
 
@@ -415,7 +416,7 @@ void IO_Socket__ErrorContextDesc_GetTemplate(IO_Socket__ErrorContext context, Ms
 static void add_msg_attribute(Msg__Msg msg, const char* name, const char* value) {
   DYN_TBCALL(Msg,MsgDesc,SetStringAttrib,msg,
 	     (msg, (const Msg__String)name, strlen(name)+1,
-              Msg__GetStringPtr((CHAR*)value, strlen(value)+1)));
+              Msg__GetStringPtr((OOC_CHAR*)value, strlen(value)+1)));
 }
 
 static Msg__Msg get_error (int res) {
@@ -424,6 +425,8 @@ static Msg__Msg get_error (int res) {
   
   if (res != -1) {
     return IO_Socket__done;
+  } else if (errno == EWOULDBLOCK) {
+    return IO_Socket__errorWouldBlock;
   } else {
     switch (errno) {
     case EPROTONOSUPPORT:
@@ -459,7 +462,7 @@ static Msg__Msg get_error (int res) {
       code = IO_Socket__connectInProgress; break;
     case EALREADY:
       code = IO_Socket__connectAlreadyInProgress; break;
-
+    
     default:
       code = IO_Socket__socketError;
     }
@@ -575,42 +578,42 @@ void IO_Socket__SocketDesc_Listen(IO_Socket__Socket s, int backlog) {
   s->res = get_error(listen(s->fd, backlog));
 }
 
-int IO_Socket__SocketDesc_Recv(IO_Socket__Socket s, unsigned char* buff, int buff_0d, int nbytes, unsigned int flags) {
+int IO_Socket__SocketDesc_Recv(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, int nbytes, unsigned int flags) {
   int res;
   
   do {
-    res = recv(s->fd, buff, nbytes, flags);
+    res = recv(s->fd, buff+start, nbytes, flags);
   } while ((res == -1) && (errno == EINTR));
   s->res = get_error(res);
   return res;
 }
 
-int IO_Socket__SocketDesc_Send(IO_Socket__Socket s, unsigned char* buff, int buff_0d, int nbytes, unsigned int flags) {
+int IO_Socket__SocketDesc_Send(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, int nbytes, unsigned int flags) {
   int res;
   
   do {
-    res = send(s->fd, buff, nbytes, flags);
+    res = send(s->fd, buff+start, nbytes, flags);
   } while ((res == -1) && (errno == EINTR));
   s->res = get_error(res);
   return res;
 }
 
-int IO_Socket__SocketDesc_RecvFrom(IO_Socket__Socket s, unsigned char* buff, int buff_0d, int nbytes, unsigned int flags, IO_Socket__SockAddrParam from, int from_0d, int *addrlen) {
+int IO_Socket__SocketDesc_RecvFrom(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, int nbytes, unsigned int flags, IO_Socket__SockAddrParam from, int from_0d, int *addrlen) {
   int res;
   
   do {
-    res = recvfrom(s->fd, buff, nbytes, flags,
+    res = recvfrom(s->fd, buff+start, nbytes, flags,
                    (struct sockaddr*)from, addrlen);
   } while ((res == -1) && (errno == EINTR));
   s->res = get_error(res);
   return res;
 }
 
-int IO_Socket__SocketDesc_SendTo(IO_Socket__Socket s, unsigned char* buff, int buff_0d, int nbytes, unsigned int flags, IO_Socket__SockAddrParam to, int to_0d, int addrlen) {
+int IO_Socket__SocketDesc_SendTo(IO_Socket__Socket s, unsigned char* buff, int buff_0d, LONGINT start, int nbytes, unsigned int flags, IO_Socket__SockAddrParam to, int to_0d, int addrlen) {
   int res;
   
   do {
-    res = sendto(s->fd, buff, nbytes, flags,
+    res = sendto(s->fd, buff+start, nbytes, flags,
                  (struct sockaddr*)to, addrlen);
   } while ((res == -1) && (errno == EINTR));
   s->res = get_error(res);
@@ -646,4 +649,14 @@ void IO_Socket_init(void) {
   NEW_REC(IO_Socket__errorContext,IO_Socket__ErrorContextDesc);
   Msg__InitContext((Msg__Context)IO_Socket__errorContext, 
 		   (const Msg__String)"IO:Socket", 10);
+
+  IO_Socket__errorWouldBlock = Msg__New((Msg__Context)IO_Socket__errorContext,
+					IO_Socket__wouldBlock);
+#if HAVE_STRERROR
+  add_msg_attribute(IO_Socket__errorWouldBlock, "errstr",
+		    strerror(EWOULDBLOCK));
+#endif
+  DYN_TBCALL(Msg,MsgDesc,SetIntAttrib,IO_Socket__errorWouldBlock,
+	     (IO_Socket__errorWouldBlock, (const Msg__String)"errno",
+	      6, (LONGINT)EWOULDBLOCK));
 }

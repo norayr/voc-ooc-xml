@@ -1,4 +1,4 @@
-(*	$Id: Socket.Mod,v 1.5 2000/09/04 09:28:27 mva Exp $	*)
+(*	$Id: Socket.Mod,v 1.6 2000/09/16 08:10:29 mva Exp $	*)
 MODULE IO:Socket [FOREIGN "C"; 
                   LINK
                     FILE "IO_Socket.c"
@@ -74,6 +74,10 @@ CONST
   connectAlreadyInProgress* = 17;
   (**The socket is non-blocking and already has a pending connection in
      progress (see @oconst{connectInProgress}).  *)
+  wouldBlock* = 18;
+  (**Nonblocking mode has been set on the socket, and the write or read
+     operation would block.  *)
+  
   
       
 TYPE
@@ -176,6 +180,7 @@ TYPE
 
 VAR
   errorContext: ErrorContext;
+  errorWouldBlock-: Result;
 
 
 PROCEDURE (context: ErrorContext) GetTemplate* (msg: Msg.Msg; VAR templ: Msg.LString);
@@ -297,36 +302,48 @@ PROCEDURE (s: Socket) Listen* (backlog: C.int);
    Depending on the result of the operation, @ofield{s.res} is changed.  *)
 
 PROCEDURE (s: Socket) Recv* (VAR buff: ARRAY OF SYSTEM.BYTE;
-                             nbytes: C.size_t;
+                             start: LONGINT; nbytes: C.size_t;
                              flags: C.set): ssize_t;
 (**Receives data from the socket.  Depending on the result of the operation,
    @ofield{s.res} is updated.  See the Unix manual page recv(2) for the
-   details.  *)
-      
+   details.
+   
+   For performace reasons, the error code @code{EWOULDBLOCK} always returns the
+   same error message @ovar{errorWouldBlock} in @ofield{s.res}.  *)
+
 PROCEDURE (s: Socket) Send* (VAR buff: ARRAY OF SYSTEM.BYTE;
-                             nbytes: C.size_t;
+                             start: LONGINT; nbytes: C.size_t;
                              flags: C.set): ssize_t;
 (**Sends data to the socket.  Depending on the result of the operation,
    @ofield{s.res} is updated.  See the Unix manual page send(2) for the
-   details.  *)
+   details.
+
+   For performace reasons, the error code @code{EWOULDBLOCK} always returns the
+   same error message @ovar{errorWouldBlock} in @ofield{s.res}.  *)
 
 PROCEDURE (s: Socket) RecvFrom* (VAR buff: ARRAY OF SYSTEM.BYTE;
-                                 nbytes: C.size_t;
+                                 start: LONGINT; nbytes: C.size_t;
                                  flags: C.set;
                                  VAR from: SockAddrParam;
                                  VAR addrlen: socklen_t): ssize_t;
 (**Receives data from the socket.  Depending on the result of the operation,
    @ofield{s.res} is updated.  See the Unix manual page recvfrom(2) for the
-   details.  *)
+   details.
+   
+   For performace reasons, the error code @code{EWOULDBLOCK} always returns the
+   same error message @ovar{errorWouldBlock} in @ofield{s.res}.  *)
 
 PROCEDURE (s: Socket) SendTo* (VAR buff: ARRAY OF SYSTEM.BYTE;
-                               nbytes: C.size_t;
+                               start: LONGINT; nbytes: C.size_t;
                                flags: C.set;
                                VAR to: SockAddrParam;
                                addrlen: socklen_t): ssize_t;
 (**Sends data to the socket.  Depending on the result of the operation,
    @ofield{s.res} is updated.  See the Unix manual page sendto(2) for the
-   details.  *)
+   details.
+
+   For performace reasons, the error code @code{EWOULDBLOCK} always returns the
+   same error message @ovar{errorWouldBlock} in @ofield{s.res}.  *)
 
 PROCEDURE (s: Socket) SetBlocking* (blocking: BOOLEAN);
 (**Set blocking or non-blocking mode of the socket: if @oparam{blocking} is
