@@ -53,6 +53,7 @@ CONST (* error codes *)
   invalidChildElement = 21;
   requiredChildMissing = 22;
   nonWhitespaceContent = 23;
+  elementCheckFailed = 24;
 
 VAR
   msgParserContext: Error.Context;
@@ -104,6 +105,17 @@ PROCEDURE (b: Build) ErrorName (code: Error.Code; name: DTD.String);
       b. noerr := FALSE
     END
   END ErrorName;
+  
+PROCEDURE (b: Build) ErrorString (code: Error.Code; string: DTD.String);
+  VAR
+    msg: Error.Msg;
+  BEGIN
+    IF b. noerr THEN
+      msg := b. errorListener. Error (msgParserContext, code, TRUE, b. locator^);
+      msg. SetLStringAttrib ("string", Msg.GetLStringPtr (string^));
+      b. noerr := FALSE
+    END
+  END ErrorString;
   
 PROCEDURE (b: Build) SetLocator* (locator: Locator.Locator);
   BEGIN
@@ -209,12 +221,18 @@ PROCEDURE (b: Build) Characters* (VAR chars: DTD.StringVar;
   
 PROCEDURE (b: Build) EndElement* (namespaceDecl: DTD.NamespaceDeclaration; localName: DTD.String);
   VAR
-    name: DTD.String;
+    name, errorMsg: DTD.String;
   BEGIN
     name := b. stack[b. nestingLevel]. MissingChild();
     IF (name # NIL) THEN
       b. ErrorName (requiredChildMissing, name)
     END;
+    
+    errorMsg := b. stack[b. nestingLevel]. CheckElement();
+    IF (errorMsg # NIL) THEN
+      b. ErrorString (elementCheckFailed, errorMsg)
+    END;
+    
     IF (b. nestingLevel = 0) THEN
       b. root := b. stack[b. nestingLevel];
       b. stack[b. nestingLevel] := NIL;
@@ -327,4 +345,6 @@ BEGIN
     "Child element `${name}' is required for this element");
   msgParserContext. SetString (nonWhitespaceContent,
     "Only whitespace allowed as content of this element");
+  msgParserContext. SetString (elementCheckFailed,
+    "${string}");
 END XML:Basic:Parser.

@@ -137,10 +137,7 @@ PROCEDURE (elem: Element) MissingChild* (): String;
 (**Called at the end of an XML element to determine if any required child
    elements are missing.  Result is the name of one of the missing childs, or
    @code{NIL} if all required child elements are present.  By default,
-   @code{NIL} is returned.
-
-   Any code, that should be evaluted if an element is done, should also be
-   placed in this method.  *)
+   @code{NIL} is returned.  *)
   BEGIN
     RETURN NIL
   END MissingChild;
@@ -200,6 +197,21 @@ PROCEDURE (elem: Element) AddCharacters* (VAR chars: StringVar;
   BEGIN
     <*PUSH; Assertions:=TRUE*>ASSERT (FALSE)<*POP*>
   END AddCharacters;
+
+PROCEDURE (elem: Element) CheckElement* (): String;
+(**Called at the very end of an XML element (after
+   @oproc{Element.MissingChild}) to perform consistency checks on the whole
+   element.  For example, this method makes sure that the combination of
+   attributes and content does not violate any rules of the application.
+
+   Result is an error message if some part of the element is invalid, and
+   @code{NIL} on success.  By default, @code{NIL} is returned.
+
+   Any code that should be evaluted if an element is completed, should be
+   placed in this method.  *)
+  BEGIN
+    RETURN NIL
+  END CheckElement;
 
 PROCEDURE (elem: Element) [ABSTRACT] Write* (writer: Writer.Writer);
 (**Serializes the object @oparam{elem} into an XML element.  The data is
