@@ -1,8 +1,6 @@
 TEST_PROG=../../TestParser
 scripts=./not-wf.sh ./valid.sh
 
-export DIFF=diff -u
-
 .PHONY: all clean test ${TEST_PROG}
 
 cxml.html:

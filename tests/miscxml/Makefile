@@ -1,8 +1,6 @@
 TEST_PROG=../../TestParser
 scripts=./not-wf.sh ./valid.sh
 
-export DIFF=diff -u
-
 .PHONY: clean test
 
 test-output:
