@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.7 1998/11/12 20:04:56 acken Exp $
+dnl $Id: aclocal.m4,v 1.1 2000/08/30 08:14:44 mva Exp $
 dnl The most current version of this file can be found in the OOC source
 dnl distribution (ooc-*-rcs.tar.gz or ooc-*-norcs.tar.gz) in the directory
 dnl   ooc/backend/ansi-c/distrib/library_autoconf
@@ -65,7 +65,7 @@ AC_CACHE_VAL(ooc_cv_path_ooc_libdir,
 if test "$ooc_test_OOC_LIBDIR" = set; then
   ooc_cv_path_ooc_libdir="$OOC_LIBDIR"
 else
-  ooc_cv_path_ooc_libdir="`grep '##PATHS:OOC:LIB##' "$OOC_INIT" | sed -e 's/^[ 	]*//' -e 's/[; 	]*##PATHS:OOC:LIB##.*$//'`"
+  ooc_cv_path_ooc_libdir="`grep '##PATHS:OOC:LIB##' "$OOC_INIT" | head -1 | sed -e 's/^[ 	]*//' -e 's/[; 	]*##PATHS:OOC:LIB##.*$//'`"
   ooc_cv_path_ooc_libdir="`dirname "$ooc_cv_path_ooc_libdir"`"
 fi])dnl
 AC_MSG_RESULT($ooc_cv_path_ooc_libdir)

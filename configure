@@ -657,7 +657,7 @@ else
 if test "$ooc_test_OOC_LIBDIR" = set; then
   ooc_cv_path_ooc_libdir="$OOC_LIBDIR"
 else
-  ooc_cv_path_ooc_libdir="`grep '##PATHS:OOC:LIB##' "$OOC_INIT" | sed -e 's/^[ 	]*//' -e 's/[; 	]*##PATHS:OOC:LIB##.*$//'`"
+  ooc_cv_path_ooc_libdir="`grep '##PATHS:OOC:LIB##' "$OOC_INIT" | head -1 | sed -e 's/^[ 	]*//' -e 's/[; 	]*##PATHS:OOC:LIB##.*$//'`"
   ooc_cv_path_ooc_libdir="`dirname "$ooc_cv_path_ooc_libdir"`"
 fi
 fi
