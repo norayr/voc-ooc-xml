@@ -1,4 +1,4 @@
-(*	$Id: Memory.Mod,v 1.2 2000/07/28 15:12:29 mva Exp $	*)
+(*	$Id: Memory.Mod,v 1.3 2000/08/20 12:59:50 mva Exp $	*)
 MODULE IO:Memory;
 (*  Implementation of a simple file system in memory.
     Copyright (C) 1999, 2000  Michael van Acken
@@ -135,12 +135,8 @@ PROCEDURE NewFile (VAR name: ARRAY OF CHAR): File;
   BEGIN
     NEW (b);
     b. next := NIL;
-    IF (name = "") THEN
-      b. name := NIL
-    ELSE
-      NEW (b. name, Strings.Length (name)+1);
-      COPY (name, b. name^)
-    END;
+    NEW (b. name, Strings.Length (name)+1);
+    COPY (name, b. name^);
     b. length := 0;
     b. dataLength := 512-slack;
     b. openCount := 0;
