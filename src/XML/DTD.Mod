@@ -1,4 +1,4 @@
-(* 	$Id: DTD.Mod,v 1.15 2001/03/20 22:16:32 mva Exp $	 *)
+(* 	$Id: DTD.Mod,v 1.16 2001/03/21 21:09:40 mva Exp $	 *)
 MODULE XML:DTD [OOC_EXTENSIONS];
 (*  Implements the internal representation of a document DTD.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -360,8 +360,8 @@ TYPE
 
 
 TYPE
-  RegexpNode* = POINTER TO RegexpNodeDesc;
-  RegexpNodeDesc* = RECORD
+  RegexpInfo* = POINTER TO RegexpInfoDesc;
+  RegexpInfoDesc* = RECORD
   END;
 
 TYPE
@@ -371,7 +371,7 @@ TYPE
     (DeclarationDesc)
     contentModel-: CP;
     (**The content model of the element.  *)
-    regexp-: RegexpNode;
+    regexp-: RegexpInfo;
     (**Regular expression contructed for @samp{children} element content.  *)
     contentType-: ContentType;
     (**Type of the content model.  *)
@@ -1100,7 +1100,7 @@ PROCEDURE (b: Builder) NewElementDecl* (name: String; contentModel: CP; external
     RETURN elemDecl
   END NewElementDecl;
 
-PROCEDURE (elemDecl: ElementDecl) SetRegexp* (regexp: RegexpNode);
+PROCEDURE (elemDecl: ElementDecl) SetRegexp* (regexp: RegexpInfo);
   BEGIN
     elemDecl. regexp := regexp
   END SetRegexp;
