@@ -60,7 +60,6 @@
   <characters>
     <chars>&#10;  </chars>
     <element-whitespace>unknown</element-whitespace>
-    <predefined-entity>no</predefined-entity>
     <locator>
       <char-index>74</char-index>
       <line>3</line>
@@ -104,7 +103,6 @@
   <characters>
     <chars>&#10;</chars>
     <element-whitespace>unknown</element-whitespace>
-    <predefined-entity>no</predefined-entity>
     <locator>
       <char-index>93</char-index>
       <line>4</line>

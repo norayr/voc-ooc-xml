@@ -26,7 +26,6 @@
     <type>internal general</type>
     <name>general1</name>
     <content>internal</content>
-    <predefined>no</predefined>
     <locator>
       <char-index>43</char-index>
       <line>1</line>
@@ -68,7 +67,6 @@
     <type>internal general</type>
     <name>general4</name>
     <content>internal</content>
-    <predefined>no</predefined>
     <locator>
       <char-index>9</char-index>
       <line>0</line>

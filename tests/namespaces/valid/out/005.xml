@@ -62,7 +62,6 @@
   <characters>
     <chars>&#10;</chars>
     <element-whitespace>unknown</element-whitespace>
-    <predefined-entity>no</predefined-entity>
     <locator>
       <char-index>89</char-index>
       <line>3</line>

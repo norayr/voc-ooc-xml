@@ -53,7 +53,6 @@
   <characters>
     <chars>&#10;  </chars>
     <element-whitespace>unknown</element-whitespace>
-    <predefined-entity>no</predefined-entity>
     <locator>
       <char-index>212</char-index>
       <line>8</line>
@@ -124,7 +123,6 @@
   <characters>
     <chars>&#10;  </chars>
     <element-whitespace>unknown</element-whitespace>
-    <predefined-entity>no</predefined-entity>
     <locator>
       <char-index>227</char-index>
       <line>9</line>
@@ -209,7 +207,6 @@
   <characters>
     <chars>&#10;  </chars>
     <element-whitespace>unknown</element-whitespace>
-    <predefined-entity>no</predefined-entity>
     <locator>
       <char-index>256</char-index>
       <line>10</line>
@@ -300,7 +297,6 @@
   <characters>
     <chars>&#10;</chars>
     <element-whitespace>unknown</element-whitespace>
-    <predefined-entity>no</predefined-entity>
     <locator>
       <char-index>301</char-index>
       <line>11</line>
