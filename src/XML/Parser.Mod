@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.7 2000/07/22 16:18:08 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.8 2000/07/23 17:47:32 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -1235,6 +1235,7 @@ PROCEDURE (p: Parser) ParseDocument*;
      @oparam{eolReplacement} is either space (ASCII 20X), denoting attribute
      value normalization, or newline (ASCII 0AX), denoting normal end of
      line processing.
+     @end itemize
      @end precond  *)
     VAR
       cend: DTD.CharPos;

@@ -85,7 +85,7 @@ TYPE
     codecFactory-: Codec.Factory;
     codec-: Codec.Codec;
     (**Any encoding errors are signalled by incrementing
-       @field{Codec.Codec.invalidChars}.  *)
+       @ofield{Codec.Codec.invalidChars}.  *)
     writer-: Channel.Writer;
     (**Write errors will set the field @ofield{Channel.Writer.res} to 
        something that isn't @oconst{Channel.done}.  *)

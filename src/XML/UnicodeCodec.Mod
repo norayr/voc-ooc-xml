@@ -111,13 +111,13 @@ PROCEDURE (codec: Codec) [ABSTRACT] Decode* (VAR source: ARRAY OF CHAR;
    @itemize
    @item
    @oparam{sourceStart} < @oparam{sourceEnd}, and the character sequence
-   @samp{@oparam{source}{@oparam{sourceStart}, @oparam{sourceEnd}[} holds
+   @samp{@oparam{source}[@oparam{sourceStart}, @oparam{sourceEnd}[} holds
    the characters that are to be decoded.
    
    @item
    @oparam{destEnd}-@oparam{destStart} >= @oconst{maxUCS2EncodingLength}.  In
    other words, there must be enough room in the destination sequence
-   @samp{@oparam{dest}{@oparam{destStart}, @oparam{destEnd}[} to hold at
+   @samp{@oparam{dest}[@oparam{destStart}, @oparam{destEnd}[} to hold at
    least one UCS-4 character, possibly split into a high and low surrogate
    pair.
    
@@ -173,9 +173,9 @@ PROCEDURE (codec: Codec) [ABSTRACT] Decode* (VAR source: ARRAY OF CHAR;
    and U+FFFF are replaced with @oconst{decodeError}.
    
    @item 
-   @samp{@oparam{dest}{@oparam{destStart}, @oparam{destDone}[} holds the
+   @samp{@oparam{dest}[@oparam{destStart}, @oparam{destDone}[} holds the
    result of decoding 
-   @samp{@oparam{source}{@oparam{sourceStart}, @oparam{sourceDone}[}.
+   @samp{@oparam{source}[@oparam{sourceStart}, @oparam{sourceDone}[}.
    @end itemize
    @end postcond *)
   END Decode;
@@ -194,13 +194,13 @@ PROCEDURE (codec: Codec) [ABSTRACT] Encode* (VAR source: ARRAY OF LONGCHAR;
    @itemize
    @item
    @oparam{sourceStart} < @oparam{sourceEnd}, and the Unicode character
-   sequence @samp{@oparam{source}{@oparam{sourceStart}, @oparam{sourceEnd}[}
+   sequence @samp{@oparam{source}[@oparam{sourceStart}, @oparam{sourceEnd}[}
    holds the characters that are to be decoded.
    
    @item
    @oparam{destEnd}-@oparam{destStart} >= @oconst{maxUTF8EncodingLength}.  In
    other words, there must be enough room in the destination sequence
-   @samp{@oparam{dest}{@oparam{destStart}, @oparam{destEnd}[} to hold at
+   @samp{@oparam{dest}[@oparam{destStart}, @oparam{destEnd}[} to hold at
    least one UCS-4 character, possibly encoded as a sequence of 6 bytes.
    
    @item
@@ -255,9 +255,9 @@ PROCEDURE (codec: Codec) [ABSTRACT] Encode* (VAR source: ARRAY OF LONGCHAR;
    to @oconst{encodeError}.
    
    @item 
-   @samp{@oparam{dest}{@oparam{destStart}, @oparam{destDone}[} holds the
+   @samp{@oparam{dest}[@oparam{destStart}, @oparam{destDone}[} holds the
    result of encoding 
-   @samp{@oparam{source}{@oparam{sourceStart}, @oparam{sourceDone}[}.
+   @samp{@oparam{source}[@oparam{sourceStart}, @oparam{sourceDone}[}.
    @end itemize
    @end postcond *)
   END Encode;
@@ -268,13 +268,13 @@ PROCEDURE (codec: Codec) EncodeBOM* (VAR dest: ARRAY OF CHAR;
 (**Appends a byte order mark to @oparam{dest}.  If the field @ofield{codec.bom}
    is @oconst{bomNotApplicable}, nothing is done and @oparam{destDone} is set
    to @oparam{destStart}.  Otherwise, the codec-specific encoding of the
-   byte order mark is appended to @oparam{dest}, and {destDone} is set to
-   the position after the mark.
+   byte order mark is appended to @oparam{dest}, and @oparam{destDone} is set
+   to the position after the mark.
 
    @precond
    @oparam{destEnd}-@oparam{destStart} >= @oconst{maxUTF8EncodingLength}.  In
    other words, there must be enough room in the destination sequence
-   @samp{@oparam{dest}{@oparam{destStart}, @oparam{destEnd}[} to hold at
+   @samp{@oparam{dest}[@oparam{destStart}, @oparam{destEnd}[} to hold at
    least one UCS-4 character, possibly encoded as a sequence of 6 bytes.
    @end precond  *)
   VAR

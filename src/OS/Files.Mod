@@ -1,4 +1,4 @@
-(* 	$Id: Files.Mod,v 1.1.1.1 2000/07/10 15:24:44 mva Exp $	 *)
+(* 	$Id: Files.Mod,v 1.1.1.2 2000/07/10 20:31:52 mva Exp $	 *)
 MODULE OS:Files [FOREIGN "C"; LINK FILE "OS_Files.c" END];
 (*  Manipulation of file and directory entries.
     Copyright (C) 2000  Michael van Acken
@@ -73,7 +73,7 @@ PROCEDURE mkdir* (path: Path; mode: Mode; VAR res: Result);
    error message.  *)
 
 PROCEDURE makedirs* (path: Path; mode: Mode; VAR res: Result);
-(**Recursive directory creation function. Like @oproc{mkdir}}, but makes all
+(**Recursive directory creation function. Like @oproc{mkdir}, but makes all
    intermediate-level directories needed to contain the leaf directory. 
    This procedure does nothing if the target directory already exists.
    If the leaf directory does not exists and cannot be created, an error
