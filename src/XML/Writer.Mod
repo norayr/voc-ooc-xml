@@ -1,7 +1,7 @@
-(*      $Id: Writer.Mod,v 1.12 2001/06/30 21:41:29 mva Exp $   *)
+(*      $Id: Writer.Mod,v 1.13 2001/09/04 20:23:19 mva Exp $   *)
 MODULE XML:Writer [OOC_EXTENSIONS];
 (*  Support for generating XML documents.
-    Copyright (C) 2000, 2001  Michael van Acken
+    Copyright (C) 2000-2002  Michael van Acken
 
     This module is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License
@@ -50,7 +50,7 @@ TYPE
 
 TYPE
   Writer* = POINTER TO WriterDesc;
-  WriterDesc = RECORD
+  WriterDesc* = RECORD
   (**Note: Output is buffered.  Calling @oproc{Writer.EndOfText} will also
      flush the buffers.  *)
     (UnicodeBuffer.OutputDesc)
@@ -69,15 +69,13 @@ TYPE
   END;
 
 
-PROCEDURE Init (w: Writer; new: BOOLEAN;
-                writer: Channel.Writer; codecFactory: Codec.Factory;
-                writeBOM: BOOLEAN; indentLevel: LONGINT);
+PROCEDURE Init* (w: Writer; 
+                 writer: Channel.Writer; codecFactory: Codec.Factory;
+                 writeBOM: BOOLEAN; indentLevel: LONGINT);
   BEGIN
-    IF new THEN
-      UnicodeBuffer.InitOutput (w, TRUE, writer, codecFactory, writeBOM);
-      NEW (w. elementStack, 8);
-    END;
-      
+    UnicodeBuffer.InitOutput (w, TRUE, writer, codecFactory, writeBOM);
+    NEW (w. elementStack, 8);
+    
     w. indentLevel := indentLevel;
     w. indent := 0;
     w. emptyElementHTML := FALSE;
@@ -97,7 +95,7 @@ PROCEDURE New* (writer: Channel.Writer; codecFactory: Codec.Factory;
     w: Writer;
   BEGIN
     NEW (w);
-    Init (w, TRUE, writer, codecFactory, writeBOM, indentLevel);
+    Init (w, writer, codecFactory, writeBOM, indentLevel);
     RETURN w
   END New;
 
