@@ -1,4 +1,4 @@
-(* 	$Id: Hierarchical.Mod,v 1.3 2000/08/27 15:14:04 mva Exp $	 *)
+(* 	$Id: Hierarchical.Mod,v 1.4 2001/10/17 23:09:51 mva Exp $	 *)
 MODULE URI:Scheme:Hierarchical;
 (*  Implementation of the generic hierarchical URI.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -456,7 +456,7 @@ PROCEDURE (uri: Generic) ResolveRelative* (baseURI: URI.HierarchicalURI);
       
       RemoveDot (uri. pathList);
       WHILE RemoveDotDot (uri. pathList) DO END;
-      uri. absolutePath := TRUE
+      uri. absolutePath := copy(Generic). absolutePath;
     END    
   END ResolveRelative;
 
