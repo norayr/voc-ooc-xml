@@ -1,20 +1,27 @@
-I've uploaded the sources of the new XML parser to the SourceForge CVS
-repository.  The sources include the XML parser itself, encoder and
-decoder for the most prominent Unicode encodings, an URI library, and
-some auxiliary OS level functions.
+The libxml sources include the XML parser itself, encoder and decoder
+for the most prominent Unicode encodings, an URI library, and some
+auxiliary OS level functions.  Both sources and test cases are
+included in the libxml tarball.
 
 At the moment, the parser succeeds for all well-formedness tests I can
 lay may hands on (which are approx. 750 different test cases).  With
 regard to the XML Information Set, the parser passes all core
 information items and almost all periphereal items to the application.
-In the future, I will add support for namespaces (near future) and
-validation (far or very far future).  Compared to the old XML parser,
-this implementation's design is simpler and the new parser is much
-faster (2-4 times faster, depending on the type of input).  Besides
-the speed improvement, it is much more widely tested and should be
-compliant to the XML 1.0 spec and the current errata list in all
-points.  Another point some people will like: the sources are
-published under the LGPL, _not_ GPL.
+Support for XML Namespaces is implemented as a specialized builder
+module that is inserted between the "real" builder and the parser.
+See module XML:Builder:Namespaces for details.
+
+Similar to namespace support, validation should also be implemented as
+a separate builder module, with only a few low-level scanner and
+parser related checks in XML:Parser.  I'm looking for a volunteer to
+do the implementation.
+
+Compared to the old XML parser, this implementation's design is
+simpler and the new parser is much faster (2-4 times faster, depending
+on the type of input).  Besides the speed improvement, it is much more
+widely tested and should be compliant to the XML 1.0 spec and the
+current errata list in all points.  Another point some people will
+like: the sources are published under the LGPL, _not_ GPL.
 
 
 This is development stuff and I expect it is only interesting to a
@@ -32,17 +39,11 @@ is probably the interface of your choice.
 
 There is no configure magic, which means you must add the directory to
 the compiler's search path yourself (libxml/src must be included for
-*.Mod and *.c).  To run the test cases, grab
-
-  http://pweb.de.uu.net/vanacken.do/ooc/oo2c-patches/oo2c_32-1.5.2-1.5.2.9.diff.gz
-
-This compiler patch fixes a glitch in the error reporting of module
-`Files' that breaks some of the tests.  Set the environment variable
-OOC to point to your oo2c compiler.  If your diff is not GNU, remove
-the option "-u" in libxml/tests/Makefile.  Then, do "make test" in the
-root directory.  (I'm not sure what happens if your make is not of the
-GNU persuasion.  I've tried this setup under both Linux and SunOS
-5.6.)
+*.Mod and *.c).  To run the test cases, please use oo2c-1.5.3 or
+later.  Set the environment variable OOC to point to your oo2c
+compiler.  Then, do "make test" in the root directory.  (I'm not sure
+what happens if your make is not of the GNU persuasion.  I've tried
+this setup under both Linux and SunOS 5.6.)
 
 The C compiler emits some warnings about missing type casts for
 `XML:Parser.c'.  They can be safely ignored.

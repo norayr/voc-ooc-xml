@@ -1,4 +1,4 @@
-(* 	$Id: CharClass.Mod,v 1.1.1.1 2000/07/10 15:24:40 mva Exp $	 *)
+(* 	$Id: CharClass.Mod,v 1.1.1.2 2000/07/10 20:31:52 mva Exp $	 *)
 MODULE URI:CharClass;
 (*  Predicates and auxiliary functions for URI character classes.
     Copyright (C) 2000  Michael van Acken
@@ -82,6 +82,11 @@ PROCEDURE IsMember* (ch: CHAR; set: ARRAY OF CHAR): BOOLEAN;
     END;
     RETURN (set[i] # 0X)
   END IsMember;
+
+PROCEDURE IsReserved* (ch: CHAR): BOOLEAN;
+  BEGIN
+    RETURN IsMember (ch, reserved)
+  END IsReserved;
 
 PROCEDURE SkipReserved* (VAR str: ARRAY OF CHAR; VAR pos: INTEGER): BOOLEAN;
   BEGIN

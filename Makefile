@@ -11,5 +11,4 @@ test: mkdirs
 	cd tests && ${MAKE} test
 
 dist: clean
-	f="ooc-libxml-`date +%Y%m%d`.tar"; cd .. && tar -c -v -f $$f --exclude libxml/tests libxml && bzip2 -9 $$f
-	f="ooc-libxml-`date +%Y%m%d`-tests.tar"; cd .. && tar -c -v -f $$f libxml/tests && bzip2 -9 $$f
+	f="ooc-libxml-`date +%Y%m%d`.tar"; cd .. && tar -c -v -f $$f libxml && bzip2 -9 $$f

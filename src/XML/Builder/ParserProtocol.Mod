@@ -1,4 +1,4 @@
-(*      $Id: ParserProtocol.Mod,v 1.4 2000/07/12 22:28:05 mva Exp $   *)
+(*      $Id: ParserProtocol.Mod,v 1.5 2000/07/22 16:18:31 mva Exp $   *)
 MODULE XML:Builder:ParserProtocol [OOC_EXTENSIONS];
 (*  Translates XML document to canonical XML.
     Copyright (C) 2000  Michael van Acken
@@ -167,13 +167,17 @@ PROCEDURE Entity (b: Builder; entity: DTD.Entity; writePos: BOOLEAN);
     w. EndTag ("entity", TRUE);
   END Entity;
 
-PROCEDURE NamespaceURI (w: Writer.Writer; namespaceURI: DTD.NamespaceURI);
+PROCEDURE NamespaceDeclaration (w: Writer.Writer; namespaceDecl: DTD.NamespaceDeclaration);
   BEGIN
-    w. StartTag ("namespace-uri");
-    String (w, "prefix", namespaceURI. prefix);
-    WriteURI (w, "uri", namespaceURI. uri);
-    w. EndTag ("namespace-uri", TRUE)
-  END NamespaceURI;
+    w. StartTag ("namespace-declaration");
+    String (w, "prefix", namespaceDecl. prefix);
+    IF (namespaceDecl. uri # NIL) THEN
+      w. StartTag ("namespace-uri");
+      w. WriteLatin1 (namespaceDecl. uri^);
+      w. EndTag ("namespace-uri", FALSE)
+    END;
+    w. EndTag ("namespace-declaration", TRUE)
+  END NamespaceDeclaration;
 
 
 PROCEDURE (b: Builder) SetLocator* (locator: Locator.Locator);
@@ -226,20 +230,20 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity);
 
 
 
-PROCEDURE (b: Builder) StartElement* (namespaceURI: DTD.NamespaceURI; 
+PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration; 
                                       localName: DTD.String);
   BEGIN
     b. w. NewLine;
     b. w. StartTag ("start-element");
-    IF (namespaceURI # NIL) THEN
-      NamespaceURI (b. w, namespaceURI)
+    IF (namespaceDecl # NIL) THEN
+      NamespaceDeclaration (b. w, namespaceDecl)
     END;
     String (b. w, "local-name", localName);
     WritePos (b);
     b. w. EndTag ("start-element", TRUE);
   END StartElement;
 
-PROCEDURE (b: Builder) Attribute* (namespaceURI: DTD.NamespaceURI; 
+PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration; 
                                    localName: DTD.String;
                                    attrDecl: DTD.AttrDecl;
                                    value: DTD.AttValue;
@@ -247,8 +251,8 @@ PROCEDURE (b: Builder) Attribute* (namespaceURI: DTD.NamespaceURI;
   BEGIN
     b. w. NewLine;
     b. w. StartTag ("attribute");
-    IF (namespaceURI # NIL) THEN
-      NamespaceURI (b. w, namespaceURI)
+    IF (namespaceDecl # NIL) THEN
+      NamespaceDeclaration (b. w, namespaceDecl)
     END;
     String (b. w, "local-name", localName);
     IF (attrDecl # NIL) THEN
@@ -283,6 +287,12 @@ PROCEDURE (b: Builder) Attribute* (namespaceURI: DTD.NamespaceURI;
     b. w. EndTag ("attribute", TRUE);
   END Attribute;
 
+PROCEDURE (b: Builder) NamespaceDeclaration* (namespaceDecl: DTD.NamespaceDeclaration);
+  BEGIN
+    b. w. NewLine;
+    NamespaceDeclaration (b. w, namespaceDecl)
+  END NamespaceDeclaration;
+
 PROCEDURE (b: Builder) AttributesDone*;
   BEGIN
     b. w. NewLine;
@@ -303,13 +313,13 @@ PROCEDURE (b: Builder) SkippedEntity* (name: DTD.String; referent: DTD.Entity);
     b. w. EndTag ("skipped-entity", TRUE);
   END SkippedEntity;
 
-PROCEDURE (b: Builder) EndElement* (namespaceURI: DTD.NamespaceURI; 
+PROCEDURE (b: Builder) EndElement* (namespaceDecl: DTD.NamespaceDeclaration; 
                                     localName: DTD.String);
   BEGIN
     b. w. NewLine;
     b. w. StartTag ("end-element");
-    IF (namespaceURI # NIL) THEN
-      NamespaceURI (b. w, namespaceURI)
+    IF (namespaceDecl # NIL) THEN
+      NamespaceDeclaration (b. w, namespaceDecl)
     END;
     String (b. w, "local-name", localName);
     WritePos (b);
