@@ -1,4 +1,4 @@
-subdirs=codecs xmltest sun oasis miscxml bulk
+subdirs=uri codecs xmltest sun oasis miscxml bulk
 
 export DIFF=diff -u
 

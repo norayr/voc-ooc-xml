@@ -1,4 +1,4 @@
-(* 	$Id: Strings.Mod,v 1.4 1999/10/03 11:45:07 ooc-devel Exp $	 *)
+(* 	$Id: Path.Mod,v 1.1.1.1 2000/07/10 15:24:44 mva Exp $	 *)
 MODULE OS:Path;
 (*  Manipulation of file and directory names.
     Copyright (C) 2000  Michael van Acken

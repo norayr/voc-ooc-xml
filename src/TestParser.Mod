@@ -1,4 +1,4 @@
-(*      $Id: TestParser.Mod,v 1.8 1999/11/29 14:30:16 ooc-devel Exp $   *)
+(*      $Id: TestParser.Mod,v 1.1.1.1 2000/07/10 15:24:30 mva Exp $   *)
 MODULE TestParser;
 (*  Converts XML document into its canonical representation.
     Copyright (C) 2000  Michael van Acken

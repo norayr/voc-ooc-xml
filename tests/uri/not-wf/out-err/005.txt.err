@@ -1,0 +1,3 @@
+Error: This URI scheme does not support a query component
+uri=file:/foobar?query
+uri_pos=12

@@ -1,4 +1,4 @@
-(*      $Id: CanonicalUTF8.Mod,v 1.3 1999/09/05 01:04:57 acken Exp $   *)
+(*      $Id: ParserProtocol.Mod,v 1.1.1.1 2000/07/10 15:24:39 mva Exp $   *)
 MODULE XML:Builder:ParserProtocol [OOC_EXTENSIONS];
 (*  Translates XML document to canonical XML.
     Copyright (C) 2000  Michael van Acken

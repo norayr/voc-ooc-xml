@@ -1,4 +1,4 @@
-(* 	$Id: Error.Mod,v 1.1 1999/12/29 14:50:31 ooc-devel Exp $	 *)
+(* 	$Id: Error.Mod,v 1.1.1.1 2000/07/10 15:24:31 mva Exp $	 *)
 MODULE XML:Error;
 (*  Creates lists of error messages and converts them to text.
     Copyright (C) 2000  Michael van Acken

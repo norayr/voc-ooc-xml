@@ -1,0 +1,3 @@
+Error: Illegal character in scheme component
+uri=foo_bar:/
+uri_pos=3

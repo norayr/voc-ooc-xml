@@ -1,4 +1,4 @@
-(* 	$Id: Strings.Mod,v 1.4 1999/10/03 11:45:07 ooc-devel Exp $	 *)
+(* 	$Id: ProcessManagment.Mod,v 1.1.1.1 2000/07/10 15:24:44 mva Exp $	 *)
 MODULE OS:ProcessManagment [FOREIGN "C"; LINK FILE "OS_ProcessManagment.c" END];
 (*  Creation and managment of processes.
     Copyright (C) 2000  Michael van Acken
