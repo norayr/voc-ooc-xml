@@ -1,4 +1,4 @@
-(*      $Id: TestParser.Mod,v 1.7 2001/03/18 00:09:32 mva Exp $   *)
+(*      $Id: TestParser.Mod,v 1.8 2001/03/19 00:22:32 mva Exp $   *)
 MODULE TestParser;
 (*  Converts XML document into its canonical representation.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -34,7 +34,7 @@ VAR
   namespaceSupport, validating, dontFollowEntityRefs: BOOLEAN;
   format: SHORTINT;
   canon: Parser.Parser;
-  builder: Builder.Builder;
+  builder, outputBuilder: Builder.Builder;
   str: ARRAY 1024 OF CHAR;
 
 PROCEDURE CreateParser(): Parser.Parser;
@@ -88,6 +88,7 @@ PROCEDURE CreateParser(): Parser.Parser;
     ELSIF (mode = modeParserProtocol) THEN
       builder := ParserProtocol.New (StdChannels.stdout, UTF8.factory)
     END;
+    outputBuilder := builder;
     
     IF validating THEN
       dontFollowEntityRefs := FALSE;
@@ -111,16 +112,16 @@ BEGIN
   canon := CreateParser();
   canon. ParseDocument;
   
-  WITH builder: Canonical.Builder DO
-    IF (builder. out. writer. res # Channel.done) THEN
+  WITH outputBuilder: Canonical.Builder DO
+    IF (outputBuilder. out. writer. res # Channel.done) THEN
       Err.String ("Error: ");
-      builder. out. writer. res. GetText (str);
+      outputBuilder. out. writer. res. GetText (str);
       Err.String (str);
       Err.Ln;
       HALT (1)
-    ELSIF (builder. out. codec. invalidChars # 0) THEN
+    ELSIF (outputBuilder. out. codec. invalidChars # 0) THEN
       Err.String ("Error: ");
-      Err.LongInt (builder. out. codec. invalidChars, 0);
+      Err.LongInt (outputBuilder. out. codec. invalidChars, 0);
       Err.String (" invalid characters were written");
       Err.Ln;
       HALT (1)
