@@ -1,4 +1,4 @@
-(*      $Id: Canonical.Mod,v 1.5 2000/07/23 17:48:35 mva Exp $   *)
+(*      $Id: Canonical.Mod,v 1.6 2000/07/31 18:38:31 mva Exp $   *)
 MODULE XML:Builder:Canonical [OOC_EXTENSIONS];
 (*  Translates XML document to canonical XML.
     Copyright (C) 2000  Michael van Acken
@@ -81,17 +81,17 @@ PROCEDURE WriteQuoted (out: UnicodeBuffer.Output; str[NO_COPY]: DTD.StringVar;
           END
         END
       END;
-      out. WriteI (str, start, i);
+      out. Write16I (str, start, i);
       
       IF (i # end) THEN
         CASE str[i] OF
-        | "&": out. Write ("&amp;")
-        | "<": out. Write ("&lt;")
-        | ">": out. Write ("&gt;")
-        | '"': out. Write ("&quot;")
-        | 09X: out. Write ("&#9;")
-        | 0AX: out. Write ("&#10;")
-        | 0DX: out. Write ("&#13;")
+        | "&": out. Write8 ("&amp;")
+        | "<": out. Write8 ("&lt;")
+        | ">": out. Write8 ("&gt;")
+        | '"': out. Write8 ("&quot;")
+        | 09X: out. Write8 ("&#9;")
+        | 0AX: out. Write8 ("&#10;")
+        | 0DX: out. Write8 ("&#13;")
         END;
         INC (i)
       END;
@@ -128,31 +128,31 @@ PROCEDURE WriteDTD (b: Builder; root: DTD.String);
     END Remove;
   
   BEGIN
-    b. out. WriteLatin1 ("<!DOCTYPE ");
-    b. out. Write (root^);
-    b. out. WriteLatin1 (" ["+Ascii.lf);
+    b. out. Write8 ("<!DOCTYPE ");
+    b. out. Write16 (root^);
+    b. out. Write8 (" ["+Ascii.lf);
     WHILE (b. notationList # NIL) DO
       node := GetNext();
       Remove (b. notationList, node);
-      b. out. WriteLatin1 ("<!NOTATION ");
-      b. out. Write (node. notation. name^);
+      b. out. Write8 ("<!NOTATION ");
+      b. out. Write16 (node. notation. name^);
       IF (node. notation. public # NIL) THEN
-        b. out. WriteLatin1 (" PUBLIC '");
-        b. out. Write (node. notation. public^);
-        b. out. WriteLatin1 ("'");
+        b. out. Write8 (" PUBLIC '");
+        b. out. Write16 (node. notation. public^);
+        b. out. Write8 ("'");
         IF (node. notation. system # NIL) THEN
-          b. out. WriteLatin1 (" '");
-          b. out. Write (node. notation. system^);
-          b. out. WriteLatin1 ("'")
+          b. out. Write8 (" '");
+          b. out. Write16 (node. notation. system^);
+          b. out. Write8 ("'")
         END
       ELSE
-        b. out. WriteLatin1 (" SYSTEM '");
-        b. out. Write (node. notation. system^);
-        b. out. WriteLatin1 ("'")
+        b. out. Write8 (" SYSTEM '");
+        b. out. Write16 (node. notation. system^);
+        b. out. Write8 ("'")
       END;
-      b. out. Write (">"+Ascii.lf)
+      b. out. Write8 (">"+Ascii.lf)
     END;
-    b. out. Write ("]>"+Ascii.lf)
+    b. out. Write8 ("]>"+Ascii.lf)
   END WriteDTD;
 
 
@@ -174,8 +174,8 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
     END;
     b. lenAttrList := 0;
     
-    b. out. WriteLatin1 ("<");
-    b. out. Write (localName^);
+    b. out. Write8 ("<");
+    b. out. Write16 (localName^);
   END StartElement;
 
 PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration; 
@@ -222,23 +222,23 @@ PROCEDURE (b: Builder) AttributesDone*;
   BEGIN
     FOR i := 0 TO b. lenAttrList-1 DO
       j := GetMin (i);
-      b. out. WriteLatin1 (" ");
-      b. out. Write (b. attrList[j]. name^);
-      b. out. WriteLatin1 ('="');
+      b. out. Write8 (" ");
+      b. out. Write16 (b. attrList[j]. name^);
+      b. out. Write8 ('="');
       str := b. attrList[j]. value. Flatten (b. attrList[j]. decl);
       WriteQuoted (b. out, str^, 0, LongStrings.Length (str^));
-      b. out. WriteLatin1 ('"');
+      b. out. Write8 ('"');
       b. attrList[j] := b. attrList[i]
     END;
-    b. out. WriteLatin1 (">")
+    b. out. Write8 (">")
   END AttributesDone;
 
 PROCEDURE (b: Builder) EndElement* (namespaceDecl: DTD.NamespaceDeclaration;
                                     localName: DTD.String);
   BEGIN
-    b. out. WriteLatin1 ("</");
-    b. out. Write (localName^);
-    b. out. WriteLatin1 (">");
+    b. out. Write8 ("</");
+    b. out. Write16 (localName^);
+    b. out. Write8 (">");
   END EndElement;
 
 PROCEDURE (b: Builder) Notation* (notation: DTD.Notation);
@@ -257,11 +257,11 @@ PROCEDURE (b: Builder) ProcessingInstruction* (
     VAR content: DTD.StringVar; contentStart, contentEnd: DTD.CharPos;
     baseURI: URI.URI);
   BEGIN
-    b. out. WriteLatin1 ("<?");
-    b. out. Write (target^);
-    b. out. WriteLatin1 (" ");
-    b. out. WriteI (content, contentStart, contentEnd);
-    b. out. WriteLatin1 ("?>");
+    b. out. Write8 ("<?");
+    b. out. Write16 (target^);
+    b. out. Write8 (" ");
+    b. out. Write16I (content, contentStart, contentEnd);
+    b. out. Write8 ("?>");
   END ProcessingInstruction;
 
 PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
