@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.28 2001/03/21 21:11:17 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.29 2001/03/21 22:41:32 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -1835,7 +1835,7 @@ PROCEDURE (p: Parser) ParseDocument*;
             ELSE
               Flush;
               attValue. Append (EntityRef (TRUE, FALSE));
-              cstart := cpos
+              cstart := cpos; cdelta := 0
             END;
           ELSE
             IF (chars[cpos] = endChar) THEN
@@ -1973,6 +1973,173 @@ PROCEDURE (p: Parser) ParseDocument*;
       END
     END Expand;
 
+  PROCEDURE ^element;
+  
+  PROCEDURE content;
+  (* post: chars[cpos] # Buffer.markerEOB *)
+
+    PROCEDURE CharData;
+    (* This procedure matches character data and character references.  The
+       latter are included for efficiency reasons.  A text sequence with
+       with embedded character references will cause only a single up 
+       call.  *)
+      VAR
+        elementWhitespace: DTD.ElementWhitespaceType;
+      BEGIN
+        StorePosition (p. l^);
+        cstart := cpos; cdelta := 0;
+        elementWhitespace := DTD.elementWhitespaceUnknown;
+
+        LOOP  (* loop invariant: cdelta = 0 *)
+          (* this is a very specialized version of the loop down below; it
+             covers the case where `cdelta' stays zero, which means that
+             no characters must be copied *)
+          CASE chars[cpos] OF
+          | 00X..1FX, Buffer.markerEOB:
+            IF (chars # p. in. chars) THEN
+              INC (cpos)
+            ELSE
+              ControlChar (Ascii.lf);
+              IF (cdelta # 0) THEN
+                EXIT
+              END
+            END
+          | " ":
+            INC (cpos)
+          | "<", "&", Buffer.markerEOD:
+            EXIT
+          | "]":
+            IF LookingAt ("]]>", followedByAny) THEN
+              EXIT
+            ELSE
+              elementWhitespace := DTD.elementWhitespaceNo;
+              INC (cpos)
+            END
+          ELSE
+            elementWhitespace := DTD.elementWhitespaceNo;
+            INC (cpos)
+          END
+        END;
+
+        LOOP
+          CASE chars[cpos] OF
+          | 00X..1FX, Buffer.markerEOB:
+            IF (chars # p. in. chars) THEN
+              (* when expanding an entity reference, no translation of
+                 end of line characters is done; the reason for this is that
+                 they have already been normalized when parsing the entity
+                 value, and any remaining CR/LF characters have been
+                 explicitly introduced through character references *)
+              chars[cpos-cdelta] := chars[cpos]; INC (cpos)
+            ELSE
+              ControlChar (Ascii.lf)
+            END
+          | " ":
+            chars[cpos-cdelta] := chars[cpos]; INC (cpos)
+          | "<", Buffer.markerEOD:
+            EXIT
+          | "&":
+            IF LookingAt ("&#", followedByAny) THEN (* character reference *)
+              elementWhitespace := DTD.elementWhitespaceNo;
+              CharRef()
+            ELSE
+              EXIT
+            END
+          | "]":
+            IF LookingAt ("]]>", followedByAny) THEN
+              Err (invalidCloseCDATA)
+            END;
+            elementWhitespace := DTD.elementWhitespaceNo;
+            chars[cpos-cdelta] := chars[cpos]; INC (cpos)
+          ELSE
+            elementWhitespace := DTD.elementWhitespaceNo;
+            chars[cpos-cdelta] := chars[cpos]; INC (cpos)
+          END
+        END;
+
+        IF (cpos-cdelta # cstart) THEN
+          p. builder. Characters (chars^, cstart, cpos-cdelta, (* callback *)
+                                  elementWhitespace)
+        END
+      END CharData;
+
+    PROCEDURE FollowEntityRef (entityRef: DTD.EntityRef);
+      VAR
+        decl: DTD.Declaration;
+        entity: DTD.Entity;
+        pos: Locator.Position;
+      BEGIN
+        decl := dtd. geNamespace. Get (entityRef. name);
+        entity := NIL;
+        IF (decl # NIL) THEN
+          entity := decl(DTD.Entity)
+        END;
+        StorePosition (p. l^);
+        IF (chars = p. in. chars) THEN
+          DecLength (p. l^, LongStrings.Length (entityRef. name^)+2)
+        END;
+
+        IF (entity = NIL) THEN
+          ErrPos (noSuchGeneralEntity, p. l^);
+          p. lastError. SetLStringAttrib ("name",
+                                       Msg.GetLStringPtr (entityRef. name^))
+        ELSIF entity. expanding THEN
+          Err (recursiveGeneralEntity);
+          p. lastError. SetLStringAttrib ("name",
+                                       Msg.GetLStringPtr (entityRef. name^))
+        ELSIF (entity. type = DTD.entityExternalGeneral) &
+              ~p. followExternalRef THEN
+          p. builder. SkippedEntity (entityRef. name, entity) (* callback *)
+        ELSE
+          p. builder. StartEntity (entity); (* callback *)
+          PushEntity (entity, TRUE);
+          StorePosition (pos);
+          (* recursivly enter replacement; FIXME: endless loop? *)
+          IF (entity. type = DTD.entityExternalGeneral) &
+             LookingAt ("<?xml", followedByNonName) THEN
+            XMLDecl (decl(DTD.ExternalEntity))
+          END;
+          content;
+          IF (chars[cpos] # Buffer.markerEOD) THEN
+            ErrPos (invalidGEReplacement, pos);
+            p. lastError. SetLStringAttrib ("name",
+                                        Msg.GetLStringPtr (entityRef. name^))
+          END;
+          PopEntity;
+          StorePosition (p. l^);
+          p. builder. EndEntity (entity); (* callback *)
+        END
+      END FollowEntityRef;
+
+    BEGIN
+      LOOP
+        CASE chars[cpos] OF
+        | Buffer.markerEOD:
+          EXIT
+        | "<":
+          IF LookingAt ("<!--", followedByAny) THEN
+            Comment
+          ELSIF LookingAt ("<![CDATA[", followedByAny) THEN
+            CDSect
+          ELSIF LookingAt ("<?", followedByAny) THEN
+            PI
+          ELSIF (chars[cpos+1] # "/") THEN
+            element
+          ELSE
+            EXIT
+          END;
+        | "&":
+          IF LookingAt ("&#", followedByAny) THEN (* character reference *)
+            CharData
+          ELSE
+            FollowEntityRef (EntityRef (FALSE, TRUE))
+          END
+        ELSE
+          CharData
+        END
+      END
+    END content;
+
   PROCEDURE element;
     VAR
       emptyElementTag: BOOLEAN;
@@ -1983,171 +2150,6 @@ PROCEDURE (p: Parser) ParseDocument*;
       attrDecl: DTD.AttrDecl;
       pos: Locator.Position;
       
-    PROCEDURE content;
-    (* post: chars[cpos] # Buffer.markerEOB *)
-
-      PROCEDURE CharData;
-      (* This procedure matches character data and character references.  The
-         latter are included for efficiency reasons.  A text sequence with
-         with embedded character references will cause only a single up 
-         call.  *)
-        VAR
-          elementWhitespace: DTD.ElementWhitespaceType;
-        BEGIN
-          StorePosition (p. l^);
-          cstart := cpos; cdelta := 0;
-          elementWhitespace := DTD.elementWhitespaceUnknown;
-          
-          LOOP  (* loop invariant: cdelta = 0 *)
-            (* this is a very specialized version of the loop down below; it
-               covers the case where `cdelta' stays zero, which means that
-               no characters must be copied *)
-            CASE chars[cpos] OF
-            | 00X..1FX, Buffer.markerEOB:
-              IF (chars # p. in. chars) THEN
-                INC (cpos)
-              ELSE
-                ControlChar (Ascii.lf);
-                IF (cdelta # 0) THEN
-                  EXIT
-                END
-              END
-            | " ":
-              INC (cpos)
-            | "<", "&", Buffer.markerEOD:
-              EXIT
-            | "]":
-              IF LookingAt ("]]>", followedByAny) THEN
-                EXIT
-              ELSE
-                elementWhitespace := DTD.elementWhitespaceNo;
-                INC (cpos)
-              END
-            ELSE
-              elementWhitespace := DTD.elementWhitespaceNo;
-              INC (cpos)
-            END
-          END;
-          
-          LOOP
-            CASE chars[cpos] OF
-            | 00X..1FX, Buffer.markerEOB:
-              IF (chars # p. in. chars) THEN
-                (* when expanding an entity reference, no translation of
-                   end of line characters is done; the reason for this is that
-                   they have already been normalized when parsing the entity
-                   value, and any remaining CR/LF characters have been
-                   explicitly introduced through character references *)
-                chars[cpos-cdelta] := chars[cpos]; INC (cpos)
-              ELSE
-                ControlChar (Ascii.lf)
-              END
-            | " ":
-              chars[cpos-cdelta] := chars[cpos]; INC (cpos)
-            | "<", Buffer.markerEOD:
-              EXIT
-            | "&":
-              IF LookingAt ("&#", followedByAny) THEN (* character reference *)
-                elementWhitespace := DTD.elementWhitespaceNo;
-                CharRef()
-              ELSE
-                EXIT
-              END
-            | "]":
-              IF LookingAt ("]]>", followedByAny) THEN
-                Err (invalidCloseCDATA)
-              END;
-              elementWhitespace := DTD.elementWhitespaceNo;
-              chars[cpos-cdelta] := chars[cpos]; INC (cpos)
-            ELSE
-              elementWhitespace := DTD.elementWhitespaceNo;
-              chars[cpos-cdelta] := chars[cpos]; INC (cpos)
-            END
-          END;
-          
-          IF (cpos-cdelta # cstart) THEN
-            p. builder. Characters (chars^, cstart, cpos-cdelta, (* callback *)
-                                    elementWhitespace)
-          END
-        END CharData;
-
-      PROCEDURE FollowEntityRef (entityRef: DTD.EntityRef);
-        VAR
-          decl: DTD.Declaration;
-          entity: DTD.Entity;
-          pos: Locator.Position;
-        BEGIN
-          decl := dtd. geNamespace. Get (entityRef. name);
-          entity := NIL;
-          IF (decl # NIL) THEN
-            entity := decl(DTD.Entity)
-          END;
-          StorePosition (p. l^);
-          IF (chars = p. in. chars) THEN
-            DecLength (p. l^, LongStrings.Length (entityRef. name^)+2)
-          END;
-          
-          IF (entity = NIL) THEN
-            ErrPos (noSuchGeneralEntity, p. l^);
-            p. lastError. SetLStringAttrib ("name",
-                                         Msg.GetLStringPtr (entityRef. name^))
-          ELSIF entity. expanding THEN
-            Err (recursiveGeneralEntity);
-            p. lastError. SetLStringAttrib ("name",
-                                         Msg.GetLStringPtr (entityRef. name^))
-          ELSIF (entity. type = DTD.entityExternalGeneral) &
-                ~p. followExternalRef THEN
-            p. builder. SkippedEntity (entityRef. name, entity) (* callback *)
-          ELSE
-            p. builder. StartEntity (entity); (* callback *)
-            PushEntity (entity, TRUE);
-            StorePosition (pos);
-            (* recursivly enter replacement; FIXME: endless loop? *)
-            IF (entity. type = DTD.entityExternalGeneral) &
-               LookingAt ("<?xml", followedByNonName) THEN
-              XMLDecl (decl(DTD.ExternalEntity))
-            END;
-            content;
-            IF (chars[cpos] # Buffer.markerEOD) THEN
-              ErrPos (invalidGEReplacement, pos);
-              p. lastError. SetLStringAttrib ("name",
-                                          Msg.GetLStringPtr (entityRef. name^))
-            END;
-            PopEntity;
-            StorePosition (p. l^);
-            p. builder. EndEntity (entity); (* callback *)
-          END
-        END FollowEntityRef;
-      
-      BEGIN
-        LOOP
-          CASE chars[cpos] OF
-          | Buffer.markerEOD:
-            EXIT
-          | "<":
-            IF LookingAt ("<!--", followedByAny) THEN
-              Comment
-            ELSIF LookingAt ("<![CDATA[", followedByAny) THEN
-              CDSect
-            ELSIF LookingAt ("<?", followedByAny) THEN
-              PI
-            ELSIF (chars[cpos+1] # "/") THEN
-              element
-            ELSE
-              EXIT
-            END;
-          | "&":
-            IF LookingAt ("&#", followedByAny) THEN (* character reference *)
-              CharData
-            ELSE
-              FollowEntityRef (EntityRef (FALSE, TRUE))
-            END
-          ELSE
-            CharData
-          END
-        END
-      END content;
-    
     PROCEDURE NoteName (name: DTD.String);
       VAR
         newList: NameList;
@@ -2933,6 +2935,51 @@ PROCEDURE (p: Parser) ParseDocument*;
         externalSubset: DTD.ExternalEntity;
         decl: DTD.Declaration;
         attr: DTD.AttrDecl;
+      
+      PROCEDURE CheckGeneralEntities;
+        VAR
+          decl: DTD.Declaration;
+          oldBuilder: Builder.Builder;
+          oldErrCount, len: LONGINT;
+          oldValidating: BOOLEAN;
+          pos: Locator.Position;
+        BEGIN
+          (* internal general entities must match the `content' production;
+             create a sandbox and parse every internal general entity inside
+             this sandbox *)
+          oldBuilder := p. builder;
+          oldErrCount := p. errList. msgCount;
+          oldValidating := p. validating;
+          StorePosition (pos);
+          
+          p. builder := Builder.New();
+          decl := p. dtd. geNamespace. declList;
+          WHILE (decl # NIL) DO
+            IF (decl(DTD.Entity). type = DTD.entityInternalGeneral) THEN
+              len := LongStrings.Length (decl. name^)+2;
+              INC (cpos, len); PushEntity (decl(DTD.Entity), TRUE);
+              
+              content;
+              IF (chars[cpos] # Buffer.markerEOD) THEN
+                ErrPos (invalidGEReplacement, pos);
+                p. lastError. SetLStringAttrib ("name",
+                                               Msg.GetLStringPtr (decl. name^))
+              END;
+              
+              PopEntity; DEC (cpos, len);
+            END;
+            decl := decl. next
+          END;
+          
+          (* replace the sandbox with the usual environment *)
+          p. validating := oldValidating;
+          IF (p. errList. msgCount = oldErrCount) THEN (* no errors found *)
+            p. builder := oldBuilder
+          ELSE                           (* some WFC was detected *)
+            p. builder := Builder.New()
+          END
+        END CheckGeneralEntities;
+      
       BEGIN  (* pre: looking at "<!DOCTYPE"+NonName *)
         p. inDTD := TRUE;
         
@@ -3006,6 +3053,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         END;
         
         dtd. AttachAttributes;
+        CheckGeneralEntities;
         StorePosition (p. l^);
         p. builder. EndDTD (externalSubset, p. readCompleteDTD); (* callback *)
         p. inDTD := FALSE
