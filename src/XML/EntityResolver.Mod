@@ -1,4 +1,4 @@
-(*      $Id: EntityResolver.Mod,v 1.2 2000/07/22 16:18:08 mva Exp $   *)
+(*      $Id: EntityResolver.Mod,v 1.3 2000/07/23 17:43:43 mva Exp $   *)
 MODULE XML:EntityResolver;
 (*  Locates and opens external entities for the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -29,12 +29,12 @@ TYPE
   END;
 
 
-PROCEDURE URItoASCII* (uri: DTD.String): DTD.StringURI;
-(**Converts a URI string represented as a sequence of Unicode characters to
-   an ASCII URI string.  The Unicode string is encoded into a UTF-8 byte
-   sequence.  Then, any resulting bytes that are not reserved or unreserved
-   URI characters, or represent that character "#", are replaced with URI
-   escape sequences.  In particular, all non-ASCII characters are escaped.  *)
+PROCEDURE NormalizeURI* (uri: DTD.String): DTD.StringURI;
+(**Normalizes an Unicode string representing a URI to a legal URI.  First, t
+   the Unicode string is encoded into a UTF-8 byte sequence.  Then, any
+   resulting bytes that are not reserved, unreserved, @samp{#}, or @samp{%}
+   are replaced with URI escape sequences.  In particular, all non-ASCII
+   bytes are escaped.  *)
   VAR
     len16, i: INTEGER;
     codec: Codec.Codec;
@@ -68,13 +68,15 @@ PROCEDURE URItoASCII* (uri: DTD.String): DTD.StringURI;
       COPY ("", str8)
     END;
 
-    (* encode every non-ASCII character in the UTF-8 string to %HH *)
+    (* encode every non-ASCII character and some other characters in the
+       UTF-8 string to %HH *)
     i := 0;
     WHILE (str8[i] # 0X) DO
       IF (str8[i] >= 80X) OR
          ~(CharClass.IsReserved (str8[i]) OR
            CharClass.IsUnreserved (str8[i]) OR
-           (str8[i] = "#")) THEN
+           (str8[i] = "#") OR
+           (str8[i] = "%")) THEN
         repl := "%HH";
         repl[1] := ToHex (ORD (str8[i]) DIV 16);
         repl[2] := ToHex (ORD (str8[i]) MOD 16);
@@ -87,7 +89,7 @@ PROCEDURE URItoASCII* (uri: DTD.String): DTD.StringURI;
     END;
 
     RETURN DTD.GetStringURI (str8, 0, i)
-  END URItoASCII;
+  END NormalizeURI;
 
 
 PROCEDURE (r: Resolver) GetURI* (public, system: DTD.String; baseURI: URI.URI;
@@ -110,7 +112,7 @@ PROCEDURE (r: Resolver) GetURI* (public, system: DTD.String; baseURI: URI.URI;
       RETURN
     END;
     
-    str8 := URItoASCII (system);
+    str8 := NormalizeURI (system);
     IF (baseURI # NIL) & (baseURI IS URI.HierarchicalURI) THEN
       uri := Parser.NewURI (str8^, baseURI(URI.HierarchicalURI), res)
     ELSE
