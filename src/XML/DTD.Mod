@@ -1,4 +1,4 @@
-(* 	$Id: Parser.Mod,v 1.2 2000/07/31 14:24:18 mva Exp $	 *)
+(* 	$Id: DTD.Mod,v 1.5 2000/08/20 13:00:30 mva Exp $	 *)
 MODULE XML:DTD [OOC_EXTENSIONS];
 (*  Implements the internal representation of a document DTD.
     Copyright (C) 2000  Michael van Acken
@@ -741,6 +741,27 @@ PROCEDURE (b: Builder) NewInternalEntity* (name: String; type: EntityType;
     InitInternalEntity (ent, name, type, entityValue);
     RETURN ent
   END NewInternalEntity;
+
+PROCEDURE (b: Builder) IsValidEntityDecl* (name, entityValue: String): BOOLEAN;
+(**Tests if the internal entity declaration is legal.  If the name
+   @oparam{name} refers to a predefined entity, but @oparam{entityValue} is no
+   legal replacement text for the entity, then this function returns
+   @code{FALSE}.  Otherwise, it returns @code{TRUE}.  *)
+  BEGIN
+    IF (name^ = "lt") THEN
+      RETURN (entityValue^ = "&#60;")
+    ELSIF (name^ = "amp") THEN
+      RETURN (entityValue^ = "&#38;")
+    ELSIF (name^ = "gt") THEN
+      RETURN (entityValue^ = ">") OR (entityValue^ = "&#62;")
+    ELSIF (name^ = "apos") THEN
+      RETURN (entityValue^ = "'") OR (entityValue^ = "&#39;")
+    ELSIF (name^ = "quot") THEN
+      RETURN (entityValue^ = '"') OR (entityValue^ = "&#34;")
+    ELSE
+      RETURN TRUE
+    END
+  END IsValidEntityDecl;
 
 PROCEDURE InitExternalEntity (ent: ExternalEntity;
                               name: String; type: EntityType;
