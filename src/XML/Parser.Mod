@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.26 2001/03/19 23:54:09 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.27 2001/03/20 22:16:32 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -1233,7 +1233,10 @@ PROCEDURE (p: Parser) ParseDocument*;
   (* Matches the syntax rule "S?".  This procedure is used only @emph{outside}
      the document element, and never as part of an entity or attribute value.
      This means that the characters skipped by this rule are never reported
-     to the application.  *)
+     to the application.
+     
+     To prevent expansion of parameter entity references, `noPE' can be
+     set to TRUE.  *)
     BEGIN
       LOOP
         CASE chars[cpos] OF
@@ -1853,6 +1856,118 @@ PROCEDURE (p: Parser) ParseDocument*;
       RETURN attValue
     END AttValue;
 
+  PROCEDURE Expand (attValue: DTD.AttValue);
+    VAR
+      fragment: DTD.Fragment;
+      decl: DTD.Declaration;
+      entity: DTD.Entity;
+
+    PROCEDURE IsRecursive (entity: DTD.Entity): BOOLEAN;
+      VAR
+        fragment: DTD.Fragment;
+      BEGIN
+        IF entity. expanding THEN
+          RETURN TRUE
+        ELSE
+          entity. expanding := TRUE;
+          fragment := entity. attValue. fragmentList;
+          WHILE (fragment # NIL) DO
+            WITH fragment: DTD.EntityRef DO
+              IF (fragment. entity # NIL) &
+                 IsRecursive (fragment. entity) THEN
+                entity. expanding := FALSE;
+                RETURN TRUE
+              END
+            ELSE                           (* ignore *)
+            END;
+            fragment := fragment. next
+          END;
+          entity. expanding := FALSE;
+          RETURN FALSE
+        END
+      END IsRecursive;
+
+    PROCEDURE ExpandAttValue (entity: DTD.Entity): DTD.AttValue;
+      VAR
+        attValue: DTD.AttValue;
+
+      PROCEDURE Flush;
+        BEGIN
+          IF (cpos # cstart) THEN
+            attValue. Append (dtd. NewCharacters (chars, cstart, cpos, FALSE))
+          END
+        END Flush;
+
+      BEGIN
+        IF (entity IS DTD.ExternalEntity) THEN
+          entity. SetEntityValue (Internalize (entity(DTD.ExternalEntity)))
+        END;
+
+        PushEntity (entity, FALSE);
+        attValue := dtd. NewAttValue();
+        cstart := cpos;
+        LOOP
+          CASE chars[cpos] OF
+          | Buffer.markerEOD:
+            Flush;
+            EXIT
+          | 00X .. 1FX:
+            (* the entity value has been cleaned of end of line artifacts or
+                invalid characters; any remaining whitespace must be replaced
+                with " " *)
+            IF (chars[cpos] # Ascii.ht) THEN
+              chars[cpos] := " "
+            END
+          | "<":
+            Err (lAngleInAttValue);
+            INC (cpos)
+          | "&":
+            Flush;
+            IF LookingAt ("&#", followedByAny) THEN
+              (* looking at character reference: replace on the spot *)
+              cstart := cpos; cdelta := 0;
+              CharRef();
+              attValue. Append (dtd. NewCharacters (chars, cstart, cpos-cdelta, FALSE))
+            ELSE
+              attValue. Append (EntityRef (TRUE, FALSE))
+            END;
+            cstart := cpos
+          ELSE
+            INC (cpos)
+          END
+        END;
+        PopEntity;
+        RETURN attValue
+      END ExpandAttValue;
+
+    BEGIN
+      fragment := attValue. fragmentList;
+      WHILE (fragment # NIL) DO
+        WITH fragment: DTD.EntityRef DO
+          decl := dtd. geNamespace. Get (fragment. name);
+          IF (decl = NIL) THEN
+            Err (noSuchGeneralEntity);
+            p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (fragment. name^))
+          ELSE
+            entity := decl(DTD.Entity);
+            fragment. entity := entity;
+            IF (entity. attValue = NIL) THEN
+              entity. attValue := ExpandAttValue (entity);
+              Expand (entity. attValue)
+            END;
+
+            IF IsRecursive (entity) THEN
+              Err (recursiveGeneralEntity);
+              p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (entity. name^));
+              fragment. entity. attValue. Clear
+            END
+          END
+        ELSE                           (* leave characters as is *)
+        END;
+        fragment := fragment. next
+      END
+    END Expand;
+
   PROCEDURE element;
     VAR
       emptyElementTag: BOOLEAN;
@@ -2027,118 +2142,6 @@ PROCEDURE (p: Parser) ParseDocument*;
           END
         END
       END content;
-    
-    PROCEDURE Expand (attValue: DTD.AttValue);
-      VAR
-        fragment: DTD.Fragment;
-        decl: DTD.Declaration;
-        entity: DTD.Entity;
-        
-      PROCEDURE IsRecursive (entity: DTD.Entity): BOOLEAN;
-        VAR
-          fragment: DTD.Fragment;
-        BEGIN
-          IF entity. expanding THEN
-            RETURN TRUE
-          ELSE
-            entity. expanding := TRUE;
-            fragment := entity. attValue. fragmentList;
-            WHILE (fragment # NIL) DO
-              WITH fragment: DTD.EntityRef DO
-                IF (fragment. entity # NIL) &
-                   IsRecursive (fragment. entity) THEN
-                  entity. expanding := FALSE;
-                  RETURN TRUE
-                END
-              ELSE                           (* ignore *)
-              END;
-              fragment := fragment. next
-            END;
-            entity. expanding := FALSE;
-            RETURN FALSE
-          END
-        END IsRecursive;
-
-      PROCEDURE ExpandAttValue (entity: DTD.Entity): DTD.AttValue;
-        VAR
-          attValue: DTD.AttValue;
-        
-        PROCEDURE Flush;
-          BEGIN
-            IF (cpos # cstart) THEN
-              attValue. Append (dtd. NewCharacters (chars, cstart, cpos, FALSE))
-            END
-          END Flush;
-
-        BEGIN
-          IF (entity IS DTD.ExternalEntity) THEN
-            entity. SetEntityValue (Internalize (entity(DTD.ExternalEntity)))
-          END;
-                    
-          PushEntity (entity, FALSE);
-          attValue := dtd. NewAttValue();
-          cstart := cpos;
-          LOOP
-            CASE chars[cpos] OF
-            | Buffer.markerEOD:
-              Flush;
-              EXIT
-            | 00X .. 1FX:
-              (* the entity value has been cleaned of end of line artifacts or
-                  invalid characters; any remaining whitespace must be replaced
-                  with " " *)
-              IF (chars[cpos] # Ascii.ht) THEN
-                chars[cpos] := " "
-              END
-            | "<":
-              Err (lAngleInAttValue);
-              INC (cpos)
-            | "&":
-              Flush;
-              IF LookingAt ("&#", followedByAny) THEN
-                (* looking at character reference: replace on the spot *)
-                cstart := cpos; cdelta := 0;
-                CharRef();
-                attValue. Append (dtd. NewCharacters (chars, cstart, cpos-cdelta, FALSE))
-              ELSE
-                attValue. Append (EntityRef (TRUE, FALSE))
-              END;
-              cstart := cpos
-            ELSE
-              INC (cpos)
-            END
-          END;
-          PopEntity;
-          RETURN attValue
-        END ExpandAttValue;
-
-      BEGIN
-        fragment := attValue. fragmentList;
-        WHILE (fragment # NIL) DO
-          WITH fragment: DTD.EntityRef DO
-            decl := dtd. geNamespace. Get (fragment. name);
-            IF (decl = NIL) THEN
-              Err (noSuchGeneralEntity);
-              p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (fragment. name^))
-            ELSE
-              entity := decl(DTD.Entity);
-              fragment. entity := entity;
-              IF (entity. attValue = NIL) THEN
-                entity. attValue := ExpandAttValue (entity);
-                Expand (entity. attValue)
-              END;
-              
-              IF IsRecursive (entity) THEN
-                Err (recursiveGeneralEntity);
-                p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (entity. name^));
-                fragment. entity. attValue. Clear
-              END
-            END
-          ELSE                           (* leave characters as is *)
-          END;
-          fragment := fragment. next
-        END
-      END Expand;
     
     PROCEDURE NoteName (name: DTD.String);
       VAR
@@ -2357,7 +2360,6 @@ PROCEDURE (p: Parser) ParseDocument*;
         cp: DTD.CP;
         elementDecl: DTD.ElementDecl;
         decl: DTD.Declaration;
-        dummy: BOOLEAN;
         
       PROCEDURE contentspec(): DTD.CP;
         VAR
@@ -2924,6 +2926,8 @@ PROCEDURE (p: Parser) ParseDocument*;
         rootName, public, system: DTD.String;
         baseURI: URI.URI;
         externalSubset: DTD.ExternalEntity;
+        decl: DTD.Declaration;
+        attr: DTD.AttrDecl;
       BEGIN  (* pre: looking at "<!DOCTYPE"+NonName *)
         p. inDTD := TRUE;
         
@@ -2984,6 +2988,16 @@ PROCEDURE (p: Parser) ParseDocument*;
           END
         ELSE
           externalSubset := NIL;
+        END;
+        
+        (* for every attribute declaration, expand its default value *)
+        decl := dtd. attributeList;
+        WHILE (decl # NIL) DO
+          attr := decl(DTD.AttrDecl);
+          IF (attr. default >= DTD.attrDefault) THEN
+            Expand (attr. defaultValue)
+          END;
+          decl := decl. next
         END;
         
         dtd. AttachAttributes;
