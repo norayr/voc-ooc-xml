@@ -1,4 +1,4 @@
-(*      $Id: Writer.Mod,v 1.7 2000/11/08 14:15:01 mva Exp $   *)
+(*      $Id: Writer.Mod,v 1.8 2001/04/01 21:25:59 mva Exp $   *)
 MODULE XML:Writer [OOC_EXTENSIONS];
 (*  Support for generating XML documents.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -18,6 +18,21 @@ MODULE XML:Writer [OOC_EXTENSIONS];
     59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 *)
 
+(**
+   Planned changes for future releases:
+
+   @itemize @bullet
+   @item
+   Rename @oproc{w.AttrInt} to @samp{AttrLongInt}.
+
+   @item
+   Rename @samp{*I} methods to @samp{*Region}.
+
+   @item
+   Provide methods for writing unquoted text (inherited methods from
+   @otype{UnicodeBuffer.OutputDesc} are not sufficient, because the writer
+   holds state of start tag).
+   @end itemize  *)
 
 IMPORT
   Ascii, Channel, Strings, LongStrings, IntStr, URI,
@@ -43,6 +58,7 @@ TYPE
     indent: LONGINT;
     newLine: ARRAY 3 OF CHAR;
     lenNewLine: LONGINT;
+    emptyElementHTML: BOOLEAN;
     baseURI-: URI.HierarchicalURI;
     
     elementStack: Elements;
@@ -63,6 +79,7 @@ PROCEDURE Init (w: Writer; new: BOOLEAN;
       
     w. indentLevel := indentLevel;
     w. indent := 0;
+    w. emptyElementHTML := FALSE;
     w. baseURI := NIL;
     w. newLine := Ascii.lf;
     w. lenNewLine := 1;
@@ -94,6 +111,11 @@ PROCEDURE (w: Writer) SetBaseURI* (baseURI: URI.HierarchicalURI);
   BEGIN
     w. baseURI := baseURI
   END SetBaseURI;
+
+PROCEDURE (w: Writer) SetEmptyElementHTML* (html: BOOLEAN);
+  BEGIN
+    w. emptyElementHTML := html
+  END SetEmptyElementHTML;
 
 PROCEDURE (w: Writer) WriteTextDecl* (version, standalone: ARRAY OF CHAR);
   VAR
@@ -361,7 +383,11 @@ PROCEDURE (w: Writer) EndTag*;
     DEC (w. lenElementStack);
     
     IF w. openStartTag THEN
-      w. Write8 ("/>");
+      IF w. emptyElementHTML THEN
+        w. Write8 (" />")
+      ELSE
+        w. Write8 ("/>")
+      END;
       w. openStartTag := FALSE
     ELSE
       w. NewLine;
