@@ -1,4 +1,4 @@
-(*      $Id: Writer.Mod,v 1.10 2001/06/19 20:41:03 mva Exp $   *)
+(*      $Id: Writer.Mod,v 1.11 2001/06/26 07:10:32 mva Exp $   *)
 MODULE XML:Writer [OOC_EXTENSIONS];
 (*  Support for generating XML documents.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -23,7 +23,7 @@ MODULE XML:Writer [OOC_EXTENSIONS];
 
    @itemize @bullet
    @item
-   Rename @oproc{w.AttrInt} to @samp{AttrLongInt}.
+   Rename @oproc{w.AttrInt} to @samp{AttrLInt}.
 
    @item
    Rename @samp{*I} methods to @samp{*Region}.
@@ -35,7 +35,7 @@ MODULE XML:Writer [OOC_EXTENSIONS];
    @end itemize  *)
 
 IMPORT
-  Ascii, Channel, Strings, LongStrings, IntStr, URI,
+  Ascii, Channel, Strings, LongStrings, IntStr, RealStr, URI,
   Codec := XML:UnicodeCodec, XML:UnicodeBuffer;
 
 
@@ -240,14 +240,21 @@ PROCEDURE (w: Writer) WriteURI* (uri: URI.URI; absolute: BOOLEAN);
     w. WriteLatin1 (str)
   END WriteURI;
 
-PROCEDURE (w: Writer) WriteLongInt* (value: LONGINT);
+PROCEDURE (w: Writer) WriteLInt* (value: LONGINT);
   VAR
     val: ARRAY 32 OF CHAR;
   BEGIN
     IntStr.IntToStr (value, val);
     w. WriteLatin1 (val)
-  END WriteLongInt;
+  END WriteLInt;
 
+PROCEDURE (w: Writer) WriteRealFix* (real: REAL; k: LONGINT);
+  VAR
+    val: ARRAY 128 OF CHAR;
+  BEGIN
+    RealStr.RealToFixed(real, SHORT(k), val);
+    w. WriteLatin1 (val)
+  END WriteRealFix;
 
 PROCEDURE GetString (VAR str: ARRAY OF Char): String;
   VAR
