@@ -1,4 +1,4 @@
-(*      $Id: Namespaces.Mod,v 1.6 2001/03/16 21:39:40 mva Exp $   *)
+(*      $Id: Validation.Mod,v 1.1 2001/03/17 21:35:12 mva Exp $   *)
 MODULE XML:Builder:Validation;
 (*  Adds validation services to the XML:Parser.
     Copyright (C) 2001  Michael van Acken
@@ -35,7 +35,17 @@ TYPE
     errorListener: Locator.ErrorListener;
     dtd: DTD.Builder;
     notationNamespace: DTD.Namespace;
+    idNamespace: DTD.Namespace;
+    idrefNamespace: DTD.Namespace;
   END;
+
+TYPE
+  IDDecl = POINTER TO IDDeclDesc;
+  IDDeclDesc = RECORD
+  (**Created for every attribute with the type ID.  *)
+    (DTD.DeclarationDesc)
+  END;
+
 
 
 CONST  (* error codes *)
@@ -56,6 +66,8 @@ CONST  (* error codes *)
   fixedDefaultMismatch = 15;
   invalidDefaultID = 16;
   invalidDefaultValue = 17;
+  multipleIDs = 18;
+  invalidIDREF = 19;
   
 VAR
   validationContext: Error.Context;
@@ -118,96 +130,107 @@ PROCEDURE ErrString3 (b: Builder; code: Error.Code;
   END ErrString3;
 
 
-  PROCEDURE IsS (ch: DTD.Char): BOOLEAN;
-    BEGIN
-      RETURN (ch = Ascii.sp) OR (ch = Ascii.ht) OR
-             (ch = Ascii.cr) OR (ch = Ascii.lf)
-    END IsS;
-  
-  PROCEDURE IsName (VAR string: ARRAY OF DTD.Char): BOOLEAN;
-    VAR
-      i: LONGINT;
-    BEGIN
-      IF ~Parser.IsNameChar0 (string[0]) THEN
-        RETURN FALSE
-      ELSE
-        i := 1;
-        WHILE (string[i] # 0X) DO
-          IF ~Parser.IsNameChar (string[i]) THEN
-            RETURN FALSE
-          END;
-          INC (i)
-        END;
-        RETURN TRUE
-      END
-    END IsName;
-  
-  PROCEDURE IsNames (VAR string: ARRAY OF DTD.Char): BOOLEAN;
-    VAR
-      i: LONGINT;
-    BEGIN
-      i := 0;
-      LOOP
-        IF Parser.IsNameChar0 (string[i]) THEN
-          REPEAT
-            INC (i)
-          UNTIL ~Parser.IsNameChar (string[i]);
-          IF (string[i] = 0X) THEN       (* end of string *)
-            RETURN TRUE
-          ELSIF IsS (string[i]) THEN
-            INC (i)
-          ELSE                           (* name includes invalid char *)
-            EXIT
-          END
-        ELSE
-          EXIT                           (* not looking at Name *)
-        END
-      END;
+PROCEDURE IsS (ch: DTD.Char): BOOLEAN;
+  BEGIN
+    RETURN (ch = Ascii.sp) OR (ch = Ascii.ht) OR
+           (ch = Ascii.cr) OR (ch = Ascii.lf)
+  END IsS;
+
+PROCEDURE IsName (VAR string: ARRAY OF DTD.Char): BOOLEAN;
+  VAR
+    i: LONGINT;
+  BEGIN
+    IF ~Parser.IsNameChar0 (string[0]) THEN
       RETURN FALSE
-    END IsNames;
-  
-  PROCEDURE IsNmtoken (VAR string: ARRAY OF DTD.Char): BOOLEAN;
-    VAR
-      i: LONGINT;
-    BEGIN
-      IF ~Parser.IsNameChar (string[0]) THEN
-        RETURN FALSE
-      ELSE
-        i := 1;
-        WHILE (string[i] # 0X) DO
-          IF ~Parser.IsNameChar (string[i]) THEN
-            RETURN FALSE
-          END;
-          INC (i)
+    ELSE
+      i := 1;
+      WHILE (string[i] # 0X) DO
+        IF ~Parser.IsNameChar (string[i]) THEN
+          RETURN FALSE
         END;
-        RETURN TRUE
-      END
-    END IsNmtoken;
-  
-  PROCEDURE IsNmtokens (VAR string: ARRAY OF DTD.Char): BOOLEAN;
-    VAR
-      i: LONGINT;
-    BEGIN
-      i := 0;
-      LOOP
-        IF Parser.IsNameChar (string[i]) THEN
-          REPEAT
-            INC (i)
-          UNTIL ~Parser.IsNameChar (string[i]);
-          IF (string[i] = 0X) THEN       (* end of string *)
-            RETURN TRUE
-          ELSIF IsS (string[i]) THEN
-            INC (i)
-          ELSE                           (* name includes invalid char *)
-            EXIT
-          END
-        ELSE
-          EXIT                           (* not looking at Name *)
-        END
+        INC (i)
       END;
+      RETURN TRUE
+    END
+  END IsName;
+
+PROCEDURE IsNames (VAR string: ARRAY OF DTD.Char): BOOLEAN;
+  VAR
+    i: LONGINT;
+  BEGIN
+    i := 0;
+    LOOP
+      IF Parser.IsNameChar0 (string[i]) THEN
+        REPEAT
+          INC (i)
+        UNTIL ~Parser.IsNameChar (string[i]);
+        IF (string[i] = 0X) THEN       (* end of string *)
+          RETURN TRUE
+        ELSIF IsS (string[i]) THEN
+          INC (i)
+        ELSE                           (* name includes invalid char *)
+          EXIT
+        END
+      ELSE
+        EXIT                           (* not looking at Name *)
+      END
+    END;
+    RETURN FALSE
+  END IsNames;
+
+PROCEDURE IsNmtoken (VAR string: ARRAY OF DTD.Char): BOOLEAN;
+  VAR
+    i: LONGINT;
+  BEGIN
+    IF ~Parser.IsNameChar (string[0]) THEN
       RETURN FALSE
-    END IsNmtokens;
-    
+    ELSE
+      i := 1;
+      WHILE (string[i] # 0X) DO
+        IF ~Parser.IsNameChar (string[i]) THEN
+          RETURN FALSE
+        END;
+        INC (i)
+      END;
+      RETURN TRUE
+    END
+  END IsNmtoken;
+
+PROCEDURE IsNmtokens (VAR string: ARRAY OF DTD.Char): BOOLEAN;
+  VAR
+    i: LONGINT;
+  BEGIN
+    i := 0;
+    LOOP
+      IF Parser.IsNameChar (string[i]) THEN
+        REPEAT
+          INC (i)
+        UNTIL ~Parser.IsNameChar (string[i]);
+        IF (string[i] = 0X) THEN       (* end of string *)
+          RETURN TRUE
+        ELSIF IsS (string[i]) THEN
+          INC (i)
+        ELSE                           (* name includes invalid char *)
+          EXIT
+        END
+      ELSE
+        EXIT                           (* not looking at Name *)
+      END
+    END;
+    RETURN FALSE
+  END IsNmtokens;
+
+
+PROCEDURE NewIDDecl (name: DTD.String): IDDecl;
+  VAR
+    idDecl: IDDecl;
+  BEGIN
+    NEW (idDecl);
+    DTD.InitDeclaration (idDecl, name);
+    RETURN idDecl
+  END NewIDDecl;
+
+
 
 PROCEDURE (b: Builder) StartDocument* (documentEntity: DTD.ExternalEntity);
   BEGIN
@@ -215,7 +238,18 @@ PROCEDURE (b: Builder) StartDocument* (documentEntity: DTD.ExternalEntity);
   END StartDocument;
 
 PROCEDURE (b: Builder) EndDocument*;
+  VAR
+    ptr: DTD.Declaration;
   BEGIN
+    (* check that all IDREF attributes have a matching ID counterpart *)
+    ptr := b. idrefNamespace. declList;
+    WHILE (ptr # NIL) DO
+      IF (b. idNamespace. Get (ptr. name) = NIL) THEN
+        ErrString (b, invalidIDREF, "name", ptr. name)
+      END;
+      ptr := ptr. next
+    END;
+    
     b. delegateBuilder. EndDocument
   END EndDocument;
 
@@ -349,7 +383,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
     string, substr, default: DTD.String;
     decl: DTD.Declaration;
     i, start: LONGINT;
-  
+    dummy: BOOLEAN;
   BEGIN
     IF (attrDecl = NIL) THEN
       Err (b, attributeNotDeclared)
@@ -426,6 +460,46 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
           ErrString (b, notInEnumeration, "name", string)
         END
       
+      | DTD.attrID:
+        string := value. Flatten (attrDecl);
+        IF ~IsName (string^) THEN
+          ErrString (b, notName, "name", string)
+        ELSIF ~b. idNamespace. Add (NewIDDecl (string)) THEN
+          ErrString (b, multipleIDs, "name", string)
+        END
+        
+      | DTD.attrIDREF:
+        string := value. Flatten (attrDecl);
+        IF ~IsName (string^) THEN
+          ErrString (b, notName, "name", string)
+        ELSE
+          dummy := ~b. idrefNamespace. Add (NewIDDecl (string))
+        END
+        
+      | DTD.attrIDREFS:
+        string := value. Flatten (attrDecl);
+        IF ~IsNames (string^) THEN
+          ErrString (b, notNames, "name", string)
+        ELSE
+          i := 0;
+          LOOP
+            start := i;
+            WHILE (string[i] > Ascii.sp) DO
+              INC (i)
+            END;
+            
+            NEW (substr, i-start+1);
+            LongStrings.Extract (string^, SHORT (start), SHORT (i-start), substr^);
+            dummy := ~b. idrefNamespace. Add (NewIDDecl (substr));
+            
+            IF (string[i] = 0X) THEN
+              EXIT
+            ELSE
+              INC (i)
+            END
+          END
+        END
+        
       ELSE  (* no validity constraints apply to the other attribute types *)
       END;
       
@@ -526,6 +600,8 @@ PROCEDURE Init* (b: Builder; delegateBuilder: B.Builder);
     b. errorListener := NIL;
     b. dtd := NIL;
     b. notationNamespace := DTD.NewNamespace();
+    b. idNamespace := DTD.NewNamespace();
+    b. idrefNamespace := DTD.NewNamespace();
   END Init;
 
 PROCEDURE New* (delegateBuilder: B.Builder): Builder;
@@ -583,6 +659,10 @@ PROCEDURE SetErrorMessages;
         t := "Attribute declaration `${element}/@${attribute}' of type ID must not have a default value"
       | invalidDefaultValue:
         t := "Invalid default value in attribute declaration `${element}/@${attribute}'"
+      | multipleIDs:
+        t := "ID `${name}' is already defined"
+      | invalidIDREF:
+        t := "No matching ID attribute for IDREF `${name}'"
       ELSE
         t := ""
       END;

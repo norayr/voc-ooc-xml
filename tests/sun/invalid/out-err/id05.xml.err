@@ -1,0 +1,3 @@
+In file invalid/id05.xml: 
+line=5, column=2
+86: Attribute declaration `root/@id2' of type ID must not have a default value

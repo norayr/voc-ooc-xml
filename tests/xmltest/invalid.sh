@@ -8,21 +8,21 @@ for d in $SUBDIR; do
     rm -f test-output/$i test-output/$i.err
     #echo $TEST_PROG -v "$i"
     if $TEST_PROG "$i" >test-output/$i 2>test-output/$i.err; then
-      echo "ok (wf): $i"
+      echo "ok: $i [wf]"
     else
       err_count=`expr $err_count + 1`
-      echo "failed (wf): $i (exit code is non-zero)"
+      echo "failed: $i [wf] (exit code is non-zero)"
     fi
     
     if $TEST_PROG -v "$i" >test-output/$i 2>test-output/$i.err; then
       err_count=`expr $err_count + 1`
-      echo "failed (validating): $i (exit code is zero)"
+      echo "failed: $i [valid] (exit code is zero)"
     else
       if $DIFF "$d/out-err/`basename $i`.err" test-output/$i.err; then
-	echo "ok (validating): $i"
+	echo "ok: $i [valid]"
       else
 	err_count=`expr $err_count + 1`
-	echo "failed (validating): $i"
+	echo "failed: $i [valid]"
       fi
     fi
   done

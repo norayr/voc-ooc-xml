@@ -1,0 +1,3 @@
+In file invalid/id01.xml: 
+line=5, column=16
+111: Attribute value `42a' does not match the Name production

@@ -1,4 +1,4 @@
-(* 	$Id: DTD.Mod,v 1.8 2001/01/15 11:15:03 mva Exp $	 *)
+(* 	$Id: DTD.Mod,v 1.9 2001/03/17 21:34:43 mva Exp $	 *)
 MODULE XML:DTD [OOC_EXTENSIONS];
 (*  Implements the internal representation of a document DTD.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -76,7 +76,7 @@ TYPE
    ------------------------------------------------------------------------ *)
 
 TYPE
-  DeclarationDesc = RECORD [ABSTRACT]
+  DeclarationDesc* = RECORD [ABSTRACT]
     next-: Declaration;
     (**Next declaration in namespace.  *)
     name-: String;
@@ -399,7 +399,7 @@ TYPE
 (* Declarations and Namespace
    ------------------------------------------------------------------------ *)
 
-PROCEDURE InitDeclaration (decl: Declaration; name: String);
+PROCEDURE InitDeclaration* (decl: Declaration; name: String);
   BEGIN
     decl. next := NIL;
     decl. name := name;

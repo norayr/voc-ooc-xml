@@ -1,0 +1,3 @@
+In file invalid/id03.xml: 
+line=4, column=2
+89: Element `attributes' has more than one ID attribute
