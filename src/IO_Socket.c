@@ -1,4 +1,4 @@
-/*	$Id: IO_PFD.c,v 1.19 1999/10/31 13:59:36 ooc-devel Exp $	*/
+/*	$Id: IO_Socket.c,v 1.1 2000/08/27 15:12:41 mva Exp $	*/
 /*  Interface to socket facilities.
     Copyright (C) 2000  Michael van Acken
 
@@ -496,7 +496,7 @@ void IO_Socket__InitSockAddrINET(IO_Socket__sockaddr_in *addr, _Type addr__tag, 
       addr->sin_addr = *(IO_Socket__in_addr*) hostinfo->h_addr;
     }
   } else {
-    addr->sin_addr.s_addr = htonl (INADDR_ANY);
+    addr->sin_addr.saddr = htonl(INADDR_ANY);
   }
 }
 
@@ -540,7 +540,7 @@ void IO_Socket__SocketDesc_Close(IO_Socket__Socket s) {
 void IO_Socket__SocketDesc_Connect(IO_Socket__Socket s, const IO_Socket__SockAddrParam servaddr, int servaddr_0d, int addrlen) {
   int res;
   
-  res = connect(s->fd, (struct sockaddr*)servaddr, (socklen_t)addrlen);
+  res = connect(s->fd, (struct sockaddr*)servaddr, addrlen);
   s->res = get_error(res);
 }
 
@@ -618,7 +618,7 @@ void IO_Socket__SocketDesc_Shutdown(IO_Socket__Socket s, int howto) {
 void IO_Socket__SocketDesc_SetReuseAddress(IO_Socket__Socket s) {
   int i = 1;
   s->res = get_error(setsockopt(s->fd, SOL_SOCKET, SO_REUSEADDR,
-                     &i, sizeof(i)));
+                     (void*)&i, sizeof(i)));
 }
 
 void IO_Socket_init(void) {

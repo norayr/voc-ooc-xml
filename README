@@ -69,3 +69,14 @@ can use "telnet localhost 5555" to connect to the server process.  Any
 data received on connections is written to stdout.  Debugging output
 is send to stderr.
 
+KNOWN PROBLEMS:
+===============
+
+Under Solaris 2.6 (and possibly other versions), the library "libxnet"
+must be linked in to access socket functions.  On this platform, the
+link section in the module declaration of src/IO/Socket.Mod must be
+be extended to 
+
+  LINK FILE "IO_Socket.c"; LIB "xnet" END
+
+

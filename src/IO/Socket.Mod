@@ -1,5 +1,5 @@
-(*	$Id: Socket.Mod,v 1.1 2000/08/27 15:13:27 mva Exp $	*)
-MODULE IO:Socket [FOREIGN "C"; LINK FILE "IO_Socket.c" END];
+(*	$Id: Socket.Mod,v 1.2 2000/08/28 07:23:38 mva Exp $	*)
+MODULE IO:Socket [FOREIGN "C"; LINK FILE "IO_Socket.c" (*; LIB "xnet"*) END];
 (*  Interface to socket facilities.
     Copyright (C) 2000  Michael van Acken
 
@@ -117,7 +117,7 @@ TYPE
   in_addr* = RECORD
   (**This data type is used in certain contexts to contain an IPv4 Internet
      host address.  *)
-    s_addr*: C.int;
+    saddr*: C.int;      (* name `s_addr' doesn't compile under Solaris  *)
     (**This field records the host address number as an unsigned 32 bit integer
        type.  *)
   END;
