@@ -1,4 +1,4 @@
-(*      $Id: Writer.Mod,v 1.8 2001/04/01 21:25:59 mva Exp $   *)
+(*      $Id: Writer.Mod,v 1.9 2001/06/17 22:34:04 mva Exp $   *)
 MODULE XML:Writer [OOC_EXTENSIONS];
 (*  Support for generating XML documents.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -65,6 +65,7 @@ TYPE
     lenElementStack: LONGINT;
     doIndent: BOOLEAN;
     openStartTag: BOOLEAN;
+    openEmptyTag: BOOLEAN;
   END;
 
 
@@ -87,6 +88,7 @@ PROCEDURE Init (w: Writer; new: BOOLEAN;
     w. lenElementStack := 0;
     w. doIndent := FALSE;                (* don't indent first start tag *)
     w. openStartTag := FALSE;
+    w. openEmptyTag := FALSE;
   END Init;
 
 PROCEDURE New* (writer: Channel.Writer; codecFactory: Codec.Factory;
@@ -156,9 +158,19 @@ PROCEDURE (w: Writer) NewLine*;
 PROCEDURE (w: Writer) CloseStartTag*;
   BEGIN
     ASSERT (w. openStartTag);
-    w. Write8 (">");
+    IF w. openEmptyTag THEN
+      IF w. emptyElementHTML THEN
+        w. Write8 (" />")
+      ELSE
+        w. Write8 ("/>")
+      END;
+      w. openEmptyTag := FALSE
+    ELSE
+      w. Write8 (">")
+    END;
     w. openStartTag := FALSE
   END CloseStartTag;
+
 
 PROCEDURE (w: Writer) WriteI* (str[NO_COPY]: ARRAY OF Char; s, e: LONGINT);
   VAR
@@ -276,6 +288,26 @@ PROCEDURE (w: Writer) StartTagLatin1* (name[NO_COPY]: ARRAY OF CHAR;
     w. StartTag (name16, mixedContent)
   END StartTagLatin1;
 
+PROCEDURE (w: Writer) EmptyTag* (name[NO_COPY]: ARRAY OF Char);
+  BEGIN
+    IF w. openStartTag THEN w. CloseStartTag END;
+    w. NewLine;
+    w. Write8 ("<");
+    w. Write16 (name);
+    (* no need to push the element name on the stack, because
+       we will not have to write out the matching end tag *)
+    w. openStartTag := TRUE;
+    w. openEmptyTag := TRUE
+  END EmptyTag;
+
+PROCEDURE (w: Writer) EmptyTagLatin1* (name[NO_COPY]: ARRAY OF Char);
+  VAR
+    name16: ARRAY 1024 OF Char;
+  BEGIN
+    COPY (name, name16);
+    w. EmptyTag (name16)
+  END EmptyTagLatin1;
+
 
 PROCEDURE (w: Writer) AttrString* (name[NO_COPY], value[NO_COPY]: ARRAY OF Char);
   VAR
@@ -382,14 +414,20 @@ PROCEDURE (w: Writer) EndTag*;
     END;
     DEC (w. lenElementStack);
     
-    IF w. openStartTag THEN
+    IF w. openEmptyTag THEN              (* preceding element was empty tag *)
+      w. CloseStartTag;
+      w. NewLine;
+      w. Write8 ("</");
+      w. Write16 (w. elementStack[w. lenElementStack]. name^);
+      w. Write8 (">")
+    ELSIF w. openStartTag THEN           (* no content, make empty tag *)
       IF w. emptyElementHTML THEN
         w. Write8 (" />")
       ELSE
         w. Write8 ("/>")
       END;
       w. openStartTag := FALSE
-    ELSE
+    ELSE                                 (* write end tag *)
       w. NewLine;
       w. Write8 ("</");
       w. Write16 (w. elementStack[w. lenElementStack]. name^);
@@ -406,6 +444,7 @@ PROCEDURE (w: Writer) EndTag*;
 PROCEDURE (w: Writer) EndOfText*;
 (**Adds final newline to text and flushes all buffers.  *)
   BEGIN
+    IF w. openStartTag THEN w. CloseStartTag END;
     w. NewLine;
     w. Flush;
     ASSERT (w. lenElementStack = 0);
