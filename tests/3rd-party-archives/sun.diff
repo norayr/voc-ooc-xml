@@ -1,0 +1,22 @@
+diff -Nru sun.orig/valid/out/not-sa02.xml sun/valid/out/not-sa02.xml
+--- sun.orig/valid/out/not-sa02.xml	Tue Aug  8 17:03:39 2000
++++ sun/valid/out/not-sa02.xml	Tue Aug  8 17:03:47 2000
+@@ -3,4 +3,4 @@
+ <!NOTATION foo PUBLIC '-//public id//foo' 'file:/dev/null'>
+ <!NOTATION nonce SYSTEM 'file:/dev/null'>
+ ]>
+-<attributes cdata="nothing happens to this one!" entities="unparsed-1 unparsed-2" entity="unparsed-1" id="number99" idref="number99" idrefs="number99 number99 number99" nmtoken="this-gets-normalized" nmtokens="this also gets normalized" notation="nonce" token="a"></attributes>
+\ No newline at end of file
++<attributes cdata="nothing happens to this one!" entities="unparsed-1 unparsed-2" entity="unparsed-1" id="number99" idref="number99" idrefs="number99 number99 number99" nmtoken="this-gets-normalized" nmtokens="this&#13;&#10; also gets normalized" notation="nonce" token="a"></attributes>
+\ No newline at end of file
+diff -Nru sun.orig/valid/out/sa02.xml sun/valid/out/sa02.xml
+--- sun.orig/valid/out/sa02.xml  Fri Jul  9 04:42:38 1999
++++ sun/valid/out/sa02.xml  Tue Aug  8 17:11:02 2000
+@@ -3,4 +3,4 @@
+ <!NOTATION foo PUBLIC '-//public id//foo' 'file:/dev/null'>
+ <!NOTATION nonce SYSTEM 'file:/dev/null'>
+ ]>
+-<attributes cdata="nothing happens to this one!" entities="unparsed-1 unparsed-2" entity="unparsed-1" id="internal42" idref="internal42" idrefs="internal42 internal42 internal42" nmtoken="this-gets-normalized" nmtokens="this also gets normalized" notation="nonce" token="a"></attributes>
+\ No newline at end of file
++<attributes cdata="nothing happens to this one!" entities="unparsed-1 unparsed-2" entity="unparsed-1" id="internal42" idref="internal42" idrefs="internal42 internal42 internal42" nmtoken="this-gets-normalized" nmtokens="this&#13;&#10; also gets normalized" notation="nonce" token="a"></attributes>
+\ No newline at end of file
