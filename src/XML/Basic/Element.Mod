@@ -265,7 +265,7 @@ PROCEDURE (sb: StringBuffer) AddCharacters* (VAR chars: StringVar;
     new: String;
   BEGIN
     (* make sure that the new text can be stored *)
-    IF (charsEnd-charsStart+sb. length > LEN (sb. array^)) THEN
+    IF (charsEnd-charsStart+sb. length >= LEN (sb. array^)) THEN
       len := LEN (sb. array^);
       REPEAT
         len := len*2+stringBufferSlack
