@@ -1,7 +1,21 @@
-(* 	$Id: Error.Mod,v 1.1.1.2 2000/07/10 20:31:56 mva Exp $	 *)
+(* 	$Id: Error.Mod,v 1.2 2000/07/13 21:04:29 mva Exp $	 *)
 MODULE XML:Error;
 (*  Creates lists of error messages and converts them to text.
     Copyright (C) 2000  Michael van Acken
+
+    This module is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public License
+    as published by the Free Software Foundation; either version 2 of
+    the License, or (at your option) any later version.
+
+    This module is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with OOC. If not, write to the Free Software Foundation,
+    59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 *)
 
 
@@ -58,9 +72,8 @@ PROCEDURE NewContext* (id: M.String): Context;
     RETURN c
   END NewContext;
 
-PROCEDURE (context: Context) GetTemplate* (msg: Msg; VAR templ: LString);
+PROCEDURE (context: Context) WriteTemplate* (msg: M.Msg; msgText: M.LString; VAR templ: M.LString);
   VAR
-    m: Mapping;
     entityName: M.Attribute;
   CONST
     eol = Ascii.lf;
@@ -74,19 +87,24 @@ PROCEDURE (context: Context) GetTemplate* (msg: Msg; VAR templ: LString);
       LongStrings.Append ("': ", templ)
     END;
     
+    LongStrings.Append (msgText, templ);
+    LongStrings.Insert ("line=${line}, column=${column}"+eol+
+                        "${char}: ", 0, templ);
+  END WriteTemplate;
+
+PROCEDURE (context: Context) GetTemplate* (msg: Msg; VAR templ: LString);
+  VAR
+    m: Mapping;
+  BEGIN
     m := context. mapping;
     WHILE (m # NIL) & (m. code # msg. code) DO
       m := m. next
     END;
     IF (m # NIL) THEN
-      LongStrings.Append (m. text^, templ)
+      context. WriteTemplate (msg, m. text^, templ)
     ELSE
-      LongStrings.Append ("--unknown error code--", templ);
-      LongStrings.Append (eol+"msg_context=${MSG_CONTEXT}"+
-                          eol+"msg_code=${MSG_CODE}", templ)
-    END;
-    LongStrings.Insert ("line=${line}, column=${column}"+eol+
-                        "${char}: ", 0, templ);
+      context. WriteTemplate (msg, "--unknown error code; msg_context=${MSG_CONTEXT}; msg_code=${MSG_CODE}--", templ)
+    END
   END GetTemplate;
 
 PROCEDURE (context: Context) SetString* (code: Code; str: String);

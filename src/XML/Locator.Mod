@@ -1,4 +1,4 @@
-(*      $Id: Builder.Mod,v 1.3 2000/07/11 22:26:09 mva Exp $   *)
+(*      $Id: Locator.Mod,v 1.1 2000/07/12 22:28:05 mva Exp $   *)
 MODULE XML:Locator [OOC_EXTENSIONS];
 (*  Provides access to position information for XML parser callbacks.
     Copyright (C) 2000  Michael van Acken
@@ -44,9 +44,28 @@ TYPE
        system identifier, and the base URI can be determined.  *)
   END;
 
-PROCEDURE (l: Locator) [ABSTRACT] InInternalEntity*(): DTD.Entity;
+TYPE
+  Position* = RECORD
+    charIndex-: Buffer.CharPos;
+    line-: Buffer.CharPos;
+    column-: Buffer.CharPos;
+    entity-: DTD.ExternalEntity;
+    inInternalEntity-: DTD.InternalEntity;
+  END;
+
+
+PROCEDURE (l: Locator) [ABSTRACT] InInternalEntity*(): DTD.InternalEntity;
 (**Returns the internal entity currently expanded by the parser.  If it is
    on the top level of an external entity, this function returns @code{NIL}. *)
   END InInternalEntity;
+
+PROCEDURE (l: Locator) StorePosition* (VAR pos: Position);
+  BEGIN
+    pos. charIndex := l. charIndex;
+    pos. line := l. line;
+    pos. column := l. column;
+    pos. entity := l. entity;
+    pos. inInternalEntity := l. InInternalEntity()
+  END StorePosition;
 
 END XML:Locator.

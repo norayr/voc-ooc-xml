@@ -82,7 +82,7 @@ TYPE
     (FragmentDesc)
     source-: String;
     sourceStart-, sourceEnd-: CharPos;
-  END;
+  END;  (* ... obsolete? *)
 
 TYPE
   AttValue* = POINTER TO AttValueDesc;

@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.4 2000/07/12 22:28:05 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.5 2000/07/13 21:04:29 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -208,10 +208,11 @@ VAR
   parserContext: Error.Context;
 
 
-PROCEDURE (l: Locator) InInternalEntity*(): DTD.Entity;
+PROCEDURE (l: Locator) InInternalEntity*(): DTD.InternalEntity;
   BEGIN
-    IF (l. p. fileEntity # l. p. peStack[l. p. lenPEStack-1]. entity) THEN
-      RETURN l. p. peStack[l. p. lenPEStack-1]. entity
+    IF (l. p. lenPEStack # 0) & 
+       (l. p. fileEntity # l. p. peStack[l. p. lenPEStack-1]. entity) THEN
+      RETURN l. p. peStack[l. p. lenPEStack-1]. entity(DTD.InternalEntity)
     ELSE
       RETURN NIL
     END
@@ -470,6 +471,28 @@ PROCEDURE IsEncNameChar (ch: Buffer.Char; first: BOOLEAN): BOOLEAN;
 
 
 (* ------------------------------------------------------------------------ *)
+
+PROCEDURE (p: Parser) Error* (context: Error.Context; code: Error.Code;
+                              fatalError: BOOLEAN;
+                              pos: AbstrLocator.Position): Error.Msg;
+  VAR
+    err: Error.Msg;
+  BEGIN
+    err := Error.New (context, code);
+    err. SetIntAttrib ("char", pos. charIndex);
+    err. SetIntAttrib ("line", pos. line);
+    err. SetIntAttrib ("column", pos. column);
+    err. SetAttribute (URI.NewURIAttribute ("baseURI", p. fileEntity. baseURI));
+    IF (pos. inInternalEntity # NIL) THEN
+      err. SetLStringAttrib ("entity_name", 
+                            Msg.GetLStringPtr (pos. inInternalEntity. name^))
+    END;
+    p. errList. Append (err);
+    IF fatalError & (p. builder = p. initialBuilder) THEN
+      p. builder := Builder.New()
+    END;
+    RETURN err
+  END Error;
 
 PROCEDURE (p: Parser) ParseDocument*;
   VAR
@@ -2893,6 +2916,7 @@ PROCEDURE Init (p: Parser; baseURI: URI.URI;
                 builder: Builder.Builder);
   BEGIN
     NEW (p. l);
+    p. l. p := p;
     p. dtd := DTD.New();
     p. errList := Error.NewList();
     p. documentEntity := p. dtd. NewDocumentEntity (baseURI);
