@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.14 2000/08/20 13:00:30 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.15 2000/10/15 10:19:35 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -49,7 +49,8 @@ TYPE
      @otype{DTD.Builder} to store and maintain the information gathered from a
      document's DTD, and on an instance of @otype{Builder.Builder} to pass on
      any data retrieved from the document content.  *)
-  errList-: Error.List;
+    
+    errList-: Error.List;
     (**Holds all error messages related to the currently parsed XML document.
        After an error occured, @samp{errList.msgCount} is no longer zero.  *)
     
@@ -700,8 +701,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           p. lastError. SetMsgAttrib ("channel_error", res);
           RETURN NIL
         ELSE
-          in := Buffer.NewInput (ch, NIL, p. errList);
-          ASSERT (in # NIL);
+          in := Buffer.NewInput (ch. NewReader(), NIL, p. errList);
           RETURN in
         END
       END
@@ -1152,8 +1152,8 @@ PROCEDURE (p: Parser) ParseDocument*;
             PushEntity (entity, TRUE);
             
             (* an external entity should being with a TextDecl *)
+            oldFlag := p. inExternalEntity;
             IF (entity. type = DTD.entityExternalParameter) THEN
-              oldFlag := p. inExternalEntity;
               p. inExternalEntity := TRUE;
               IF LookingAt ("<?xml", followedByNonName) THEN
                 XMLDecl (entity(DTD.ExternalEntity))
@@ -2905,18 +2905,28 @@ PROCEDURE (p: Parser) ParseDocument*;
   END ParseDocument;
 
 
-PROCEDURE Init (p: Parser; baseURI: URI.URI;
+PROCEDURE Init (p: Parser; new: BOOLEAN;
+                reader: Channel.Reader;
+                baseURI: URI.URI;
+                codecFactory: Codec.Factory;
                 entityResolver: EntityResolver.Resolver;
                 builder: Builder.Builder);
   BEGIN
-    NEW (p. l);
-    p. l. inInternalEntity := NIL;
+    p. errList := Error.NewList();
+    IF new THEN
+      NEW (p. l);
+      NEW (p. errorListener);
+      NEW (p. nameList, initNameList);
+      NEW (p. peStack, initPEStack);
+      p. in := Buffer.NewInput (reader, codecFactory, p. errList);
+    ELSE
+      p. in. Reset (reader, codecFactory, p. errList)
+    END;
     
-    NEW (p. errorListener);
+    p. l. inInternalEntity := NIL;
     p. errorListener. p := p;
     
     p. dtd := DTD.New();
-    p. errList := Error.NewList();
     p. documentEntity := p. dtd. NewDocumentEntity (baseURI);
     p. builder := builder;
     p. initialBuilder := builder;
@@ -2936,14 +2946,28 @@ PROCEDURE Init (p: Parser; baseURI: URI.URI;
     p. inExternalEntity := FALSE;
     
     p. currEntityValue := NIL;
-    NEW (p. nameList, initNameList);
     p. lenNameList := 0;
-    NEW (p. peStack, initPEStack);
     p. lenPEStack := 0
   END Init;
 
+PROCEDURE (p: Parser) Reset* (reader: Channel.Reader;
+                              baseURI: URI.URI;
+                              codecFactory: Codec.Factory;
+                              entityResolver: EntityResolver.Resolver;
+                              builder: Builder.Builder);
+(**Resets the buffer @oparam{b} to its initial state.  This has the same effect
+   as calling @oproc{NewReader} with the same parameters, except that some of
+   the resources allocated by @oparam{b} are reused.
+   
+   Note: This method does not change the state of the reader @oparam{reader}.
+   For example, if the reader should continue reading a file from its
+   beginning, then it must be positioned @emph{before} this method is called.*)
+  BEGIN
+    Init (p, FALSE, reader, baseURI, codecFactory, entityResolver, builder)
+  END Reset;
 
-PROCEDURE NewChannel* (ch: Channel.Channel; baseURI: URI.URI; 
+PROCEDURE NewChannel* (ch: Channel.Channel;
+                       baseURI: URI.URI; 
                        codecFactory: Codec.Factory;
                        entityResolver: EntityResolver.Resolver;
                        builder: Builder.Builder): Parser;
@@ -2967,10 +2991,25 @@ PROCEDURE NewChannel* (ch: Channel.Channel; baseURI: URI.URI;
     p: Parser;
   BEGIN
     NEW (p);
-    Init (p, baseURI, entityResolver, builder);
-    p. in := Buffer.NewInput (ch, codecFactory, p. errList);
+    Init (p, TRUE, ch. NewReader(), 
+                   baseURI, codecFactory, entityResolver, builder);
     RETURN p
   END NewChannel;
+
+PROCEDURE NewReader* (reader: Channel.Reader;
+                      baseURI: URI.URI; 
+                      codecFactory: Codec.Factory;
+                      entityResolver: EntityResolver.Resolver;
+                      builder: Builder.Builder): Parser;
+(**Like @oproc{NewChannel}, but takes the data from the reader @oparam{reader}.
+   *)
+  VAR
+    p: Parser;
+  BEGIN
+    NEW (p);
+    Init (p, TRUE, reader, baseURI, codecFactory, entityResolver, builder);
+    RETURN p
+  END NewReader;
 
 PROCEDURE NewURI* (uri, baseURI: URI.URI; 
                    codecFactory: Codec.Factory;
