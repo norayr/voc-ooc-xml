@@ -1,0 +1,3 @@
+In file invalid/attr04.xml: 
+line=10, column=2
+317: Attribute declaration `root/@type' refers to undeclared notation `vegetable'

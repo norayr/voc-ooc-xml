@@ -1,0 +1,3 @@
+In file invalid/attr13.xml: 
+line=7, column=2
+146: Invalid default value in attribute declaration `root/@value'

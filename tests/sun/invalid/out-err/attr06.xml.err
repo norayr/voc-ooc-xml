@@ -1,0 +1,3 @@
+In file invalid/attr06.xml: 
+line=8, column=6
+160: Attribute value `now is the time!?' does not match the Nmtoken production

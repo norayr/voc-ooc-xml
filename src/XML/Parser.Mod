@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.19 2001/03/16 19:48:49 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.20 2001/03/16 21:49:07 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -439,14 +439,14 @@ PROCEDURE IsLetter (ch: Buffer.Char): BOOLEAN;
     RETURN IsBaseChar (ch) OR IsIdeographic (ch)
   END IsLetter;
 
-PROCEDURE IsNameChar (ch: Buffer.Char): BOOLEAN;
+PROCEDURE IsNameChar* (ch: Buffer.Char): BOOLEAN;
   BEGIN
     RETURN IsLetter (ch) OR IsDigit (ch) OR
            (ch = ".") OR (ch = "-") OR (ch = "_") OR (ch = ":") OR
            IsCombiningChar (ch) OR IsExtender (ch)
   END IsNameChar;
 
-PROCEDURE IsNameChar0 (ch: Buffer.Char): BOOLEAN;
+PROCEDURE IsNameChar0* (ch: Buffer.Char): BOOLEAN;
   BEGIN
     RETURN IsLetter (ch) OR (ch = "_") OR (ch = ":")
   END IsNameChar0;
@@ -2875,7 +2875,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         p. inDTD := TRUE;
         
         StorePosition (p. l^);
-        p. builder. StartDTD;            (* callback *)
+        p. builder. StartDTD (p. dtd);   (* callback *)
         
         INC (cpos, 9);                   (* skip over "<!DOCTYPE" *)
         S;
@@ -2928,6 +2928,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           externalSubset := NIL;
         END;
         
+        dtd. AttachAttributes;
         StorePosition (p. l^);
         p. builder. EndDTD (externalSubset, p. readCompleteDTD); (* callback *)
         p. inDTD := FALSE
@@ -2956,7 +2957,6 @@ PROCEDURE (p: Parser) ParseDocument*;
     p. builder. StartDocument (p. documentEntity); (* callback *)
     
     prolog;
-    dtd. AttachAttributes;
     p. inDocumentElement := TRUE;
     element;
     IF (p. lenPEStack # 0) THEN

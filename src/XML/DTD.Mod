@@ -1,4 +1,4 @@
-(* 	$Id: DTD.Mod,v 1.7 2000/10/29 20:25:50 mva Exp $	 *)
+(* 	$Id: DTD.Mod,v 1.8 2001/01/15 11:15:03 mva Exp $	 *)
 MODULE XML:DTD [OOC_EXTENSIONS];
 (*  Implements the internal representation of a document DTD.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -64,7 +64,11 @@ TYPE
     elementNamespace-: Namespace;
     (**Namespace with element declarations.  *)
     
-    attributeList, attributeTail: Declaration;
+    attributeList-, attributeTail: Declaration;
+    (**Holds attributes that cannot be attached to an element declaration,
+       because no matching element type exists.  Before
+       @oproc{*XML:Builder.EndDTD} has been called, this list holds all
+       attributes seen so far by the parser.  *)
   END;
 
 
@@ -198,6 +202,8 @@ TYPE
     defaultValue-: AttValue;
   END;
 
+VAR
+  undefAttr-: AttrDecl;
 
 (* Entities
    ------------------------------------------------------------------------ *)
@@ -348,6 +354,18 @@ TYPE
     (**The content model of the element.  *)
     attrNamespace-: Namespace;
     (**The attribute namespace of the element.  *)
+    idAttr-: AttrDecl;
+    (**If the element has an ID attribute, then this field refers to its
+       attribute declaration after @oproc{Builder.AttachAttributes} has been
+       called.  If the element has no ID attribute, then this field is
+       @code{NIL}.  If it has multiple ID attributes, it has the value
+       @ovar{undefAttr}.  *)
+    notationAttr-: AttrDecl;
+    (**If the element has a NOTATION attribute, then this field refers to its
+       attribute declaration after @oproc{Builder.AttachAttributes} has been
+       called.  If the element has no NOTATION attribute, then this field is
+       @code{NIL}.  If it has multiple NOTATION attributes, it has the value
+       @ovar{undefAttr}.  *)
   END;
 
 (* ------------------------------------------------------------------------ *)
@@ -655,10 +673,23 @@ PROCEDURE (enum: Enumeration) Append* (name: String);
     IF (enum. nameList = NIL) THEN
       enum. nameList := node
     ELSE
-      enum. nameTail := node
+      enum. nameTail. next := node
     END;
     enum. nameTail := node
   END Append;
+
+PROCEDURE (enum: Enumeration) Matches* (VAR name: StringVar): BOOLEAN;
+(**Returns @code{TRUE}, if one of the names listed in the enumeration matches
+   the string @oparam{name}.  *)
+  VAR
+    ptr: NameNode;
+  BEGIN
+    ptr := enum. nameList;
+    WHILE (ptr # NIL) & (ptr. name^ # name) DO
+      ptr := ptr. next
+    END;
+    RETURN (ptr # NIL)
+  END Matches;
 
 
 PROCEDURE InitAttrDecl* (attrDecl: AttrDecl; elementName, name: String;
@@ -696,18 +727,41 @@ PROCEDURE (b: Builder) AddAttribute* (attrDecl: AttrDecl);
   END AddAttribute;
 
 PROCEDURE (b: Builder) AttachAttributes*;
+(**Attaches all attribute declarations in the DTD to the declarations of
+   their element.  *)
   VAR
     attrDecl: AttrDecl;
-    elemDecl: Declaration;
+    ptr, decl: Declaration;
+    elemDecl: ElementDecl;
     dummy: BOOLEAN;
   BEGIN
-    WHILE (b. attributeList # NIL) DO
-      attrDecl := b. attributeList(AttrDecl);
-      b. attributeList := attrDecl. next;
+    ptr := b. attributeList;
+    b. attributeList := NIL;
+    b. attributeTail := NIL;
+    
+    WHILE (ptr # NIL) DO
+      attrDecl := ptr(AttrDecl);
+      ptr := attrDecl. next;
       
-      elemDecl := b. elementNamespace. Get (attrDecl. elementName);
-      IF (elemDecl # NIL) THEN
-        dummy := elemDecl(ElementDecl). attrNamespace. Add (attrDecl)
+      decl := b. elementNamespace. Get (attrDecl. elementName);
+      IF (decl = NIL) THEN               (* no matching attribute *)
+        b. AddAttribute (attrDecl)
+      ELSE
+        elemDecl := decl(ElementDecl);
+        dummy := elemDecl. attrNamespace. Add (attrDecl);
+        IF (attrDecl. type = attrID) THEN
+          IF (elemDecl. idAttr = NIL) THEN
+            elemDecl. idAttr := attrDecl
+          ELSE
+            elemDecl. idAttr := undefAttr
+          END
+        ELSIF (attrDecl. type = attrNOTATION) THEN
+          IF (elemDecl. notationAttr = NIL) THEN
+            elemDecl. notationAttr := attrDecl
+          ELSE
+            elemDecl. notationAttr := undefAttr
+          END
+        END
       END
     END;
     b. attributeTail := NIL
@@ -932,7 +986,9 @@ PROCEDURE InitElementDecl (elemDecl: ElementDecl; name: String; contentModel: CP
   BEGIN
     InitDeclaration (elemDecl, name);
     elemDecl. contentModel := contentModel;
-    elemDecl. attrNamespace := attrNamespace
+    elemDecl. attrNamespace := attrNamespace;
+    elemDecl. idAttr := NIL;
+    elemDecl. notationAttr := NIL;
   END InitElementDecl;
 
 PROCEDURE (b: Builder) NewElementDecl* (name: String; contentModel: CP): ElementDecl;
@@ -943,6 +999,12 @@ PROCEDURE (b: Builder) NewElementDecl* (name: String; contentModel: CP): Element
     InitElementDecl (elemDecl, name, contentModel, NewNamespace());
     RETURN elemDecl
   END NewElementDecl;
+
+PROCEDURE (elemDecl: ElementDecl) IsEmpty* (): BOOLEAN;
+  BEGIN
+    RETURN (elemDecl. contentModel IS NameCP) &
+           (elemDecl. contentModel(NameCP). name^ = "EMPTY")
+  END IsEmpty;
 
 
 (* Namespace Declaration
@@ -1037,4 +1099,7 @@ PROCEDURE New*(): Builder;
     RETURN b
   END New;
 
+BEGIN
+  NEW (undefAttr);
+  InitAttrDecl (undefAttr, NIL, NIL, -1, NIL, -1, NIL);
 END XML:DTD.

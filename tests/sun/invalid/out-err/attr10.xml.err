@@ -1,0 +1,5 @@
+In file invalid/attr10.xml: 
+line=14, column=2
+277: Invalid default value in attribute declaration `identifier/@value'
+line=17, column=16
+308: Attribute has not been declared

@@ -1,4 +1,4 @@
-(*      $Id: Namespaces.Mod,v 1.5 2001/02/07 10:37:12 mva Exp $   *)
+(*      $Id: Namespaces.Mod,v 1.6 2001/03/16 21:39:40 mva Exp $   *)
 MODULE XML:Builder:Namespaces;
 (*  Provides namespace support for XML:Parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -107,9 +107,9 @@ PROCEDURE (b: Builder) EndDocument*;
     b. delegateBuilder. EndDocument
   END EndDocument;
 
-PROCEDURE (b: Builder) StartDTD*;
+PROCEDURE (b: Builder) StartDTD* (dtdBuilder: DTD.Builder);
   BEGIN
-    b. delegateBuilder. StartDTD
+    b. delegateBuilder. StartDTD (dtdBuilder)
   END StartDTD;
 
 PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
@@ -487,6 +487,6 @@ PROCEDURE SetErrorMessages;
   END SetErrorMessages;
 
 BEGIN
-  namespacesContext := Error.NewContext ("XML:Parser");
+  namespacesContext := Error.NewContext ("XML:Builder:Namespaces");
   SetErrorMessages
 END XML:Builder:Namespaces.

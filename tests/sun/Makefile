@@ -1,5 +1,6 @@
 TEST_PROG=../../TestParser
-scripts=./not-wf.sh ./valid.sh
+#scripts=./invalid.sh
+scripts=./not-wf.sh ./valid.sh ./invalid.sh
 
 .PHONY: all clean test ${TEST_PROG}
 
@@ -8,16 +9,16 @@ cxml.html:
 	patch -p1 <../3rd-party-archives/sun.diff
 	mv valid/sun-valid.xml .
 	mv not-wf/sun-not-wf.xml .
-	rm -f not-wf/lang0[1-6].xml  # no longer not-wf since E73
+	rm -f not-wf/lang0[1-6].xml  # no longer not-wf since First Ed. E73
 
 test-output:
-	mkdir test-output test-output/valid test-output/not-wf
+	mkdir test-output test-output/valid test-output/not-wf test-output/invalid
 
 ${TEST_PROG}:
 	cd `dirname ${TEST_PROG}` && ${OOC} -MOv `basename ${TEST_PROG}`
 
 clean:
-	for i in cxml.html error invalid not-wf/*.xml not-wf/*.dtd not-wf/decl.ent sun-*.xml valid; do rm -Rf "$$i"; done
+	for i in cxml.html error invalid/*.* not-wf/*.* sun-*.xml valid; do rm -Rf "$$i"; done
 	rm -Rf test-output
 
 test: cxml.html test-output ${TEST_PROG}

@@ -1,4 +1,4 @@
-(*      $Id: Builder.Mod,v 1.10 2000/10/29 20:28:38 mva Exp $   *)
+(*      $Id: Builder.Mod,v 1.11 2001/02/07 10:37:06 mva Exp $   *)
 MODULE XML:Builder [OOC_EXTENSIONS];
 (*  Low-level builder interface to the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -132,13 +132,14 @@ PROCEDURE (b: Builder) EndDocument*;
    file.  *)
   END EndDocument;
 
-PROCEDURE (b: Builder) StartDTD*;
+PROCEDURE (b: Builder) StartDTD* (dtdBuilder: DTD.Builder);
 (**Called by the parser just before it begins parsing the document type
-   declaration.  All comments and processing instruction events that are
-   reported between @oproc{Builder.StartDTD} and @oproc{Builder.EndDTD}
-   are part of the DTD.  Events from the internal DTD are reported before
-   events of the external DTD.  The locator is positioned at the beginning of
-   @samp{<!DOCTYPE}.  *)
+   declaration.  @oparam{dtdBuilder} is the object that is used by the parser
+   to build the DTD data structure.  All comments and processing instruction
+   events that are reported between @oproc{Builder.StartDTD} and
+   @oproc{Builder.EndDTD} are part of the DTD.  Events from the internal DTD
+   are reported before events of the external DTD.  The locator is positioned
+   at the beginning of @samp{<!DOCTYPE}.  *)
   END StartDTD;
 
 PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;

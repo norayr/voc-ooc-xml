@@ -1,0 +1,3 @@
+In file invalid/attr11.xml: 
+line=12, column=2
+359: Invalid default value in attribute declaration `reference/@value'

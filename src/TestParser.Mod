@@ -1,4 +1,4 @@
-(*      $Id: TestParser.Mod,v 1.4 2000/07/23 17:38:22 mva Exp $   *)
+(*      $Id: TestParser.Mod,v 1.5 2001/03/16 21:48:37 mva Exp $   *)
 MODULE TestParser;
 (*  Converts XML document into its canonical representation.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -21,7 +21,8 @@ MODULE TestParser;
 IMPORT
   ProgramArgs, TextRider, StdChannels, Channel, Err, Msg,
   XML:Builder, XML:Parser, XML:UnicodeCodec:UTF8, XML:UnicodeCodec:ImportAll,
-  XML:Builder:Canonical, XML:Builder:ParserProtocol, XML:Builder:Namespaces;
+  XML:Builder:Canonical, XML:Builder:ParserProtocol, XML:Builder:Namespaces,
+  XML:Builder:Validation;
 
 
 CONST
@@ -41,8 +42,7 @@ PROCEDURE CreateParser(): Parser.Parser;
     arg: ARRAY 256 OF CHAR;
     argReader: TextRider.Reader;
     p: Parser.Parser;
-    namespaceBuilder: Builder.Builder;
-    
+    namespaceBuilder, validatingBuilder: Builder.Builder;
     res: Msg.Msg;
   BEGIN
     NEW (canon);
@@ -87,8 +87,9 @@ PROCEDURE CreateParser(): Parser.Parser;
     END;
     
     IF validating THEN
+      validatingBuilder := Validation.New (builder);
+      builder := validatingBuilder
     END;
-    
     IF namespaceSupport THEN
       namespaceBuilder := Namespaces.New (builder);
       builder := namespaceBuilder

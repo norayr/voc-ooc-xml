@@ -1,0 +1,3 @@
+In file invalid/attr05.xml: 
+line=8, column=6
+159: Attribute value `dev@null' does not match the Nmtoken production
