@@ -16,18 +16,18 @@ IMPORTANT: You'll need oo2c-1.5.4 or later to compile the sources.
 
 --------
 
-At the moment, the XML parser succeeds for all well-formedness tests I
-can lay may hands on (which are approx. 750 different test cases).
-With regard to the XML Information Set, the parser passes all core
-information items and almost all periphereal items to the application.
-Support for XML Namespaces is implemented as a specialized builder
-module that is inserted between the "real" builder and the parser.
-See module XML:Builder:Namespaces for details.
+At the moment, the XML parser succeeds for all well-formedness and
+validation tests I can lay may hands on (which are approx. 2580
+different test cases).  With regard to the XML Information Set, the
+parser passes all core information items and almost all periphereal
+items to the application.  Support for XML Namespaces is implemented
+as a specialized builder module that is inserted between the "real"
+builder and the parser.  See module XML:Builder:Namespaces for
+details.
 
-Similar to namespace support, validation should also be implemented as
-a separate builder module, with only a few low-level scanner and
-parser related checks in XML:Parser.  I'm looking for a volunteer to
-do the implementation.
+Similar to namespace support, validation is implemented as a separate
+builder module XML:Builder:Validation, with only a few low-level
+scanner and parser related checks in XML:Parser.
 
 Compared to the old XML parser, this implementation's design is
 simpler and the new parser is much faster (2-4 times faster, depending
@@ -63,7 +63,7 @@ happens if your make is not of the GNU persuasion.  I've tried this
 setup under both Linux and SunOS 5.6.  Under CygWin, there seems to be
 a problem with patching the Sun tests.  Ignore it.)
 
-"make test" requires GNU patch to modify the Sun tests.
+"make test" requires GNU patch to modify some of the test files.
 
 The C compiler emits some warnings about missing type casts for
 `XML_Parser.c'.  They can be safely ignored.
@@ -88,3 +88,4 @@ listens on port 5555 of the local host for incoming connections.  You
 can use "telnet localhost 5555" to connect to the server process.  Any
 data received on connections is written to stdout.  Debugging output
 is send to stderr.
+
