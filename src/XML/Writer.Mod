@@ -1,4 +1,4 @@
-(*      $Id: Writer.Mod,v 1.11 2001/06/26 07:10:32 mva Exp $   *)
+(*      $Id: Writer.Mod,v 1.12 2001/06/30 21:41:29 mva Exp $   *)
 MODULE XML:Writer [OOC_EXTENSIONS];
 (*  Support for generating XML documents.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -23,7 +23,7 @@ MODULE XML:Writer [OOC_EXTENSIONS];
 
    @itemize @bullet
    @item
-   Rename @oproc{w.AttrInt} to @samp{AttrLInt}.
+   Rename @oproc{Writer.AttrInt} to @samp{AttrLInt}.
 
    @item
    Rename @samp{*I} methods to @samp{*Region}.
