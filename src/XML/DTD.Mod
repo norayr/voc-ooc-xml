@@ -1,4 +1,4 @@
-(* 	$Id: DTD.Mod,v 1.5 2000/08/20 13:00:30 mva Exp $	 *)
+(* 	$Id: DTD.Mod,v 1.6 2000/10/15 10:16:30 mva Exp $	 *)
 MODULE XML:DTD [OOC_EXTENSIONS];
 (*  Implements the internal representation of a document DTD.
     Copyright (C) 2000  Michael van Acken
@@ -550,12 +550,16 @@ PROCEDURE (attValue: AttValue) Length* (): LONGINT;
     RETURN len
   END Length;
 
-PROCEDURE (attValue: AttValue) Flatten* (attrDecl: AttrDecl): String;
+PROCEDURE (attValue: AttValue) FlattenValue* (normalizeWhitespace: BOOLEAN): String;
+(**Returns the string representation of the attribute value
+   @oparam{attrDecl}.  If @oparam{normalizeWhitespace} is @code{TRUE}, then
+   sequences of spaces are collapsed into a single space, and leading and
+   trailing whitespace is removed from the string.  *)
+   
   VAR
     str: String;
     len, pos: LONGINT;
     skipSpace: BOOLEAN;
-    normalizeWhitespace: BOOLEAN;
   
   PROCEDURE Append (attValue: AttValue);
     VAR
@@ -601,7 +605,6 @@ PROCEDURE (attValue: AttValue) Flatten* (attrDecl: AttrDecl): String;
     END Append;
   
   BEGIN
-    normalizeWhitespace := (attrDecl # NIL) & (attrDecl. type # attrCDATA);
     len := attValue. Length();
     NEW (str, len+2);
     (* the second additional character is used for entity value padding
@@ -614,6 +617,17 @@ PROCEDURE (attValue: AttValue) Flatten* (attrDecl: AttrDecl): String;
     END;
     str[pos] := 0X;
     RETURN str
+  END FlattenValue;
+
+PROCEDURE (attValue: AttValue) Flatten* (attrDecl: AttrDecl): String;
+(**Returns the string representation of the attribute value
+   @oparam{attrDecl}.  If @oparam{attrDecl} is not @code{NIL}, and
+   the attribute's type is not @oconst{attrCDATA}, then
+   sequences of spaces are collapsed into a single space, and leading and
+   trailing whitespace is removed from the string.  *)
+  BEGIN
+    RETURN attValue. FlattenValue ((attrDecl # NIL) &
+                                   (attrDecl. type # attrCDATA));
   END Flatten;
 
 

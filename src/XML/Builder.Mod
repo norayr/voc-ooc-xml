@@ -1,4 +1,4 @@
-(*      $Id: Builder.Mod,v 1.8 2000/07/31 18:37:07 mva Exp $   *)
+(*      $Id: Builder.Mod,v 1.9 2000/08/16 08:23:43 mva Exp $   *)
 MODULE XML:Builder [OOC_EXTENSIONS];
 (*  Low-level builder interface to the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -159,7 +159,7 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
    The namespace prefix of the attribute name can be obtained from
    @oparam{namespaceDecl}.
 
-   The locator is positioned at the beginning of the start tag's name.
+b   The locator is positioned at the beginning of the start tag's name.
 
    @strong{Note}: Namespaces are only partially supported in the parser itself.
    For full namespace support, the special builder class
@@ -196,12 +196,13 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
    @code{TRUE}.
 
    The attribute's value is passed into the parameter @oparam{value}.  Call
-   @oproc{DTD.AttValue.Flatten} to retrieve the normalized value of the
-   attribute.  You can also access the data structure @oparam{value}.  The
-   string values in the data structure are normalized for @code{CDATA} values.
-   When reading @oparam{value} for non-@code{CDATA} attributes, you must
-   collapse sequences of whitespace into a single space, and remove any
-   whitespace from the beginning and the end of the attribute value.
+   @oproc{DTD.AttValue.Flatten} or @oproc{DTD.AttValue.FlattenValue} to
+   retrieve the normalized value of the attribute.  You can also access the
+   data structure @oparam{value}.  The string values in the data structure are
+   normalized for @code{CDATA} values.  When reading @oparam{value} for
+   non-@code{CDATA} attributes, you must collapse sequences of whitespace into
+   a single space, and remove any whitespace from the beginning and the end of
+   the attribute value.
 
    The locator is at the beginning of the attribute's name, if
    @oparam{specified} is @code{TRUE}.  For defaulted attributes, the locator is
