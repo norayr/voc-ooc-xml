@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.8 2000/07/23 17:47:32 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.9 2000/07/25 12:20:13 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000  Michael van Acken
@@ -680,7 +680,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       IF (entity. baseURI = NIL) THEN
         RETURN NIL
       ELSE
-        ch := entity. baseURI. GetChannel (FALSE, res);
+        ch := entity. baseURI. GetChannel (URI.channelOld, res);
         IF (ch = NIL) THEN
           Err (accessError);
           entity. baseURI. GetString (str);
@@ -3030,7 +3030,7 @@ PROCEDURE NewURI* (uri, baseURI: URI.URI;
   VAR
     ch: Channel.Channel;
   BEGIN
-    ch := uri. GetChannel (FALSE, res);
+    ch := uri. GetChannel (URI.channelOld, res);
     IF (ch = NIL) THEN
       RETURN NIL
     ELSE
