@@ -6,6 +6,7 @@ err_count=0
 for d in $SUBDIR; do
   for i in $d/*.xml; do
     rm -f test-output/$i
+    #echo $TEST_PROG "$i"
     if $TEST_PROG "$i" >test-output/$i; then
       if $DIFF "$d/out/`basename $i`" test-output/$i; then
 	echo "ok: $i"
