@@ -1,7 +1,7 @@
-(*      $Id: TestParser.Mod,v 1.3 2000/07/13 21:04:29 mva Exp $   *)
+(*      $Id: TestParser.Mod,v 1.4 2000/07/23 17:38:22 mva Exp $   *)
 MODULE TestParser;
 (*  Converts XML document into its canonical representation.
-    Copyright (C) 2000  Michael van Acken
+    Copyright (C) 2000, 2001  Michael van Acken
 
     This module is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License
@@ -30,7 +30,7 @@ CONST
   
 VAR
   mode: SHORTINT;
-  namespaceSupport: BOOLEAN;
+  namespaceSupport, validating: BOOLEAN;
   format: SHORTINT;
   canon: Parser.Parser;
   builder: Builder.Builder;
@@ -56,6 +56,7 @@ PROCEDURE CreateParser(): Parser.Parser;
     (* parse command line arguments *)
     mode := modeCanonical;
     namespaceSupport := FALSE;
+    validating := FALSE;
     format := Canonical.firstCanonicalForm;
     argReader := TextRider.ConnectReader (ProgramArgs.args);
     argReader. ReadLine (arg);           (* skip command name *)
@@ -71,6 +72,8 @@ PROCEDURE CreateParser(): Parser.Parser;
         mode := modeParserProtocol
       ELSIF (arg = "-n") THEN
         namespaceSupport := TRUE
+      ELSIF (arg = "-v") THEN
+        validating := TRUE
       ELSE
         EXIT;
       END;
@@ -83,6 +86,9 @@ PROCEDURE CreateParser(): Parser.Parser;
       builder := ParserProtocol.New (StdChannels.stdout, UTF8.factory)
     END;
     
+    IF validating THEN
+    END;
+    
     IF namespaceSupport THEN
       namespaceBuilder := Namespaces.New (builder);
       builder := namespaceBuilder
@@ -90,6 +96,7 @@ PROCEDURE CreateParser(): Parser.Parser;
     
     p := Parser.NewFile (arg, NIL, NIL, NIL, builder, res);
     p. enforceQNames := namespaceSupport; (* enable QName and NCName checks *)
+    p. enforceGroupNesting := validating; (* enable PE nesting checks *)
     ASSERT (res = NIL);
     RETURN p
   END CreateParser;

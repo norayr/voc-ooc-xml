@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.18 2001/02/07 10:37:06 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.19 2001/03/16 19:48:49 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -90,6 +90,11 @@ TYPE
        targets, and notation names contain no colon.  This enables parts of the
        checks required from namespace aware parsers.  The default is
        @code{FALSE}.  *)
+    enforceGroupNesting*: BOOLEAN;
+    (**If @code{TRUE}, then the parser checks that parameter entity references
+       do not violate the nesting requirements imposed by the various validity
+       constraints.  This enables parts of the checks required from validating
+       parsers.  The default is @code{FALSE}.  *)
     processDeclarations: BOOLEAN;
     (* if FALSE, then entity declarations and attribute declarations must not
        be processed; this field starts out TRUE, and is set to FALSE after
@@ -225,6 +230,7 @@ CONST  (* error codes *)
   accessError = 303;
   referenceToUnparsed = 304;
   externalRefInAtttribute = 305;
+  nestingViolation = 306;
   
 VAR
   parserContext: Error.Context;
@@ -656,6 +662,11 @@ PROCEDURE (p: Parser) ParseDocument*;
       StorePosition (p. errorPos);
       ErrPos (code, p. errorPos)
     END Err;
+  
+  PROCEDURE ErrNF (code: Error.Code);
+    BEGIN  (* non-fatal error *)
+      Err (code)
+    END ErrNF;
   
   (* ---------------------------------------------------------------------- *)
   
@@ -1494,9 +1505,29 @@ PROCEDURE (p: Parser) ParseDocument*;
     END XMLDecl;
 
 
+  PROCEDURE CurrentEntity (): DTD.Entity;
+    BEGIN
+      IF (p. lenPEStack = 0) THEN
+        ASSERT (p. documentEntity # NIL);
+        RETURN p. documentEntity
+      ELSE
+        ASSERT (p. peStack[p. lenPEStack-1]. entity # NIL);
+        RETURN p. peStack[p. lenPEStack-1]. entity
+      END
+    END CurrentEntity;
+  
+  PROCEDURE CheckCurrentEntity (reference: DTD.Entity);
+    BEGIN
+      IF p. enforceGroupNesting & (reference # CurrentEntity()) THEN
+        ErrNF (nestingViolation)
+      END
+    END CheckCurrentEntity;
+  
+  
   PROCEDURE PI;
   (* pre: looking at "<?" *)
     VAR
+      currentEntity: DTD.Entity;
       target: DTD.String;
     
     PROCEDURE IsReserved (name: ARRAY OF DTD.Char): BOOLEAN;
@@ -1508,6 +1539,7 @@ PROCEDURE (p: Parser) ParseDocument*;
     
     BEGIN
       StorePosition (p. l^);
+      currentEntity := CurrentEntity();
       INC (cpos, 2);                     (* skip over "<?" *)
       target := Name (TRUE);
       IF (target^ = "xml") THEN
@@ -1532,6 +1564,7 @@ PROCEDURE (p: Parser) ParseDocument*;
             EXIT
           | "?":
             IF LookingAt ("?>", followedByAny) THEN
+              CheckCurrentEntity (currentEntity);
               p. builder. ProcessingInstruction (target, chars^, (* callback *)
                                                  cstart, cpos-cdelta,
                                                  p. fileEntity. baseURI);
@@ -1549,8 +1582,11 @@ PROCEDURE (p: Parser) ParseDocument*;
 
   PROCEDURE Comment;
   (* pre: looking at "<!--" *)
+    VAR
+      currentEntity: DTD.Entity;
     BEGIN
       StorePosition (p. l^);
+      currentEntity := CurrentEntity();
       INC (cpos, 4);                     (* skip over "<!--" *)
       cstart := cpos; cdelta := 0;
       LOOP
@@ -1562,6 +1598,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           EXIT
         | "-":
           IF LookingAt ("-->", followedByAny) THEN
+            CheckCurrentEntity (currentEntity);
             p. builder. Comment (chars^, cstart, cpos-cdelta); (* callback *)
             INC (cpos, 3);
             EXIT
@@ -2269,7 +2306,7 @@ PROCEDURE (p: Parser) ParseDocument*;
     END ExternalID;
 
   PROCEDURE markupdecl;
-    PROCEDURE elementdecl;
+    PROCEDURE elementdecl (currentEntity: DTD.Entity);
     (* pre: looking at "<!ELEMENT"+NonName *)
       VAR
         elementName: DTD.String;
@@ -2278,7 +2315,10 @@ PROCEDURE (p: Parser) ParseDocument*;
         dummy: BOOLEAN;
         
       PROCEDURE contentspec(): DTD.CP;
-        PROCEDURE Mixed(): DTD.CP;
+        VAR
+          currentEntity: DTD.Entity;
+          
+        PROCEDURE Mixed (currentEntity: DTD.Entity): DTD.CP;
         (* pre: looking at "#PCDATA"+nonNameChar *)
           VAR
             hasAlternative: BOOLEAN;
@@ -2296,6 +2336,7 @@ PROCEDURE (p: Parser) ParseDocument*;
               last. SetNext (dtd. NewNameCP (DTD.cpOnce, Name (FALSE)));
               OptS (FALSE)
             END;
+            CheckCurrentEntity (currentEntity);
             CheckChar (")");
             IF hasAlternative OR (chars[cpos] = "*") THEN
               CheckChar ("*");
@@ -2305,7 +2346,7 @@ PROCEDURE (p: Parser) ParseDocument*;
             END
           END Mixed;
 
-        PROCEDURE children(): DTD.CP;
+        PROCEDURE children (currentEntity: DTD.Entity): DTD.CP;
         (* pre: character before chars[cpos] was "("+S? *)
           VAR
             cp: DTD.CP;
@@ -2322,7 +2363,7 @@ PROCEDURE (p: Parser) ParseDocument*;
               END
             END Quantifier;
 
-          PROCEDURE choiceseq(): DTD.CP;
+          PROCEDURE choiceseq (currentEntity: DTD.Entity): DTD.CP;
           (* pre: character before chars[cpos] was "("+S? *)
             VAR
               class: DTD.Char;
@@ -2332,11 +2373,13 @@ PROCEDURE (p: Parser) ParseDocument*;
             (* pre: chars[cpos] # markerEOB *)
               VAR
                 cp: DTD.CP;
+                currentEntity: DTD.Entity;
               BEGIN
                 IF (chars[cpos] = "(") THEN
+                  currentEntity := CurrentEntity();
                   CheckChar ("(");
                   OptS (FALSE);
-                  cp := choiceseq()
+                  cp := choiceseq (currentEntity)
                 ELSIF IsNameChar0 (chars[cpos]) THEN
                   cp := dtd. NewNameCP (DTD.cpOnce, Name (FALSE))
                 ELSE
@@ -2369,7 +2412,8 @@ PROCEDURE (p: Parser) ParseDocument*;
                 END
               END;
               CheckChar (")");
-
+              CheckCurrentEntity (currentEntity);
+              
               IF (class = ",") THEN
                 RETURN dtd. NewSeqCP (DTD.cpOnce, first)
               ELSE
@@ -2378,7 +2422,7 @@ PROCEDURE (p: Parser) ParseDocument*;
             END choiceseq;
 
           BEGIN
-            cp := choiceseq();
+            cp := choiceseq (currentEntity);
             cp. SetMode (Quantifier());
             RETURN cp
           END children;
@@ -2389,12 +2433,13 @@ PROCEDURE (p: Parser) ParseDocument*;
           ELSIF LookingAt ("ANY", followedByNonName) THEN
             RETURN dtd. NewNameCP (DTD.cpOnce, Name (FALSE))
           ELSIF (chars[cpos] = "(") THEN
+            currentEntity := CurrentEntity();
             CheckChar ("(");
             OptS (FALSE);
             IF LookingAt ("#PCDATA", followedByNonName) THEN
-              RETURN Mixed()
+              RETURN Mixed (currentEntity)
             ELSE
-              RETURN children()
+              RETURN children (currentEntity)
             END
           ELSE
             Err (expectedContentSpec);
@@ -2413,10 +2458,11 @@ PROCEDURE (p: Parser) ParseDocument*;
         elementDecl := dtd. NewElementDecl (elementName, cp);
         dummy := dtd. elementNamespace. Add (elementDecl);
 
+        CheckCurrentEntity (currentEntity);
         CheckChar (">")
       END elementdecl;
 
-    PROCEDURE AttListDecl;
+    PROCEDURE AttListDecl (currentEntity: DTD.Entity);
     (* pre: looking at "<!ATTLIST"+NonName *)
       VAR
         elementName, attrName: DTD.String;
@@ -2542,10 +2588,11 @@ PROCEDURE (p: Parser) ParseDocument*;
             dtd. AddAttribute (attrDecl)
           END
         END;
+        CheckCurrentEntity (currentEntity);
         CheckChar (">")
       END AttListDecl;
 
-    PROCEDURE EntityDecl;
+    PROCEDURE EntityDecl (currentEntity: DTD.Entity);
     (* pre: looking at "<!ENTITY"+NonName *)
       VAR
         name: DTD.String;
@@ -2680,6 +2727,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           entity := dtd. NewExternalEntity (name, entityType, public, system, ndata, baseURI)
         END;
         OptS (FALSE);
+        CheckCurrentEntity (currentEntity);
         CheckChar (">");
 
         IF p. processDeclarations THEN
@@ -2691,7 +2739,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         END
       END EntityDecl;
 
-    PROCEDURE NotationDecl;
+    PROCEDURE NotationDecl (currentEntity: DTD.Entity);
     (* pre: looking at "<!NOTATION"+NonName *)
       VAR
         name, public, system: DTD.String;
@@ -2708,18 +2756,19 @@ PROCEDURE (p: Parser) ParseDocument*;
            ... *)
         OptS (FALSE);
         p. builder. Notation (dtd. NewNotation (name, public, system, baseURI)); (* callback *)
+        CheckCurrentEntity (currentEntity);
         CheckChar (">")
       END NotationDecl;
 
     BEGIN
       IF LookingAt ("<!ELEMENT", followedByNonName) THEN
-        elementdecl
+        elementdecl (CurrentEntity())
       ELSIF LookingAt ("<!ATTLIST", followedByNonName) THEN
-        AttListDecl
+        AttListDecl (CurrentEntity())
       ELSIF LookingAt ("<!ENTITY", followedByNonName) THEN
-        EntityDecl
+        EntityDecl (CurrentEntity())
       ELSIF LookingAt ("<!NOTATION", followedByNonName) THEN
-        NotationDecl
+        NotationDecl (CurrentEntity())
       ELSIF LookingAt ("<?", followedByAny) THEN
         PI
       ELSIF LookingAt ("<!--", followedByAny) THEN
@@ -2733,6 +2782,7 @@ PROCEDURE (p: Parser) ParseDocument*;
   PROCEDURE extSubsetDecl;
     VAR
       pos: Locator.Position;
+      currentEntity: DTD.Entity;
       
     PROCEDURE ignoreSectContents;
       VAR
@@ -2749,6 +2799,9 @@ PROCEDURE (p: Parser) ParseDocument*;
             EXIT
           | "]":
             IF LookingAt ("]]>", followedByAny) THEN
+              IF (level = 1) THEN
+                CheckCurrentEntity (currentEntity)
+              END;
               INC (cpos, 3);             (* skip over "]]>" *)
               DEC (level);
               IF (level = 0) THEN
@@ -2773,6 +2826,7 @@ PROCEDURE (p: Parser) ParseDocument*;
     BEGIN
       LOOP
         IF (chars[cpos] = "<") THEN
+          currentEntity := CurrentEntity();
           StorePosition (pos);
           IF LookingAt ("<![", followedByAny) THEN
             INC (cpos, 3);           (* skip over "<![" *)
@@ -2780,8 +2834,10 @@ PROCEDURE (p: Parser) ParseDocument*;
             IF LookingAt ("INCLUDE", followedByNonName) THEN
               INC (cpos, 7);         (* skip over "INCLUDE" *)
               OptS (FALSE);
+              CheckCurrentEntity (currentEntity);
               CheckChar ("[");
               extSubsetDecl;
+              CheckCurrentEntity (currentEntity);
               IF LookingAt ("]]>", followedByAny) THEN
                 INC (cpos, 3)        (* skip over "]]>" *)
               ELSE
@@ -2790,6 +2846,7 @@ PROCEDURE (p: Parser) ParseDocument*;
             ELSIF LookingAt ("IGNORE", followedByNonName) THEN
               INC (cpos, 6);         (* skip over "IGNORE" *)
               OptS (FALSE);
+              CheckCurrentEntity (currentEntity);
               CheckChar ("[");
               ignoreSectContents
             ELSE
@@ -2951,6 +3008,7 @@ PROCEDURE Init (p: Parser; new: BOOLEAN;
     
     p. followExternalRef := TRUE;
     p. enforceQNames := FALSE;
+    p. enforceGroupNesting := FALSE;
     p. processDeclarations := TRUE;
     p. readCompleteDTD := TRUE;
     
@@ -3212,6 +3270,8 @@ PROCEDURE SetErrorMessages;
         t := "Reference to unparsed entity `${name}' not allowed"
       | externalRefInAtttribute:
         t := "Attribute value contains reference to external entity `${name}'"
+      | nestingViolation:
+        t := "Nesting violation: Opening and closing parenthesis not in same entity"
       ELSE
         t := ""
       END;

@@ -1,5 +1,5 @@
 TEST_PROG=../../TestParser
-scripts=./not-wf.sh ./valid.sh
+scripts=./not-wf.sh ./valid.sh ./invalid.sh
 
 .PHONY: all clean test ${TEST_PROG}
 
@@ -8,13 +8,13 @@ readme.html:
 	patch -p1 <../3rd-party-archives/xmltest.diff
 
 test-output:
-	mkdir test-output test-output/valid test-output/valid/ext-sa test-output/valid/not-sa test-output/valid/sa test-output/not-wf test-output/not-wf/sa test-output/not-wf/ext-sa test-output/not-wf/not-sa
+	mkdir test-output test-output/valid test-output/valid/ext-sa test-output/valid/not-sa test-output/valid/sa test-output/not-wf test-output/not-wf/sa test-output/not-wf/ext-sa test-output/not-wf/not-sa test-output/invalid
 
 ${TEST_PROG}:
 	cd `dirname ${TEST_PROG}` && ${OOC} -MOv `basename ${TEST_PROG}`
 
 clean:
-	for i in canonxml.html invalid not-wf/sa/*.xml not-wf/not-sa/*.xml not-wd/ext-sa/*.xml readme.html valid; do rm -Rf "$$i"; done
+	for i in canonxml.html invalid/*.* not-wf/sa/*.* not-wf/not-sa/*.* not-wf/ext-sa/*.* readme.html valid; do rm -Rf "$$i"; done
 	rm -Rf test-output
 
 test: readme.html test-output ${TEST_PROG}
