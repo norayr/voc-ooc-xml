@@ -1,0 +1,9 @@
+In file p58fail8.xml: 
+line=4, column=28
+94: Expected name token
+line=6, column=0
+114: Character `<' not allowed in attribute value
+line=4, column=30
+96: String not closed
+line=7, column=0
+122: Expected whitespace

@@ -1,0 +1,9 @@
+In file p58fail3.xml: 
+line=5, column=30
+158: Expected name token
+line=9, column=0
+179: Expected attribute value
+line=9, column=16
+195: Expected whitespace
+line=11, column=0
+211: Expected attribute value

@@ -1,0 +1,5 @@
+In file p09fail4.xml: 
+line=3, column=16
+56: String not closed
+line=5, column=6
+72: Expected character `>'

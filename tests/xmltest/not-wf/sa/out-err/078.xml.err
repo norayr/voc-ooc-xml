@@ -1,0 +1,5 @@
+In file not-wf/sa/078.xml: 
+line=2, column=23
+66: General entity `foo' not defined
+line=4, column=4
+83: General entity `foo' not defined

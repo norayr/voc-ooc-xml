@@ -1,0 +1,5 @@
+In file not-wf/uri01.xml: 
+line=3, column=29
+102: Malformed URI: Junk after URI
+uri=foo#bar
+uri_pos=3

@@ -1,0 +1,5 @@
+In file not-wf/sa/028.xml: 
+line=1, column=0
+7: Processing instruction not closed
+line=4, column=0
+44: Expected end tag </doc>

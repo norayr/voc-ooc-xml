@@ -1,0 +1,5 @@
+In file p60fail3.xml: 
+line=3, column=34
+74: Expected name token
+line=5, column=5
+93: Expected attribute type (type name, `NOTATION', or enumeration)

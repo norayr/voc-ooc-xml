@@ -1,0 +1,5 @@
+In file not-wf/sa/027.xml: 
+line=1, column=0
+7: Comment not closed
+line=3, column=0
+25: Expected end tag </doc>

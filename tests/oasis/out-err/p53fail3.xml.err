@@ -1,0 +1,5 @@
+In file p53fail3.xml: 
+line=3, column=18
+58: Expected attribute type (type name, `NOTATION', or enumeration)
+line=5, column=1
+74: Expected character `]'

@@ -1,0 +1,4 @@
+<!DOCTYPE doc SYSTEM "003.ent" [
+<!ENTITY % YN '"Yes"' >
+]>
+<doc>&WhatHeSaid;</doc>

@@ -1,0 +1,3 @@
+In file p18fail3.xml: 
+line=3, column=0
+72: String `]]>' not allowed in character data

@@ -1,0 +1,5 @@
+In file p58fail2.xml: 
+line=5, column=29
+121: Expected character `)'
+line=7, column=0
+140: Expected markup declaration

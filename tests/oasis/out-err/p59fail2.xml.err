@@ -1,0 +1,5 @@
+In file p59fail2.xml: 
+line=3, column=20
+60: Expected character `)'
+line=5, column=0
+79: Expected markup declaration

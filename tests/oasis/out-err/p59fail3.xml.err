@@ -1,0 +1,9 @@
+In file p59fail3.xml: 
+line=3, column=19
+59: Expected Nmtoken
+line=5, column=0
+79: Character `<' not allowed in attribute value
+line=3, column=21
+61: String not closed
+line=6, column=0
+87: Expected whitespace

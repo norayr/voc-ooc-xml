@@ -1,0 +1,3 @@
+In file not-wf/not-sa/002.xml: 
+line=3, column=0
+99: While expanding entity `e': XML declaration must be at beginning of file

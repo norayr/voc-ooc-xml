@@ -1,0 +1,7 @@
+In file not-wf/element03.xml: 
+line=2, column=5
+52: Expected name token
+line=2, column=24
+71: Expected character `='
+line=2, column=40
+87: Expected character `='

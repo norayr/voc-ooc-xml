@@ -1,0 +1,3 @@
+In file p44fail5.xml: 
+line=0, column=15
+15: Attribute `att' is already defined

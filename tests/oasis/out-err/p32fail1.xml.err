@@ -1,0 +1,5 @@
+In file p32fail1.xml: 
+line=0, column=31
+31: String not closed
+line=2, column=0
+48: Expected `?>'

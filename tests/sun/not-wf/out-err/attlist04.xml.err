@@ -1,0 +1,5 @@
+In file not-wf/attlist04.xml: 
+line=6, column=16
+120: Expected attribute type (type name, `NOTATION', or enumeration)
+line=11, column=0
+139: Expected markup declaration

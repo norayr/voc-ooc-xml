@@ -1,0 +1,5 @@
+In file not-wf/sa/001.xml: 
+line=2, column=0
+13: Expected name token
+line=5, column=0
+32: Expected end tag </doc>
