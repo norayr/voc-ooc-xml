@@ -12,6 +12,13 @@ To install the files into the compiler's installation directory, do
 The socket modules are known to work under Linux and Solaris 2.6.  I
 would like to get some feedback for other platforms.
 
+
+IMPORTANT: You'll need oo2c-1.5.3.4 or later to compile the sources.
+At the moment, no there is no 1.5.4 release of the compiler.  the
+patch against oo2c-1.5.3 can be found at
+
+  http://pweb.de/vanacken.do/ooc/oo2c-patches/
+
 --------
 
 At the moment, the XML parser succeeds for all well-formedness tests I
@@ -57,7 +64,7 @@ what happens if your make is not of the GNU persuasion.  I've tried
 this setup under both Linux and SunOS 5.6.)
 
 The C compiler emits some warnings about missing type casts for
-`XML:Parser.c'.  They can be safely ignored.
+`XML_Parser.c'.  They can be safely ignored.
 
 
 
