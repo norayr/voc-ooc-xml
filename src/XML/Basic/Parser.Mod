@@ -8,9 +8,10 @@ MODULE XML:Basic:Parser [OOC_EXTENSIONS];
    This version of the ``basic'' parser does not support namespaces.  *)
 
 IMPORT
-  Ch := Channel, Msg, 
-  XML:DTD, XML:Builder, XML:UnicodeCodec, 
-  XML:Locator, XML:Parser, XML:Error, XML:Basic:Element;
+  Ch := Channel, Msg, URI,
+  XMLError := XML:Error, XML:DTD, XML:Builder, XML:UnicodeCodec, 
+  XML:Locator, XML:Parser, XML:Builder:Validation, XML:Error,
+  XML:Basic:Element;
 
 CONST
   initialNestingDepth = 4;
@@ -150,7 +151,8 @@ PROCEDURE (b: Build) StartElement* (namespaceDecl: DTD.NamespaceDeclaration; loc
       IF (b. stack[b. nestingLevel+1] = NIL) THEN
         b. Error (invalidChildElement)
       ELSE
-        INC (b. nestingLevel)
+        INC (b. nestingLevel);
+        b. stack[b. nestingLevel]. SetLocator (b. locator)
       END
     END
   END StartElement;
@@ -242,23 +244,47 @@ PROCEDURE (b: Build) EndElement* (namespaceDecl: DTD.NamespaceDeclaration; local
   END ParseMIMEHeader;*)
 
 PROCEDURE Parse* (byteReader: Ch.Reader;
+                  baseURI: URI.URI;
                   unicodeFactory: UnicodeCodec.Factory;
+                  validate: BOOLEAN;
                   rootFactory: Element.RootFactory;
                   maxNestingDepth: LONGINT;
                   flags: SET;
-                  VAR errList: Msg.MsgList): Element.Element;
-(**Parses a @samp{start} request.  In case of an error, @oparam{errList} refers
-   to the error list and result is @code{NIL}.  Otherwise, @oparam{errList}
-   is @code{NIL} and an instance of the root element is returned.  *)
+                  VAR errList: XMLError.List): Element.Element;
+(**Parses an XML document from reader @samp{byteReader} request.  If
+   @oparam{baseURI} is not @code{NIL}, or if @oparam{validate} is @code{TRUE},
+   external references in the XML document are followed.  In this case,
+   relative URIs are interpreted using the base URI @oparam{baseURI}.  If
+   @oparam{unicodeFactory} is given, then the document is assumed to use its
+   character encoding.
+
+   The root element of the document is created by selecting the matching
+   factory function from @oparam{rootFactory}.  An error is signalled if the
+   nesting level of an element exceeds @oparam{maxNestingLevel}.
+
+   The parser acts as a validating parser if @oparam{validate} is @code{TRUE}.
+
+   In case of an error, @oparam{errList} refers to the error list and result is
+   @code{NIL}.  Otherwise, @oparam{errList} is @code{NIL} and an instance of
+   the root element is returned.  *)
   VAR
     b: Build;
     parser: Parser.Parser;
+    builder: Builder.Builder;
   BEGIN
     NEW (b);
     InitBuild (b, rootFactory, maxNestingDepth);
     
-    parser := Parser.NewReader (byteReader, NIL, unicodeFactory, NIL, b);
+    IF validate THEN
+      builder := Validation.New (b)
+    ELSE
+      builder := b
+    END;
+    
+    parser := Parser.NewReader (byteReader, baseURI, unicodeFactory, NIL, builder);
     (* ... should disable XMLDecl and DoctypeDecl if flags are set *)
+    parser. followExternalRef := validate OR (baseURI # NIL);
+    parser. validating := validate;
     
     parser. ParseDocument();
     IF (parser. errList. msgCount = 0) THEN
