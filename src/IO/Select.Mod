@@ -1,4 +1,4 @@
-(*	$Id: PosixFileDescr.Mod,v 1.10 1999/10/31 13:58:05 ooc-devel Exp $	*)
+(*	$Id: Select.Mod,v 1.1 2000/08/27 15:13:27 mva Exp $	*)
 MODULE IO:Select [FOREIGN "C"; LINK FILE "IO_Select.c" END];
 (*  Wrapper around the select() function.
     Copyright (C) 2000  Michael van Acken
@@ -73,6 +73,12 @@ PROCEDURE Select* (read, write, except: FileDescrSet;
    On success, the returned value is the total number of ready file descriptors
    in all of the sets.  A result of @samp{-1} signals an error: a descriptor in
    the file descriptor sets is invalid, or one of the timeout value is negative
-   or too large.  *)
+   or too large.
+
+   Note: For the current implementation, a signal that causes @samp{select()}
+   to return with @samp{EINTR} starts the timeout anew.  When this happens,
+   @samp{select()} waits longer than the specified time; if the signals arrive
+   ``just right'' it might even wait forever.  This is a bug and should be
+   fixed ;-)  *)
 
 END IO:Select.

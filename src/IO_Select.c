@@ -1,4 +1,4 @@
-/*	$Id: IO_Select.c,v 1.1 2000/08/27 15:12:41 mva Exp $	*/
+/*	$Id: IO_Select.c,v 1.2 2000/09/12 09:19:04 mva Exp $	*/
 /*  Wrapper around the select() function.
     Copyright (C) 2000  Michael van Acken
 
@@ -152,6 +152,7 @@ int IO_Select__Select(IO_Select__FileDescrSet read,
 		 except ? (fd_set*)(except->fd_set) : NULL,
 		 tvptr);
   } while ((res == -1) && (errno == EINTR));
+  /* ... bug: EINTR must adjust the timeout! */
   return res;
 }
 
