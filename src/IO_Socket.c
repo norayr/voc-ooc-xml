@@ -1,4 +1,4 @@
-/*	$Id: IO_Socket.c,v 1.4 2000/09/16 08:14:36 mva Exp $	*/
+/*	$Id: IO_Socket.c,v 1.5 2000/10/09 19:36:51 mva Exp $	*/
 /*  Interface to socket facilities.
     Copyright (C) 2000  Michael van Acken
 
@@ -620,12 +620,11 @@ int IO_Socket__SocketDesc_SendTo(IO_Socket__Socket s, unsigned char* buff, int b
   return res;
 }
 
-void IO_Socket__SocketDesc_SetBlocking(IO_Socket__Socket s, unsigned char blocking) {
-  int block;
+void IO_Socket__SocketDesc_SetBlocking(IO_Socket__Socket s, OOC_BOOLEAN blocking) {
   int delay_flag;
   
   delay_flag = fcntl(s->fd, F_GETFL, 0);
-  if (block) {
+  if (blocking) {
     delay_flag &= (~O_NDELAY);
   } else {
     delay_flag |= O_NDELAY;
