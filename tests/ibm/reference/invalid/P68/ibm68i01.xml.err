@@ -1,0 +1,6 @@
+In file ibm/invalid/P68/ibm68i01.dtd: 
+line=2, column=25
+69: General entity `ge2' not defined
+In file ibm/invalid/P68/ibm68i01.xml: 
+line=3, column=2
+98: General entity `ge2' not defined

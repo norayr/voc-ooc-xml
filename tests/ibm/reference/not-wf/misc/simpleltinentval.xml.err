@@ -1,0 +1,35 @@
+In file ibm/not-wf/misc/simpleltinentval.xml: 
+line=4, column=2
+138: While expanding entity `gewithlt': Expected name token
+line=5, column=16
+156: Expected character `='
+line=5, column=33
+173: Expected character `='
+line=6, column=5
+199: Expected character `='
+line=6, column=22
+216: Expected character `='
+line=6, column=40
+234: Expected character `='
+line=7, column=5
+255: Expected character `='
+line=7, column=24
+274: Expected character `='
+line=7, column=43
+293: Expected character `='
+line=8, column=5
+311: Expected character `='
+line=8, column=26
+332: Expected character `='
+line=8, column=43
+349: Expected character `='
+line=9, column=5
+365: Expected character `='
+line=9, column=32
+392: Expected character `='
+line=12, column=1
+408: Expected whitespace
+line=12, column=18
+425: Expected character `='
+line=13, column=2
+441: Expected attribute value

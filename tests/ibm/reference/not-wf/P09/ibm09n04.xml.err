@@ -1,0 +1,5 @@
+In file ibm/not-wf/P09/ibm09n04.xml: 
+line=3, column=26
+95: String not closed
+line=8, column=0
+196: Expected character `>'

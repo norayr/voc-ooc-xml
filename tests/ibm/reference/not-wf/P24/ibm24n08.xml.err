@@ -1,0 +1,17 @@
+In file ibm/not-wf/P24/ibm24n08.xml: 
+line=0, column=18
+18: Invalid character in version number
+line=1, column=13
+37: Invalid character in version number
+line=2, column=12
+53: Invalid character in version number
+line=4, column=0
+70: Invalid character in version number
+line=5, column=15
+93: Invalid character in version number
+line=5, column=36
+114: Invalid character in version number
+line=0, column=14
+14: String not closed
+line=5, column=40
+118: Expected whitespace

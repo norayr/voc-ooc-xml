@@ -1,0 +1,11 @@
+In file ibm/not-wf/P43/ibm43n01.xml: 
+line=7, column=1
+125: Expected name token
+line=7, column=17
+141: Expected character `='
+line=7, column=34
+158: Expected character `='
+line=9, column=3
+174: Expected attribute value
+line=9, column=19
+190: Expected character `='

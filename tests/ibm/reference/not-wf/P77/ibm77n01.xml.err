@@ -1,0 +1,9 @@
+In file ibm/not-wf/P77/ibm77n01.xml: 
+line=7, column=16
+184: Expected character `;'
+In file ibm/not-wf/P77/ibm77n01.ent: 
+line=0, column=21
+21: Unknown character encoding
+In file ibm/not-wf/P77/ibm77n01.xml: 
+line=8, column=0
+193: Expected end tag </root>

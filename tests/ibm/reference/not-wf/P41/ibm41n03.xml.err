@@ -1,0 +1,7 @@
+In file ibm/not-wf/P41/ibm41n03.xml: 
+line=6, column=13
+155: Expected attribute value
+line=6, column=31
+173: Expected character `='
+line=6, column=49
+191: Expected character `='

@@ -1,0 +1,5 @@
+In file ibm/not-wf/P89/ibm89n08.xml: 
+line=2, column=3
+46: Expected whitespace
+line=5, column=0
+106: Junk after document element

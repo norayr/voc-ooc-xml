@@ -1,0 +1,5 @@
+In file ibm/invalid/P56/ibm56i11.xml: 
+line=8, column=2
+275: Unparsed entity `image' refers to undeclared notation `gif'
+line=10, column=11
+296: Attribute value `ima ge' does not match the Name production

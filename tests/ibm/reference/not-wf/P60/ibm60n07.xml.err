@@ -1,0 +1,5 @@
+In file ibm/not-wf/P60/ibm60n07.xml: 
+line=8, column=3
+205: While expanding entity `avalue': Expected character `>'
+line=10, column=15
+230: While expanding entity `avalue': Character `<' not allowed in attribute value

@@ -1,0 +1,6 @@
+In file ibm/not-wf/P41/ibm41n11.ent: 
+line=0, column=6
+6: Expected token `encoding'
+In file ibm/not-wf/P41/ibm41n11.xml: 
+line=8, column=14
+234: While expanding entity `aIndirect': Attribute value contains reference to external entity `aExternal'

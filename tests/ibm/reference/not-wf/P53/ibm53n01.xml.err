@@ -1,0 +1,7 @@
+In file ibm/not-wf/P53/ibm53n01.xml: 
+line=5, column=24
+152: Expected attribute value
+line=7, column=10
+169: Expected attribute type (type name, `NOTATION', or enumeration)
+line=10, column=0
+189: Expected attribute value

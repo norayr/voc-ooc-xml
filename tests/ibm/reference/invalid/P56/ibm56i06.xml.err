@@ -1,0 +1,3 @@
+In file ibm/invalid/P56/ibm56i06.xml: 
+line=8, column=3
+237: Element `a' has more than one ID attribute

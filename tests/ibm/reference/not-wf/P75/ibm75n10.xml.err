@@ -1,0 +1,5 @@
+In file ibm/not-wf/P75/ibm75n10.xml: 
+line=3, column=13
+87: Invalid character in public ID string
+line=7, column=2
+168: Could not access URL `': The URI `' does not support channel access

@@ -1,0 +1,7 @@
+In file ibm/not-wf/P41/ibm41n04.xml: 
+line=6, column=6
+148: Expected name token
+line=6, column=22
+164: Expected whitespace
+line=6, column=44
+186: Expected character `='

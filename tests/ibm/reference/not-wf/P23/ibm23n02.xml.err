@@ -1,0 +1,5 @@
+In file ibm/not-wf/P23/ibm23n02.xml: 
+line=0, column=6
+6: Expected token `version'
+line=0, column=23
+23: Expected `?>'

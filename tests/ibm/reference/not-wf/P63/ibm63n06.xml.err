@@ -1,0 +1,5 @@
+In file ibm/not-wf/P63/ibm63n06.dtd: 
+line=3, column=0
+77: Expected `INCLUDE' or `IGNORE'
+line=5, column=0
+126: Junk after external DTD subset

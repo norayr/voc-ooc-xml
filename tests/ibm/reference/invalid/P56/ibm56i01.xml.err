@@ -1,0 +1,3 @@
+In file ibm/invalid/P56/ibm56i01.xml: 
+line=7, column=11
+207: Attribute value `@c999' does not match the Name production

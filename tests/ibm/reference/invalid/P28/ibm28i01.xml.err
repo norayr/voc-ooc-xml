@@ -1,0 +1,3 @@
+In file ibm/invalid/P28/ibm28i01.xml: 
+line=6, column=1
+223: Element name does not match root name `tiger' from the DTD

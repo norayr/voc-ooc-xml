@@ -1,0 +1,3 @@
+In file ibm/not-wf/P68/ibm68n10.xml: 
+line=10, column=2
+248: While expanding entity `eee': General entity `aaa' is defined recursively

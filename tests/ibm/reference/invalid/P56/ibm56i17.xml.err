@@ -1,0 +1,3 @@
+In file ibm/invalid/P56/ibm56i17.xml: 
+line=9, column=11
+236: Attribute value `x : image' does not match the Nmtoken production

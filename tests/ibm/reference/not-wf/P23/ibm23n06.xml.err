@@ -1,0 +1,11 @@
+In file ibm/not-wf/P23/ibm23n06.xml: 
+line=0, column=1
+1: Expected name token
+line=0, column=54
+54: Expected name token
+line=1, column=12
+70: Expected whitespace
+line=2, column=13
+88: Expected character `='
+line=5, column=42
+154: Expected character `<'

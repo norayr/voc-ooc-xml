@@ -1,0 +1,3 @@
+In file ibm/invalid/P50/ibm50i01.dtd: 
+line=6, column=28
+181: Nesting violation: Opening and closing parenthesis not in same entity

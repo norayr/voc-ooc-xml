@@ -1,0 +1,3 @@
+In file ibm/invalid/P51/ibm51i01.dtd: 
+line=9, column=20
+277: While expanding entity `mixed2': Nesting violation: Opening and closing parenthesis not in same entity

@@ -1,0 +1,5 @@
+In file ibm/not-wf/P10/ibm10n03.xml: 
+line=13, column=21
+310: Expected whitespace
+line=13, column=46
+335: Expected character `='

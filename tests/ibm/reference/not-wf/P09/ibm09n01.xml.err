@@ -1,0 +1,5 @@
+In file ibm/not-wf/P09/ibm09n01.xml: 
+line=3, column=31
+101: Parameter entity references are restricted to markup declarations in the internal subset of the DTD
+line=20, column=1
+223: Expected character `>'

@@ -1,0 +1,7 @@
+In file ibm/not-wf/P10/ibm10n08.xml: 
+line=13, column=42
+360: Character `<' not allowed in attribute value
+line=13, column=15
+333: String not closed
+line=14, column=0
+372: Expected character `>'

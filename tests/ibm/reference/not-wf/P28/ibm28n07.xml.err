@@ -1,0 +1,7 @@
+In file ibm/not-wf/P28/ibm28n07.xml: 
+line=1, column=17
+57: Expected character `>'
+line=2, column=13
+73: Expected character `='
+line=6, column=0
+150: Expected character `<'

@@ -1,0 +1,7 @@
+In file ibm/not-wf/P53/ibm53n08.xml: 
+line=5, column=12
+135: Expected name token
+line=5, column=28
+151: Expected attribute type (type name, `NOTATION', or enumeration)
+line=7, column=3
+167: Expected element

@@ -1,0 +1,5 @@
+In file ibm/not-wf/P72/ibm72n09.xml: 
+line=5, column=8
+150: Expected whitespace
+line=5, column=35
+177: Expected character `>'

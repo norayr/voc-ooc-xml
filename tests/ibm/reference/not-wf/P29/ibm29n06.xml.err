@@ -1,0 +1,5 @@
+In file ibm/not-wf/P29/ibm29n06.xml: 
+line=5, column=3
+197: Comment not closed
+line=8, column=0
+258: Expected character `]'

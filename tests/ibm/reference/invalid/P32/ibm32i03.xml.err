@@ -1,0 +1,3 @@
+In file ibm/invalid/P32/ibm32i03.xml: 
+line=8, column=8
+352: With standalone='yes', this attribute value must not change with normalization

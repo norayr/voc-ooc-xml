@@ -1,0 +1,15 @@
+In file ibm/not-wf/P12/ibm12n03.xml: 
+line=3, column=32
+101: Invalid character in public ID string
+line=6, column=0
+119: Invalid character in public ID string
+line=6, column=62
+181: Invalid character in public ID string
+line=7, column=20
+204: Invalid character in public ID string
+line=7, column=37
+221: Invalid character in public ID string
+line=3, column=29
+98: String not closed
+line=7, column=38
+222: Expected whitespace

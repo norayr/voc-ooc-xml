@@ -1,0 +1,7 @@
+In file ibm/not-wf/P40/ibm40n02.xml: 
+line=6, column=10
+152: Expected whitespace
+line=6, column=26
+168: Expected attribute value
+line=6, column=46
+188: Expected character `='

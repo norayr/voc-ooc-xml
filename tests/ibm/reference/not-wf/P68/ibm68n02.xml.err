@@ -1,0 +1,9 @@
+In file ibm/not-wf/P68/ibm68n02.xml: 
+line=6, column=15
+127: Expected character `;'
+line=6, column=35
+147: Character `<' not allowed in attribute value
+line=6, column=10
+122: String not closed
+line=7, column=0
+156: Expected character `>'

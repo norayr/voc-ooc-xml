@@ -1,0 +1,13 @@
+In file ibm/not-wf/P20/ibm20n01.xml: 
+line=6, column=1
+137: Expected name token
+line=6, column=17
+153: Expected character `='
+line=6, column=33
+169: Expected attribute value
+line=7, column=0
+187: Expected attribute value
+line=7, column=17
+204: Expected character `='
+line=7, column=38
+225: Expected character `='

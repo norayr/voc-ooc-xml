@@ -1,0 +1,7 @@
+In file ibm/not-wf/P66/ibm66n02.xml: 
+line=6, column=45
+130: Expected digit [0-9a-fA-F]
+line=6, column=10
+95: String not closed
+line=7, column=0
+135: Expected character `>'

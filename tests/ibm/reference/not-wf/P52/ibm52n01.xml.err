@@ -1,0 +1,5 @@
+In file ibm/not-wf/P52/ibm52n01.xml: 
+line=5, column=22
+148: Expected attribute type (type name, `NOTATION', or enumeration)
+line=7, column=1
+164: Expected character `]'

@@ -1,0 +1,5 @@
+In file ibm/not-wf/P01/ibm01n02.xml: 
+line=1, column=0
+55: XML declaration must be at beginning of file
+line=2, column=0
+78: Junk after document element

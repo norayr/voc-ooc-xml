@@ -1,0 +1,5 @@
+In file ibm/not-wf/P41/ibm41n13.xml: 
+line=6, column=2
+183: While expanding entity `withlt': Expected end tag </lessthan>
+line=7, column=14
+199: While expanding entity `withlt': Character `<' not allowed in attribute value

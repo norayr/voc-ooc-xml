@@ -1,0 +1,6 @@
+In file ibm/invalid/P49/ibm49i02.xml: 
+line=3, column=2
+90: Could not access URL `file:ibm/invalid/P49/ibm49i02.dtd': The named file does not exist
+errno=2
+errstr=No such file or directory
+file_name=ibm/invalid/P49/ibm49i02.dtd

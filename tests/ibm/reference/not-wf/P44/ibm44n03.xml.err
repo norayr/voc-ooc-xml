@@ -1,0 +1,9 @@
+In file ibm/not-wf/P44/ibm44n03.xml: 
+line=6, column=17
+161: Expected whitespace
+line=7, column=12
+177: Expected character `='
+line=7, column=29
+194: Expected character `='
+line=7, column=45
+210: Expected character `='

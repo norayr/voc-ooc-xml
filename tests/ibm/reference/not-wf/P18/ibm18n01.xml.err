@@ -1,0 +1,5 @@
+In file ibm/not-wf/P18/ibm18n01.xml: 
+line=6, column=50
+188: String `]]>' not allowed in character data
+line=9, column=0
+207: Expected end tag </student>

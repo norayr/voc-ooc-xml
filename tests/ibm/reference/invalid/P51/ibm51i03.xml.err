@@ -1,0 +1,3 @@
+In file ibm/invalid/P51/ibm51i03.xml: 
+line=9, column=2
+275: In element `e', child `a' appears multiple times in the Mixed declaration

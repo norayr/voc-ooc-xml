@@ -1,0 +1,5 @@
+In file ibm/not-wf/P54/ibm54n01.xml: 
+line=6, column=16
+140: Expected attribute type (type name, `NOTATION', or enumeration)
+line=6, column=34
+158: Expected whitespace

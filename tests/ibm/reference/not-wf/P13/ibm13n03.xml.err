@@ -1,0 +1,11 @@
+In file ibm/not-wf/P13/ibm13n03.xml: 
+line=2, column=45
+82: Invalid character in public ID string
+In file ibm/not-wf/P13/student.dtd: 
+line=2, column=1
+52: Expected name token
+line=2, column=18
+69: Expected character `='
+In file ibm/not-wf/P13/ibm13n03.xml: 
+line=8, column=0
+193: Document `file:ibm/not-wf/P13/ibm13n03.xml' had 2 character encoding errors

@@ -1,0 +1,7 @@
+In file ibm/not-wf/P11/ibm11n03.xml: 
+line=1, column=25
+48: String not closed
+line=7, column=0
+209: Malformed URI: Illegal character in path component of the URI
+uri=student.DTD%20[%0A%09%3C!ELEMENT%20student%20(#PCDATA)%3E%20%0A]%3E%0A%0A%3C!--%20testing%20invalid%20system%20literal%20with%20no%20closing%20bracket%20%20--%3E%0A%3Cstudent%3EMy%20Name%20is%20SnowMan.%20%3C/student%3E%0A
+uri_pos=14

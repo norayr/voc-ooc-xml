@@ -1,0 +1,3 @@
+In file ibm/invalid/P58/ibm58i02.xml: 
+line=9, column=3
+314: Attribute declaration `blob/@content-encoding' refers to undeclared notation `raw'
