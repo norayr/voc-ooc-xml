@@ -1,10 +1,11 @@
-/* 	$Id: OS_ProcessParameters.c,v 1.2 2000/09/12 09:19:04 mva Exp $	 */
+/* 	$Id: OS_ProcessParameters.c,v 1.3 2000/10/09 19:33:44 mva Exp $	 */
 #include "__oo2c.h"
 
 #include <unistd.h>
 #include <errno.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 #include "__mini_gc.h"
 
 /* begin -  #include "OS:ProcessParameters.d" */
