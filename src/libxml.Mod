@@ -1,4 +1,5 @@
-MODULE libxml;  <* Warnings := FALSE *>
+MODULE libxml [LIBRARY "oo2c_xml" "0:0:0"; INTERFACE "C"];
+<* Warnings := FALSE *>
 
 IMPORT
   OS:Files,

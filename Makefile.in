@@ -9,7 +9,7 @@ OOC_LIBDIR=@OOC_LIBDIR@
 OOC_INIT=@OOC_INIT@
 
 ### Does the compiler support creating libraries (yes/no)?
-ooc_have_libs=no  # disabled for now, otherwise use @ooc_have_libs@
+ooc_have_libs=@ooc_have_libs@
 
 ### Name of this package.
 package=XML
