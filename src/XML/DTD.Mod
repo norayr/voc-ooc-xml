@@ -1,4 +1,4 @@
-(* 	$Id: DTD.Mod,v 1.16 2001/03/21 21:09:40 mva Exp $	 *)
+(* 	$Id: DTD.Mod,v 1.17 2001/03/24 01:10:12 mva Exp $	 *)
 MODULE XML:DTD [OOC_EXTENSIONS];
 (*  Implements the internal representation of a document DTD.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -25,7 +25,7 @@ MODULE XML:DTD [OOC_EXTENSIONS];
    information.  *)
 
 IMPORT
-  LongStrings, URI, XML:UnicodeBuffer;
+  LongStrings, URI, XML:UnicodeCodec, XML:UnicodeBuffer;
 
 
 TYPE
@@ -291,6 +291,12 @@ TYPE
        no encoding is given.  *)
     standalone-: StandaloneType;
     (**The standalone declaration.  Only applicable to the document entity.  *)
+    
+    codecFactory-: UnicodeCodec.Factory;
+    (**The factory object that produced the Unicode decoder that is used to
+       access the files contents.  If @ofield{encoding} is @code{NIL}, the
+       factory is derived by auto detection.  Otherwise, the encoding 
+       declaration @ofield{encoding} is used to retrieve it.  *)
   END;
 
 
@@ -410,7 +416,8 @@ CONST
   (**If the document source for a character sequence does not match the
      @code{S} production (for example, because it includes a non-whitespace
      character, a character reference, or is a @code{CDATA} section), then
-     @oparam{elementWhitespace} is @oconst{DTD.elementWhitespaceNo}.  *)
+     @oparam{*XML:Builder.Characters.elementWhitespace} is
+     @oconst{elementWhitespaceNo}.  *)
   elementWhitespaceUnknown* = 2;
   (**If the document source matches the production @code{S}, but the parser
      does not know if the current element permits only element content, then
@@ -926,6 +933,11 @@ PROCEDURE (b: Builder) NewExternalEntity* (name: String; type: EntityType;
     InitExternalEntity (ent, name, type, public, system, ndata, baseURI, externalMarkupDecl);
     RETURN ent
   END NewExternalEntity;
+
+PROCEDURE (entity: ExternalEntity) SetCodecFactory* (codecFactory: UnicodeCodec.Factory);
+  BEGIN
+    entity. codecFactory := codecFactory;
+  END SetCodecFactory;
 
 PROCEDURE (entity: ExternalEntity) SetVersion* (version: String);
   BEGIN
