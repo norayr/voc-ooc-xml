@@ -1,0 +1,5 @@
+In file not-wf/sa/051.xml: 
+line=1, column=1
+21: Expected name token
+line=2, column=4
+38: Expected character `='

@@ -1,0 +1,5 @@
+In file p59fail1.xml: 
+line=3, column=19
+59: Expected Nmtoken
+line=5, column=0
+76: Expected markup declaration

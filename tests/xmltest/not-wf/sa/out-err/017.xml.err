@@ -1,0 +1,5 @@
+In file not-wf/sa/017.xml: 
+line=0, column=5
+5: CDATA section not closed
+line=1, column=0
+22: Expected end tag </doc>

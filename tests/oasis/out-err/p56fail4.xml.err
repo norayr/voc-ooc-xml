@@ -1,0 +1,5 @@
+In file p56fail4.xml: 
+line=3, column=18
+58: Expected attribute type (type name, `NOTATION', or enumeration)
+line=3, column=34
+74: Expected whitespace

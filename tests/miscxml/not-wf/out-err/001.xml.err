@@ -1,0 +1,3 @@
+In file not-wf/001.xml: 
+line=5, column=9
+106: While expanding entity `e': Character `<' not allowed in attribute value

@@ -1,0 +1,7 @@
+In file not-wf/sa/158.xml: 
+line=3, column=10
+92: Expected name token
+line=3, column=33
+115: Expected attribute type (type name, `NOTATION', or enumeration)
+line=5, column=1
+131: Expected character `]'

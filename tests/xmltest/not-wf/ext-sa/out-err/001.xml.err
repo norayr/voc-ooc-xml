@@ -1,0 +1,3 @@
+In file not-wf/ext-sa/001.ent: 
+line=0, column=3
+3: General entity `e' is defined recursively

@@ -1,0 +1,5 @@
+In file p60fail1.xml: 
+line=3, column=24
+64: Expected attribute value
+line=5, column=1
+80: Expected character `]'

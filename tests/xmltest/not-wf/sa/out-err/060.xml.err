@@ -1,0 +1,5 @@
+In file not-wf/sa/060.xml: 
+line=2, column=17
+60: Expected attribute type (type name, `NOTATION', or enumeration)
+line=3, column=0
+76: Expected attribute value

@@ -1,0 +1,9 @@
+In file p43fail2.xml: 
+line=6, column=1
+104: Expected name token
+line=6, column=17
+120: Expected whitespace
+line=6, column=34
+137: Expected attribute value
+line=8, column=0
+162: Expected end tag </elem>

@@ -1,0 +1,6 @@
+In file not-wf/sa/084.xml: 
+line=5, column=4
+115: Could not access URL `file:not-wf/sa/nul': The named file does not exist
+errno=2
+errstr=No such file or directory
+file_name=not-wf/sa/nul

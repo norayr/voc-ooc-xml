@@ -1,0 +1,5 @@
+In file not-wf/element02.xml: 
+line=2, column=5
+52: Expected name token
+line=2, column=29
+76: Parameter entity references are restricted to markup declarations in the internal subset of the DTD

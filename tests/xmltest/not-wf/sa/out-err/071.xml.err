@@ -1,0 +1,3 @@
+In file not-wf/sa/071.xml: 
+line=5, column=5
+89: While expanding entity `e3': General entity `e1' is defined recursively

@@ -1,0 +1,3 @@
+In file not-wf/002.xml: 
+line=5, column=5
+104: While expanding entity `e': Replacement text of general entity `e' is not valid content

@@ -1,0 +1,5 @@
+In file p56fail3.xml: 
+line=3, column=18
+58: Expected attribute type (type name, `NOTATION', or enumeration)
+line=4, column=0
+74: Expected attribute value
