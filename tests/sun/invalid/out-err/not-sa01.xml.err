@@ -1,0 +1,5 @@
+In file invalid/not-sa01.xml: 
+line=4, column=6
+92: With standalone='yes', `root' cannot have white space content
+line=8, column=12
+204: With standalone='yes', `root' cannot have white space content

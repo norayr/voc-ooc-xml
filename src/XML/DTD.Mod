@@ -1,4 +1,4 @@
-(* 	$Id: DTD.Mod,v 1.9 2001/03/17 21:34:43 mva Exp $	 *)
+(* 	$Id: DTD.Mod,v 1.10 2001/03/17 23:14:09 mva Exp $	 *)
 MODULE XML:DTD [OOC_EXTENSIONS];
 (*  Implements the internal representation of a document DTD.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -197,6 +197,7 @@ TYPE
   (DeclarationDesc)
     elementName-: String;
     type-: AttributeType;
+    externalMarkupDecl-: BOOLEAN;
     enumeration-: Enumeration;
     default-: DefaultType;
     defaultValue-: AttValue;
@@ -244,7 +245,8 @@ TYPE
        version of an external entity.  For an internal entity, this field
        is never @code{NIL}.  This string is not terminated with an @code{0X},
        use @oproc{Entity.LengthValue} to determine its length.  *)
-
+    externalMarkupDecl-: BOOLEAN;
+    (**Set if the entity is declared in an external markup declaration.  *)
     expanding*: BOOLEAN;
     (**This field is used internally by the parser.  While expanding the 
        entity, it is set to @code{TRUE}.  *)
@@ -568,11 +570,14 @@ PROCEDURE (attValue: AttValue) Length* (): LONGINT;
     RETURN len
   END Length;
 
-PROCEDURE (attValue: AttValue) FlattenValue* (normalizeWhitespace: BOOLEAN): String;
-(**Returns the string representation of the attribute value
-   @oparam{attValue}.  If @oparam{normalizeWhitespace} is @code{TRUE}, then
-   sequences of spaces are collapsed into a single space, and leading and
-   trailing whitespace is removed from the string.  *)
+PROCEDURE (attValue: AttValue) FlattenValue* (normalizeWhitespace: BOOLEAN;
+                                        VAR didNormalization: BOOLEAN): String;
+(**Returns the string representation of the attribute value @oparam{attValue}.
+   If @oparam{normalizeWhitespace} is @code{TRUE}, then sequences of spaces are
+   collapsed into a single space, and leading and trailing whitespace is
+   removed from the string.  On completion, @oparam{didNormalization} is
+   @code{TRUE} if, and only if, the value was modified by normalizing
+   whitespace.  *)
    
   VAR
     str: String;
@@ -594,6 +599,8 @@ PROCEDURE (attValue: AttValue) FlattenValue* (normalizeWhitespace: BOOLEAN): Str
               str[pos] := " ";
               INC (pos);
               skipSpace := normalizeWhitespace
+            ELSE
+              didNormalization := TRUE
             END;
           ELSE
             skipSpace := FALSE;
@@ -629,24 +636,38 @@ PROCEDURE (attValue: AttValue) FlattenValue* (normalizeWhitespace: BOOLEAN): Str
        by the XML parser *)
     pos := 0;
     skipSpace := normalizeWhitespace;
+    didNormalization := FALSE;
     Append (attValue);
     IF normalizeWhitespace & (pos # 0) & (str[pos-1] = " ") THEN
-      DEC (pos)
+      DEC (pos); didNormalization := TRUE
     END;
     str[pos] := 0X;
     RETURN str
   END FlattenValue;
 
 PROCEDURE (attValue: AttValue) Flatten* (attrDecl: AttrDecl): String;
-(**Returns the string representation of the attribute value
-   @oparam{attrDecl}.  If @oparam{attrDecl} is not @code{NIL}, and
-   the attribute's type is not @oconst{attrCDATA}, then
-   sequences of spaces are collapsed into a single space, and leading and
-   trailing whitespace is removed from the string.  *)
+(**Returns the string representation of the attribute value @oparam{attrDecl}.
+   If @oparam{attrDecl} is not @code{NIL}, and the attribute's type is not
+   @oconst{attrCDATA}, then sequences of spaces are collapsed into a single
+   space, and leading and trailing whitespace is removed from the string.  *)
+  VAR
+    didNormalization: BOOLEAN;
   BEGIN
     RETURN attValue. FlattenValue ((attrDecl # NIL) &
-                                   (attrDecl. type # attrCDATA));
+                                   (attrDecl. type # attrCDATA),
+                                   didNormalization);
   END Flatten;
+
+PROCEDURE (attValue: AttValue) FlattenNorm* (attrDecl: AttrDecl;
+                                        VAR didNormalization: BOOLEAN): String;
+(**Like @oproc{AttValue.Flatten}, but reports if normalization has been done.
+   On completion, @oparam{didNormalization} is @code{TRUE} if, and only if, the
+   value was modified by normalizing whitespace.  *)
+  BEGIN
+    RETURN attValue. FlattenValue ((attrDecl # NIL) &
+                                   (attrDecl. type # attrCDATA),
+                                   didNormalization);
+  END FlattenNorm;
 
 
 (* Attribute Declaration
@@ -694,25 +715,28 @@ PROCEDURE (enum: Enumeration) Matches* (VAR name: StringVar): BOOLEAN;
 
 PROCEDURE InitAttrDecl* (attrDecl: AttrDecl; elementName, name: String;
                          type: AttributeType; enum: Enumeration;
-                         default: DefaultType; defaultValue: AttValue);
+                         default: DefaultType; defaultValue: AttValue;
+                         externalMarkupDecl: BOOLEAN);
   BEGIN
     InitDeclaration (attrDecl, name);
     attrDecl. elementName := elementName;
     attrDecl. type := type;
+    attrDecl. externalMarkupDecl := externalMarkupDecl;
     attrDecl. enumeration := enum;
     attrDecl. default := default;
-    attrDecl. defaultValue := defaultValue
+    attrDecl. defaultValue := defaultValue;
   END InitAttrDecl;
 
 PROCEDURE (b: Builder) NewAttrDecl* (elementName, name: String;
                         type: AttributeType; enum: Enumeration;
-                        default: DefaultType; defaultValue: AttValue): AttrDecl;
+                        default: DefaultType; defaultValue: AttValue;
+                        externalMarkupDecl: BOOLEAN): AttrDecl;
   VAR
     attrDecl: AttrDecl;
   BEGIN
     NEW (attrDecl);
     InitAttrDecl (attrDecl, elementName, name, type, enum,
-                  default, defaultValue);
+                  default, defaultValue, externalMarkupDecl);
     RETURN attrDecl
   END NewAttrDecl;
 
@@ -772,10 +796,11 @@ PROCEDURE (b: Builder) AttachAttributes*;
    ------------------------------------------------------------------------ *)
 
 PROCEDURE InitEntity (ent: Entity; name: String; type: EntityType;
-                      entityValue: String);
+                      entityValue: String; externalMarkupDecl: BOOLEAN);
   BEGIN
     InitDeclaration (ent, name);
     ent. type := type;
+    ent. externalMarkupDecl := externalMarkupDecl;
     ent. entityValue := entityValue;
     ent. expanding := FALSE;
     ent. attValue := NIL
@@ -792,21 +817,28 @@ PROCEDURE (entity: Entity) LengthValue*(): LONGINT;
     RETURN LEN (entity. entityValue^)-2
   END LengthValue;
 
+PROCEDURE (entity: Entity) IsDocumentEntity* (): BOOLEAN;
+  BEGIN
+    RETURN FALSE
+  END IsDocumentEntity;
+
 
 PROCEDURE InitInternalEntity (ent: InternalEntity;
                               name: String; type: EntityType;
-                              entityValue: String);
+                              entityValue: String;
+                              externalMarkupDecl: BOOLEAN);
   BEGIN
-    InitEntity (ent, name, type, entityValue);
+    InitEntity (ent, name, type, entityValue, externalMarkupDecl);
   END InitInternalEntity;
 
 PROCEDURE (b: Builder) NewInternalEntity* (name: String; type: EntityType;
-                                          entityValue: String): InternalEntity;
+                                          entityValue: String;
+                                          externalMarkupDecl: BOOLEAN): InternalEntity;
   VAR
     ent: InternalEntity;
   BEGIN
     NEW (ent);
-    InitInternalEntity (ent, name, type, entityValue);
+    InitInternalEntity (ent, name, type, entityValue, externalMarkupDecl);
     RETURN ent
   END NewInternalEntity;
 
@@ -834,9 +866,10 @@ PROCEDURE (b: Builder) IsValidEntityDecl* (name, entityValue: String): BOOLEAN;
 PROCEDURE InitExternalEntity (ent: ExternalEntity;
                               name: String; type: EntityType;
                               public, system, ndata: String;
-                              baseURI: URI.URI);
+                              baseURI: URI.URI;
+                              externalMarkupDecl: BOOLEAN);
   BEGIN
-    InitEntity (ent, name, type, NIL);
+    InitEntity (ent, name, type, NIL, externalMarkupDecl);
     ent. public := public;
     ent. system := system;
     ent. baseURI := baseURI;
@@ -848,12 +881,13 @@ PROCEDURE InitExternalEntity (ent: ExternalEntity;
 
 PROCEDURE (b: Builder) NewExternalEntity* (name: String; type: EntityType;
                                            public, system, ndata: String;
-                                           baseURI: URI.URI): ExternalEntity;
+                                           baseURI: URI.URI;
+                                           externalMarkupDecl: BOOLEAN): ExternalEntity;
   VAR
     ent: ExternalEntity;
   BEGIN
     NEW (ent);
-    InitExternalEntity (ent, name, type, public, system, ndata, baseURI);
+    InitExternalEntity (ent, name, type, public, system, ndata, baseURI, externalMarkupDecl);
     RETURN ent
   END NewExternalEntity;
 
@@ -872,6 +906,11 @@ PROCEDURE (entity: ExternalEntity) SetStandalone* (standalone: StandaloneType);
     entity. standalone := standalone
   END SetStandalone;
 
+PROCEDURE (entity: ExternalEntity) IsDocumentEntity* (): BOOLEAN;
+  BEGIN
+    RETURN (entity. type = entityDocument)
+  END IsDocumentEntity;
+
 PROCEDURE (b: Builder) NewExternalDTD* (public, system: String;
                                         baseURI: URI.URI): ExternalEntity;
   VAR
@@ -879,7 +918,7 @@ PROCEDURE (b: Builder) NewExternalDTD* (public, system: String;
   BEGIN
     NEW (entity);
     InitExternalEntity (entity, NIL, entityExternalDTDSubset,
-                        public, system, NIL, baseURI);
+                        public, system, NIL, baseURI, FALSE);
     RETURN entity
   END NewExternalDTD;
 
@@ -889,7 +928,7 @@ PROCEDURE (b: Builder) NewDocumentEntity* (baseURI: URI.URI): ExternalEntity;
   BEGIN
     NEW (entity);
     InitExternalEntity (entity, NIL, entityDocument,
-                        NIL, NIL, NIL, baseURI);
+                        NIL, NIL, NIL, baseURI, FALSE);
     entity. standalone := standaloneNotPresent;
     RETURN entity
   END NewDocumentEntity;
@@ -1006,6 +1045,16 @@ PROCEDURE (elemDecl: ElementDecl) IsEmpty* (): BOOLEAN;
            (elemDecl. contentModel(NameCP). name^ = "EMPTY")
   END IsEmpty;
 
+PROCEDURE (elemDecl: ElementDecl) IsElementContent* (): BOOLEAN;
+  BEGIN
+    (* element content is equivalent to not having mixed content *)
+    RETURN 
+      ~((elemDecl. contentModel IS ChoiceCP) &
+        (elemDecl. contentModel(ChoiceCP). list IS NameCP) &
+        (elemDecl. contentModel(ChoiceCP). list(NameCP). name^ = "#PCDATA"))
+  END IsElementContent;
+
+
 
 (* Namespace Declaration
    ------------------------------------------------------------------------ *)
@@ -1071,7 +1120,7 @@ PROCEDURE Init* (b: Builder);
       replString[LEN (replString^)-2] := UnicodeBuffer.markerEOD;
       
       entity := b. NewInternalEntity (nameString, entityInternalGeneral, 
-                                      replString);
+                                      replString, FALSE);
       dummy := b. geNamespace. Add (entity)
     END PredefEntity;
   
@@ -1101,5 +1150,5 @@ PROCEDURE New*(): Builder;
 
 BEGIN
   NEW (undefAttr);
-  InitAttrDecl (undefAttr, NIL, NIL, -1, NIL, -1, NIL);
+  InitAttrDecl (undefAttr, NIL, NIL, -1, NIL, -1, NIL, FALSE);
 END XML:DTD.

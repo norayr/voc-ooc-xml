@@ -1,0 +1,19 @@
+In file invalid/not-sa02.xml: 
+line=18, column=4
+378: With standalone='yes', this attribute value must not change with normalization
+line=19, column=4
+403: With standalone='yes', this attribute value must not change with normalization
+line=20, column=4
+442: With standalone='yes', this attribute value must not change with normalization
+line=22, column=4
+496: With standalone='yes', this attribute value must not change with normalization
+line=23, column=4
+520: With standalone='yes', this attribute value must not change with normalization
+line=25, column=4
+551: With standalone='yes', this attribute value must not change with normalization
+line=26, column=4
+604: With standalone='yes', this attribute value must not change with normalization
+line=27, column=4
+632: With standalone='yes', this attribute value must not change with normalization
+line=31, column=5
+722: With standalone='yes', the attribute `token' is taken from an external markup declaration

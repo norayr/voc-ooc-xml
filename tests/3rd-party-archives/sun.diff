@@ -44,3 +44,27 @@ diff -Nru sun.orig/invalid/attr12.xml sun/invalid/attr12.xml
      >
      <!-- tests the "attribute default legal" vc -->
  
+diff -Nru sun.orig/invalid/not-sa02.xml sun/invalid/not-sa02.xml
+--- sun.orig/invalid/not-sa02.xml	Sun Mar 18 13:21:39 2001
++++ sun/invalid/not-sa02.xml	Sun Mar 18 13:22:11 2001
+@@ -18,7 +18,8 @@
+ <attributes
+     notation =	" nonce "
+     nmtoken =	" this-gets-normalized "
+-    nmtokens =	" this&#x0d;&#x0a; also	 gets&#x20; normalized "
++    nmtokens =	" this
++ also	 gets&#x20; normalized "
+     id =	"	&internal; "
+     idref =	" &internal;
+     "
+diff -Nru sun.orig/invalid/not-sa08.xml sun/invalid/not-sa08.xml
+--- sun.orig/invalid/not-sa08.xml	Fri Jul  9 04:42:40 1999
++++ sun/invalid/not-sa08.xml	Sun Mar 18 14:46:12 2001
+@@ -8,5 +8,6 @@
+ 
+ <attributes
+     token =	"b"
+-    nmtokens =	" this&#x0d;&#x0a; also	 gets&#x20; normalized "
++    nmtokens =	" this
++ also	 gets&#x20; normalized "
+     />

@@ -1,7 +1,7 @@
-(*      $Id: Canonical.Mod,v 1.7 2000/08/08 13:58:37 mva Exp $   *)
+(*      $Id: Canonical.Mod,v 1.8 2000/11/08 14:15:07 mva Exp $   *)
 MODULE XML:Builder:Canonical [OOC_EXTENSIONS];
 (*  Translates XML document to canonical XML.
-    Copyright (C) 2000  Michael van Acken
+    Copyright (C) 2000, 2001  Michael van Acken
 
     This module is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License

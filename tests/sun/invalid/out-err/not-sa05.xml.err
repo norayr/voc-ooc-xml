@@ -1,0 +1,3 @@
+In file invalid/not-sa05.xml: 
+line=9, column=4
+152: With standalone='yes', this attribute value must not change with normalization

@@ -1,4 +1,4 @@
-(*      $Id: Validation.Mod,v 1.2 2001/03/17 23:14:55 mva Exp $   *)
+(*      $Id: Validation.Mod,v 1.3 2001/03/18 00:10:26 mva Exp $   *)
 MODULE XML:Builder:Validation;
 (*  Adds validation services to the XML:Parser.
     Copyright (C) 2001  Michael van Acken
@@ -27,16 +27,25 @@ IMPORT
 
 TYPE
   Builder* = POINTER TO BuilderDesc;
+  Stack = POINTER TO ARRAY OF DTD.ElementDecl;
   BuilderDesc = RECORD
   (**This builder adds validation services to the parser.  *)
     (B.BuilderDesc)
     parserLocator: Locator.Locator;
     delegateBuilder: B.Builder;
     errorListener: Locator.ErrorListener;
+    
+    documentEntity: DTD.ExternalEntity;
     dtd: DTD.Builder;
     notationNamespace: DTD.Namespace;
     idNamespace: DTD.Namespace;
     idrefNamespace: DTD.Namespace;
+    
+    currLevel: LONGINT;
+    (* level of current element; document element is 0, each nesting level
+       adds 1 *)
+    stack: Stack;
+    (* stack[currLevel] may be NIL, if the element type is not declared *)
   END;
 
 TYPE
@@ -68,6 +77,12 @@ CONST  (* error codes *)
   invalidDefaultValue = 17;
   multipleIDs = 18;
   invalidIDREF = 19;
+  invalidStandaloneWhitespace = 20;
+  invalidStandaloneAttrNormalization = 21;
+  invalidStandaloneAttrEntityRef = 22;
+  invalidStandaloneDefaultAttr = 23;
+  invalidStandaloneElemEntityRef = 24;
+  invalidCharacterContent = 25;
   
 VAR
   validationContext: Error.Context;
@@ -220,6 +235,12 @@ PROCEDURE IsNmtokens (VAR string: ARRAY OF DTD.Char): BOOLEAN;
     RETURN FALSE
   END IsNmtokens;
 
+PROCEDURE IsStandalone (b: Builder): BOOLEAN;
+  BEGIN
+    RETURN (b. documentEntity. standalone = DTD.standaloneYes) &
+           (b. parserLocator. entity. type = DTD.entityDocument)
+  END IsStandalone;
+
 
 PROCEDURE NewIDDecl (name: DTD.String): IDDecl;
   VAR
@@ -230,10 +251,38 @@ PROCEDURE NewIDDecl (name: DTD.String): IDDecl;
     RETURN idDecl
   END NewIDDecl;
 
+PROCEDURE PushElement (b: Builder; elemDecl: DTD.Declaration);
+  VAR
+    i: LONGINT;
+    new: Stack;
+  BEGIN
+    IF (b. currLevel = LEN (b. stack^)) THEN
+      NEW (new, LEN (b. stack^)*2);
+      FOR i := 0 TO LEN (b. stack^)-1 DO
+        new[i] := b. stack[i]
+      END;
+      b. stack := new
+    END;
+    INC (b. currLevel);
+    IF (elemDecl = NIL) THEN
+      b. stack[b. currLevel] := NIL
+    ELSE
+      b. stack[b. currLevel] := elemDecl(DTD.ElementDecl)
+    END
+  END PushElement;
+
+PROCEDURE PopElement (b: Builder);
+  BEGIN
+    b. stack[b. currLevel] := NIL;
+    DEC (b. currLevel)
+  END PopElement;
+
+
 
 
 PROCEDURE (b: Builder) StartDocument* (documentEntity: DTD.ExternalEntity);
   BEGIN
+    b. documentEntity := documentEntity;
     b. delegateBuilder. StartDocument (documentEntity)
   END StartDocument;
 
@@ -271,7 +320,7 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
       decl: DTD.Declaration;
       attrDecl: DTD.AttrDecl;
       default: DTD.String;
-      match: BOOLEAN;
+      match, didNormalization: BOOLEAN;
     BEGIN
       decl := list;
       WHILE (decl # NIL) DO
@@ -285,7 +334,8 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
           ELSE
             (* the default value of an attribute must match the syntactical 
                contraints of the attribute type *)
-            default := attrDecl. defaultValue. Flatten (attrDecl);
+            default := attrDecl. defaultValue. FlattenNorm (attrDecl,
+                                                            didNormalization);
             CASE attrDecl. type OF
             | DTD.attrIDREF, DTD.attrENTITY:
               match := IsName (default^)
@@ -360,18 +410,15 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
 PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration; 
                                       localName: DTD.String);
   BEGIN
-    b. delegateBuilder. StartElement (namespaceDecl, localName);
-    
-(*    decl := d. dtd. elementNamespace. Get (localName);
-    IF (decl = NIL) THEN
-      (* ... *)
-    END;*)
+    PushElement (b, b. dtd. elementNamespace. Get (localName));
+    b. delegateBuilder. StartElement (namespaceDecl, localName)
   END StartElement;
 
 PROCEDURE (b: Builder) EndElement* (namespaceDecl: DTD.NamespaceDeclaration; 
                                     localName: DTD.String);
   BEGIN
-    b. delegateBuilder. EndElement (namespaceDecl, localName)
+    b. delegateBuilder. EndElement (namespaceDecl, localName);
+    PopElement (b)
   END EndElement;
 
 PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration; 
@@ -383,17 +430,41 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
     string, substr, default: DTD.String;
     decl: DTD.Declaration;
     i, start: LONGINT;
-    dummy: BOOLEAN;
+    dummy, didNormalization: BOOLEAN;
+    ref: DTD.Entity;
+  
+  PROCEDURE ExternalReference (attValue: DTD.AttValue): DTD.Entity;
+    VAR
+      fragment: DTD.Fragment;
+      ref: DTD.Entity;
+    BEGIN
+      ref := NIL;
+      fragment := attValue. fragmentList;
+      WHILE (ref = NIL) & (fragment # NIL) DO
+        IF (fragment IS DTD.EntityRef) &
+           (fragment(DTD.EntityRef). entity # NIL) THEN
+          IF fragment(DTD.EntityRef). entity. externalMarkupDecl THEN
+            ref := fragment(DTD.EntityRef). entity
+          ELSE
+            ref := 
+              ExternalReference (fragment(DTD.EntityRef). entity. attValue)
+          END
+        END;
+        fragment := fragment. next
+      END;
+      RETURN ref
+    END ExternalReference;
+  
   BEGIN
     IF (attrDecl = NIL) THEN
       Err (b, attributeNotDeclared)
     ELSE
+      string := value. FlattenNorm (attrDecl, didNormalization);
       CASE attrDecl. type OF
       | DTD.attrENTITY:
         (* check if an unparsed entity of the given name exists; we don't need
            to check the attribute syntax, because all declared entities have
            a valid name *)
-        string := value. Flatten (attrDecl);
         IF specified & ~IsName (string^) THEN
           ErrString (b, notName, "name", string)
         ELSE
@@ -406,7 +477,6 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
         END
       
       | DTD.attrENTITIES:
-        string := value. Flatten (attrDecl);
         IF specified & ~IsNames (string^) THEN
           Err (b, notNames)
         ELSE
@@ -435,25 +505,21 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
         END
       
       | DTD.attrNOTATION:
-        string := value. Flatten (attrDecl);
         IF ~attrDecl. enumeration. Matches (string^) THEN
           ErrString (b, notationMismatch, "name", string)
         END
         
       | DTD.attrNMTOKEN:
-        string := value. Flatten (attrDecl);
         IF specified & ~IsNmtoken (string^) THEN
           ErrString (b, notNmtoken, "name", string)
         END
       
       | DTD.attrNMTOKENS:
-        string := value. Flatten (attrDecl);
         IF specified & ~IsNmtokens (string^) THEN
           Err (b, notNmtokens)
         END
       
       | DTD.attrENUMERATED:
-        string := value. Flatten (attrDecl);
         IF specified & ~IsNmtoken (string^) THEN
           Err (b, notNmtoken)
         ELSIF ~attrDecl. enumeration. Matches (string^) THEN
@@ -461,7 +527,6 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
         END
       
       | DTD.attrID:
-        string := value. Flatten (attrDecl);
         IF specified & ~IsName (string^) THEN
           ErrString (b, notName, "name", string)
         ELSIF ~b. idNamespace. Add (NewIDDecl (string)) THEN
@@ -469,7 +534,6 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
         END
         
       | DTD.attrIDREF:
-        string := value. Flatten (attrDecl);
         IF specified & ~IsName (string^) THEN
           ErrString (b, notName, "name", string)
         ELSE
@@ -477,7 +541,6 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
         END
         
       | DTD.attrIDREFS:
-        string := value. Flatten (attrDecl);
         IF specified & ~IsNames (string^) THEN
           ErrString (b, notNames, "name", string)
         ELSE
@@ -503,11 +566,37 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
       ELSE  (* no validity constraints apply to the other attribute types *)
       END;
       
+      (* for a #FIXED attribute, the value must match the default from the
+         declaration *)
       IF (attrDecl. default = DTD.attrFixed) THEN
         default := attrDecl. defaultValue. Flatten (attrDecl);
         string := value. Flatten (attrDecl);
         IF (string^ # default^) THEN
           Err (b, fixedDefaultMismatch)
+        END
+      END;
+      
+      IF IsStandalone (b) THEN
+        (* with standalone='yes', an attribute's default value must not be
+           taken from an external markup declaration *)
+        IF ~specified & attrDecl. externalMarkupDecl THEN
+          ErrString (b, invalidStandaloneDefaultAttr,
+                     "attribute", attrDecl. name)
+        END;
+        
+        (* with standalone='yes', an attribute's value must not change with
+           normalization, if the attribute was declared in an external markup
+           declaration *)
+        IF didNormalization & attrDecl. externalMarkupDecl THEN
+          Err (b, invalidStandaloneAttrNormalization)
+        END;
+        
+        (* with standalone='yes', an attribute's replacement text must not
+           contain references to entities declared in an external markup
+           declaration *)
+        ref := ExternalReference (value);
+        IF (ref # NIL) THEN
+          ErrString (b, invalidStandaloneAttrEntityRef, "name", ref. name)
         END
       END
     END;
@@ -537,6 +626,13 @@ PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
                                     charsStart, charsEnd: DTD.CharPos;
                                     elementWhitespace: DTD.ElementWhitespaceType);
   BEGIN
+    IF IsStandalone (b) &
+       (b. stack[b. currLevel] # NIL) &
+       b. stack[b. currLevel]. IsElementContent() THEN
+      ErrString (b, invalidStandaloneWhitespace,
+                 "element", b. stack[b. currLevel]. name)
+    END;
+    
     b. delegateBuilder. Characters (chars, charsStart, charsEnd,
                                     elementWhitespace)
   END Characters;
@@ -544,6 +640,15 @@ PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
 
 PROCEDURE (b: Builder) StartCDATA*;
   BEGIN
+    (* an element with element content cannot include non-whitespace character
+       data; a CDATA section does not match S and is therefore forbidden *)
+    IF IsStandalone (b) &
+       (b. stack[b. currLevel] # NIL) &
+       b. stack[b. currLevel]. IsElementContent() THEN
+      ErrString (b, invalidCharacterContent,
+                 "element", b. stack[b. currLevel]. name)
+    END;
+    
     b. delegateBuilder. StartCDATA
   END StartCDATA;
 
@@ -554,6 +659,10 @@ PROCEDURE (b: Builder) EndCDATA*;
 
 PROCEDURE (b: Builder) StartEntity* (entity: DTD.Entity);
   BEGIN
+    IF IsStandalone (b) & entity. externalMarkupDecl THEN
+      Err (b, invalidStandaloneElemEntityRef)
+    END;
+    
     b. delegateBuilder. StartEntity (entity)
   END StartEntity;
 
@@ -594,14 +703,24 @@ PROCEDURE (b: Builder) Comment* (VAR chars: DTD.StringVar;
 
 
 PROCEDURE Init* (b: Builder; delegateBuilder: B.Builder);
+  VAR
+    i: LONGINT;
   BEGIN
     b. delegateBuilder := delegateBuilder;
     b. parserLocator := NIL;
     b. errorListener := NIL;
+    
+    b. documentEntity := NIL;
     b. dtd := NIL;
     b. notationNamespace := DTD.NewNamespace();
     b. idNamespace := DTD.NewNamespace();
     b. idrefNamespace := DTD.NewNamespace();
+    
+    b. currLevel := -1;
+    NEW (b. stack, 16);
+    FOR i := 0 TO LEN (b. stack^)-1 DO
+      b. stack[i] := NIL
+    END
   END Init;
 
 PROCEDURE New* (delegateBuilder: B.Builder): Builder;
@@ -663,6 +782,18 @@ PROCEDURE SetErrorMessages;
         t := "ID `${name}' is already defined"
       | invalidIDREF:
         t := "No matching ID attribute for IDREF `${name}'"
+      | invalidStandaloneWhitespace:
+        t := "With standalone='yes', `${element}' cannot have white space content"
+      | invalidStandaloneAttrNormalization:
+        t := "With standalone='yes', this attribute value must not change with normalization"
+      | invalidStandaloneAttrEntityRef:
+        t := "With standalone='yes', the attribute value refers to the externally declared entity `&${name};'"
+      | invalidStandaloneDefaultAttr:
+        t := "With standalone='yes', the attribute `${attribute}' is taken from an external markup declaration"
+      | invalidStandaloneElemEntityRef:
+        t := "With standalone='yes', this entity reference points to an externally declared entity"
+      | invalidCharacterContent:
+        t := "`${element}' does not have character content"
       ELSE
         t := ""
       END;

@@ -1,4 +1,4 @@
-(*      $Id: Parser.Mod,v 1.21 2001/03/17 21:34:43 mva Exp $   *)
+(*      $Id: Parser.Mod,v 1.22 2001/03/18 00:10:01 mva Exp $   *)
 MODULE XML:Parser;
 (*  Implements the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
@@ -1499,7 +1499,11 @@ PROCEDURE (p: Parser) ParseDocument*;
         INC (cpos, 10);              (* skip over "standalone" *)
         Eq;
         string := String (stringStandalone);
-        entity. SetStandalone (DTD.standaloneYes)
+        IF (string^ = "yes") THEN
+          entity. SetStandalone (DTD.standaloneYes)
+        ELSE
+          entity. SetStandalone (DTD.standaloneNo)
+        END
       END;
       OptS (TRUE);
       IF LookingAt ("?>", followedByAny) THEN
@@ -2594,7 +2598,8 @@ PROCEDURE (p: Parser) ParseDocument*;
           DefaultDecl (attrType, default, defaultValue);
           IF p. processDeclarations THEN
             attrDecl := dtd. NewAttrDecl (elementName, attrName,
-              attrType, attrEnumeration, default, defaultValue);
+              attrType, attrEnumeration, default, defaultValue,
+              ~currentEntity. IsDocumentEntity());
             dtd. AddAttribute (attrDecl)
           END
         END;
@@ -2714,7 +2719,8 @@ PROCEDURE (p: Parser) ParseDocument*;
           IF ~isPEntity & ~dtd. IsValidEntityDecl (name, entityValue) THEN
             ErrPos (invalidPredefEntityDecl, p. l^)
           END;
-          entity := dtd. NewInternalEntity (name, entityType, entityValue)
+          entity := dtd. NewInternalEntity (name, entityType, entityValue,
+                                            ~currentEntity. IsDocumentEntity())
         ELSE
           entityValue := NIL;
           IF isPEntity THEN
@@ -2734,7 +2740,8 @@ PROCEDURE (p: Parser) ParseDocument*;
               ndata := Name (FALSE)
             END
           END;
-          entity := dtd. NewExternalEntity (name, entityType, public, system, ndata, baseURI)
+          entity := dtd. NewExternalEntity (name, entityType, public, system, 
+                            ndata, baseURI, ~currentEntity. IsDocumentEntity())
         END;
         OptS (FALSE);
         CheckCurrentEntity (currentEntity);

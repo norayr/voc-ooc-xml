@@ -1,0 +1,5 @@
+In file invalid/not-sa14.xml: 
+line=4, column=6
+92: `root' does not have character content
+line=9, column=12
+270: `root' does not have character content
