@@ -2,4 +2,6 @@ In file p11fail1.xml:
 line=4, column=23
 138: String not closed
 line=7, column=0
-156: Expected character `>'
+156: Malformed URI: Illegal character in path component of the URI
+uri=a%22%3E%0A]%3E%0A%3Cdoc/%3E%0A
+uri_pos=10
