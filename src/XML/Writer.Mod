@@ -1,7 +1,7 @@
-(*      $Id: Writer.Mod,v 1.6 2000/10/29 20:17:17 mva Exp $   *)
+(*      $Id: Writer.Mod,v 1.7 2000/11/08 14:15:01 mva Exp $   *)
 MODULE XML:Writer [OOC_EXTENSIONS];
 (*  Support for generating XML documents.
-    Copyright (C) 2000  Michael van Acken
+    Copyright (C) 2000, 2001  Michael van Acken
 
     This module is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License
@@ -337,13 +337,15 @@ PROCEDURE (w: Writer) AttrBool* (name[NO_COPY]: ARRAY OF Char; value: BOOLEAN);
 
 PROCEDURE (w: Writer) AttrURI* (name[NO_COPY]: ARRAY OF Char; uri: URI.URI;
                                 absolute: BOOLEAN);
+  VAR
+    str: ARRAY 1024 OF CHAR;
   BEGIN
     ASSERT (w. openStartTag);
-    w. Write8 (" ");
-    w. Write16 (name);
-    w. Write8 ("='");
-    w. WriteURI (uri, absolute);
-    w. Write8 ("'")
+    IF ~absolute THEN
+      uri := uri. MakeRelative (w. baseURI)
+    END;
+    uri. GetString (str);
+    w. AttrStringLatin1 (name, str)
   END AttrURI;
 
 
