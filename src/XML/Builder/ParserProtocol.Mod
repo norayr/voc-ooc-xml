@@ -1,4 +1,4 @@
-(*      $Id: ParserProtocol.Mod,v 1.1.1.2 2000/07/10 20:32:02 mva Exp $   *)
+(*      $Id: ParserProtocol.Mod,v 1.2 2000/07/11 13:15:24 mva Exp $   *)
 MODULE XML:Builder:ParserProtocol [OOC_EXTENSIONS];
 (*  Translates XML document to canonical XML.
     Copyright (C) 2000  Michael van Acken
@@ -89,14 +89,17 @@ PROCEDURE WriteURI (w: Writer.Writer; name: ARRAY OF LONGCHAR; uri: URI.URI);
   END WriteURI;
 
 
-(*PROCEDURE Notation (w: Writer.Writer; notation: DTD.Notation);
+PROCEDURE Notation (w: Writer.Writer; notation: DTD.Notation);
   BEGIN
     IF (notation # NIL) THEN
       w. StartTag ("notation");
-      (* ... notation *)
+      String (w, "name", notation. name);
+      String (w, "system-identifier", notation. system);
+      String (w, "public-identifier", notation. public);
+      WriteURI (w, "base-uri", notation. baseURI);
       w. EndTag ("notation", TRUE);
     END
-  END Notation;*)
+  END Notation;
 
 PROCEDURE Entity (w: Writer.Writer; entity: DTD.Entity);
   BEGIN
@@ -122,13 +125,21 @@ PROCEDURE Entity (w: Writer.Writer; entity: DTD.Entity);
       String (w, "notation", entity. ndata);
     | entity: DTD.InternalEntity DO
       w. StartTag ("content");
-      w. WriteQuoted (entity. entityValue^);
+      w. WriteQuotedI (entity. entityValue^, 0, entity. LengthValue());
       w. EndTag ("content", FALSE);
       Boolean (w, "predefined", entity. predefined)
     END;
     
     w. EndTag ("entity", TRUE);
   END Entity;
+
+PROCEDURE NamespaceURI (w: Writer.Writer; namespaceURI: DTD.NamespaceURI);
+  BEGIN
+    w. StartTag ("namespace-uri");
+    String (w, "prefix", namespaceURI. prefix);
+    WriteURI (w, "uri", namespaceURI. uri);
+    w. EndTag ("namespace-uri", TRUE)
+  END NamespaceURI;
 
 
 PROCEDURE (b: Builder) StartDocument* (documentEntity: DTD.ExternalEntity);
@@ -164,46 +175,161 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity);
   BEGIN
     b. w. NewLine;
     b. w. StartTag ("end-dtd");
-    Entity (b. w, externalDTD);
+    IF (externalDTD # NIL) THEN
+      Entity (b. w, externalDTD)
+    END;
     b. w. EndTag ("end-dtd", TRUE);
   END EndDTD;
 
 
 
-PROCEDURE (b: Builder) StartElement* (name: DTD.String);
+PROCEDURE (b: Builder) StartElement* (namespaceURI: DTD.NamespaceURI; 
+                                      localName: DTD.String);
   BEGIN
-(*    IF b. writePosition THEN WritePos (b. writer, b) END*)
+    b. w. NewLine;
+    b. w. StartTag ("start-element");
+    IF (namespaceURI # NIL) THEN
+      NamespaceURI (b. w, namespaceURI)
+    END;
+    String (b. w, "local-name", localName);
+    b. w. EndTag ("start-element", TRUE);
   END StartElement;
 
-PROCEDURE (b: Builder) ElementAttribute* (name: DTD.String;
-                                          type: DTD.AttributeType;
-                                          value: DTD.AttValue);
+PROCEDURE (b: Builder) ElementAttribute* (namespaceURI: DTD.NamespaceURI; 
+                                          localName: DTD.String;
+                                          attrDecl: DTD.AttrDecl;
+                                          value: DTD.AttValue;
+                                          specified: BOOLEAN);
   BEGIN
+    b. w. NewLine;
+    b. w. StartTag ("element-attribute");
+    IF (namespaceURI # NIL) THEN
+      NamespaceURI (b. w, namespaceURI)
+    END;
+    String (b. w, "local-name", localName);
+    IF (attrDecl # NIL) THEN
+      b. w. StartTag ("attr-type");
+      CASE attrDecl. type OF
+      | DTD.attrID: b. w. WriteLatin1 ("ID")
+      | DTD.attrIDREF: b. w. WriteLatin1 ("IDREF")
+      | DTD.attrIDREFS: b. w. WriteLatin1 ("IDREFS")
+      | DTD.attrENTITY: b. w. WriteLatin1 ("ENTITY")
+      | DTD.attrENTITIES: b. w. WriteLatin1 ("ENTITIES")
+      | DTD.attrNMTOKEN: b. w. WriteLatin1 ("NMTOKEN")
+      | DTD.attrNMTOKENS: b. w. WriteLatin1 ("NMTOKENS")
+      | DTD.attrNOTATION: b. w. WriteLatin1 ("NOTATION")
+      | DTD.attrENUMERATED: b. w. WriteLatin1 ("ENUMERATED")
+      | DTD.attrCDATA: b. w. WriteLatin1 ("CDATA")
+      END;
+      b. w. EndTag ("attr-type", FALSE);
+      b. w. StartTag ("default-type");
+      CASE attrDecl. default OF
+      | DTD.attrRequired: b. w. WriteLatin1 ("#REQUIRED")
+      | DTD.attrImplied: b. w. WriteLatin1 ("#IMPLIED")
+      | DTD.attrDefault: b. w. WriteLatin1 ("#DEFAULT")
+      | DTD.attrFixed: b. w. WriteLatin1 ("#FIXED")
+      END;
+      b. w. EndTag ("default-type", FALSE)
+    END;
+    String (b. w, "value", value. Flatten (attrDecl));
+    Boolean (b. w, "specified", specified);
+    b. w. EndTag ("element-attribute", TRUE);
   END ElementAttribute;
 
 PROCEDURE (b: Builder) AttributesDone*;
+  BEGIN
+    b. w. NewLine;
+    b. w. EmptyTag ("attributes-done");
   END AttributesDone;
 
-PROCEDURE (b: Builder) EndElement* (name: DTD.String);
+PROCEDURE (b: Builder) SkippedEntity* (name: DTD.String; referent: DTD.Entity);
+  BEGIN
+    b. w. NewLine;
+    b. w. StartTag ("skipped-entity");
+    String (b. w, "name", name);
+    IF (referent # NIL) THEN
+      Entity (b. w, referent)
+    END;
+    b. w. EndTag ("skipped-entity", TRUE);
+  END SkippedEntity;
+
+PROCEDURE (b: Builder) EndElement* (namespaceURI: DTD.NamespaceURI; 
+                                    localName: DTD.String);
+  BEGIN
+    b. w. NewLine;
+    b. w. StartTag ("end-element");
+    IF (namespaceURI # NIL) THEN
+      NamespaceURI (b. w, namespaceURI)
+    END;
+    String (b. w, "local-name", localName);
+    b. w. EndTag ("end-element", TRUE);
   END EndElement;
 
-PROCEDURE (b: Builder) Notation* (name: DTD.String;
-                                  publicIdentifier: DTD.String;
-                                  systemIdentifier: DTD.String;
-                                  baseURI: URI.URI);
+PROCEDURE (b: Builder) EntityDecl* (entity: DTD.Entity);
+  BEGIN
+    b. w. NewLine;
+    Entity (b. w, entity)
+  END EntityDecl;
+
+PROCEDURE (b: Builder) Notation* (notation: DTD.Notation);
+  BEGIN
+    b. w. NewLine;
+    Notation (b. w, notation)
   END Notation;
 
 PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
                                     charsStart, charsEnd: DTD.CharPos;
                                     elementWhitespace: DTD.ElementWhitespaceType;
                                     predefinedEntity: BOOLEAN);
+  BEGIN
+    b. w. NewLine;
+    b. w. StartTag ("characters");
+    b. w. StartTag ("chars");
+    b. w. WriteQuotedI (chars, charsStart, charsEnd);
+    b. w. EndTag ("chars", FALSE);
+    b. w. StartTag ("element-whitespace");
+    CASE elementWhitespace OF
+    | DTD.elementWhitespaceYes: b. w. WriteLatin1 ("yes")
+    | DTD.elementWhitespaceNo: b. w. WriteLatin1 ("no")
+    | DTD.elementWhitespaceUnknown: b. w. WriteLatin1 ("unknown")
+    END;
+    b. w. EndTag ("element-whitespace", FALSE);
+    Boolean (b. w, "predefined-entity", predefinedEntity);
+    b. w. EndTag ("characters", TRUE);
   END Characters;
+
+PROCEDURE (b: Builder) StartCDATA*;
+  BEGIN
+    b. w. NewLine;
+    b. w. EmptyTag ("start-cdata");
+  END StartCDATA;
+
+PROCEDURE (b: Builder) EndCDATA*;
+  BEGIN
+    b. w. NewLine;
+    b. w. EmptyTag ("end-cdata");
+  END EndCDATA;
+
+PROCEDURE (b: Builder) StartEntity* (entity: DTD.Entity);
+  BEGIN
+    b. w. NewLine;
+    b. w. StartAttr ("start-entity");
+    b. w. AttrString ("name", entity. name^);
+    b. w. EndAttr (TRUE)
+  END StartEntity;
+
+PROCEDURE (b: Builder) EndEntity* (entity: DTD.Entity);
+  BEGIN
+    b. w. NewLine;
+    b. w. StartAttr ("end-entity");
+    b. w. AttrString ("name", entity. name^);
+    b. w. EndAttr (TRUE)
+  END EndEntity;
 
 
 PROCEDURE (b: Builder) ProcessingInstruction* (
-    target: DTD.String;
-    VAR content: DTD.StringVar; contentStart, contentEnd: DTD.CharPos;
-    baseURI: URI.URI);
+                      target: DTD.String; VAR content: DTD.StringVar;
+                      contentStart, contentEnd: DTD.CharPos; baseURI: URI.URI);
   BEGIN
     b. w. NewLine;
     b. w. StartTag ("processing-instruction");

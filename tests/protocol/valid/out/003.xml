@@ -1,0 +1,52 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<parser-protocol xml:base='file:/usr/home/ooc-devel/sourceforge/libxml/tests/protocol/'>
+  <start-document>
+    <entity>
+      <type>document</type>
+      <base-uri>valid/003.xml</base-uri>
+    </entity>
+  </start-document>
+  
+  <start-dtd>
+  </start-dtd>
+  
+  <entity>
+    <type>internal general</type>
+    <name>general1</name>
+    <content>internal</content>
+    <predefined>no</predefined>
+  </entity>
+  
+  <entity>
+    <type>external general</type>
+    <name>general2</name>
+    <system-identifier>003.ent</system-identifier>
+    <public-identifier>public</public-identifier>
+    <base-uri>valid/003.ent</base-uri>
+  </entity>
+  
+  <entity>
+    <type>external general unparsed</type>
+    <name>general3</name>
+    <system-identifier>003.ent</system-identifier>
+    <public-identifier>public</public-identifier>
+    <base-uri>valid/003.ent</base-uri>
+    <notation>furbie</notation>
+  </entity>
+  
+  <end-dtd>
+  </end-dtd>
+  
+  <start-element>
+    <local-name>doc</local-name>
+  </start-element>
+  
+  <attributes-done/>
+  
+  <end-element>
+    <local-name>doc</local-name>
+  </end-element>
+  
+  <end-document>
+  </end-document>
+</parser-protocol>

@@ -168,6 +168,8 @@ CONST  (* error codes *)
   unbalancedGERef = 301;  (* unused...? *)
   invalidGEReplacement = 302;
   accessError = 303;
+  referenceToUnparsed = 304;
+  externalRefInAtttribute = 305;
   
 VAR
   parserContext: Error.Context;
@@ -1045,7 +1047,7 @@ PROCEDURE document (p: Parser);
               p. inExternalEntity := oldFlag;
               PopEntity
             END
-          ELSIF (dtd. standalone # DTD.standaloneYes) THEN
+          ELSIF (p. documentEntity. standalone # DTD.standaloneYes) THEN
             p. processDeclarations := FALSE
           END
         ELSE
@@ -1431,6 +1433,7 @@ PROCEDURE document (p: Parser);
       pos: Position;
     BEGIN
       StorePosition (pos);
+      p. builder. StartCDATA;
       INC (cpos, 9);                     (* skip over "<![CDATA[" *)
       cstart := cpos; cdelta := 0;
       LOOP
@@ -1445,6 +1448,7 @@ PROCEDURE document (p: Parser);
             p. builder. Characters (chars^, cstart, cpos-cdelta,
                                     DTD.elementWhitespaceUnknown, FALSE);
             INC (cpos, 3);
+            p. builder. EndCDATA;
             EXIT
           ELSE
             chars[cpos-cdelta] := chars[cpos]; INC (cpos)
@@ -1534,7 +1538,7 @@ PROCEDURE document (p: Parser);
       DEC (cdelta, ToUnicode (cval))
     END CharRef;
 
-  PROCEDURE EntityRef (enforceDecl: BOOLEAN): DTD.EntityRef;
+  PROCEDURE EntityRef (enforceDecl, permitExternal: BOOLEAN): DTD.EntityRef;
   (* pre: (chars[cpos] = "&") & (chars[cpos] # "#")
      post: `cstart' is preserved *)
     VAR
@@ -1559,7 +1563,16 @@ PROCEDURE document (p: Parser);
           lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (name^))
         END
       ELSE
-        entity := decl(DTD.Entity)
+        entity := decl(DTD.Entity);
+        IF (entity. type = DTD.entityUnparsed) THEN
+          ErrPos (referenceToUnparsed, pos);
+          lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (name^));
+          name := noName
+        ELSIF ~permitExternal & (entity. type = DTD.entityExternalGeneral) THEN
+          ErrPos (externalRefInAtttribute, pos);
+          lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (name^));
+          name := noName
+        END
       END;
       IF (name = noName) THEN
         (* the name wasn't taken from the input data *)
@@ -1620,7 +1633,7 @@ PROCEDURE document (p: Parser);
               END
             ELSE
               Flush;
-              attValue. Append (EntityRef (TRUE));
+              attValue. Append (EntityRef (TRUE, FALSE));
               cstart := cpos
             END;
           ELSE
@@ -1648,8 +1661,8 @@ PROCEDURE document (p: Parser);
       startName, endName: DTD.String;
       attrName: DTD.String;
       attrValue: DTD.AttValue;
-      decl, attrDecl: DTD.Declaration;
-      attrType: DTD.AttributeType;
+      decl, decl0: DTD.Declaration;
+      attrDecl: DTD.AttrDecl;
       pos: Position;
       
     PROCEDURE content;
@@ -1730,10 +1743,16 @@ PROCEDURE document (p: Parser);
       PROCEDURE FollowEntityRef (entityRef: DTD.EntityRef);
         VAR
           decl: DTD.Declaration;
+          entity: DTD.Entity;
           pos: Position;
         BEGIN
           decl := dtd. geNamespace. Get (entityRef. name);
-          IF (decl = NIL) THEN
+          entity := NIL;
+          IF (decl # NIL) THEN
+            entity := decl(DTD.Entity)
+          END;
+          
+          IF (entity = NIL) THEN
             StorePosition (pos);
             IF (chars = p. in. chars) THEN
               DecLength (pos, LongStrings.Length (entityRef. name^)+2)
@@ -1741,15 +1760,19 @@ PROCEDURE document (p: Parser);
             ErrPos (noSuchGeneralEntity, pos);
             lastError. SetLStringAttrib ("name",
                                          Msg.GetLStringPtr (entityRef. name^))
-          ELSIF decl(DTD.Entity). expanding THEN
+          ELSIF entity. expanding THEN
             Err (recursiveGeneralEntity);
             lastError. SetLStringAttrib ("name",
                                          Msg.GetLStringPtr (entityRef. name^))
+          ELSIF (entity. type = DTD.entityExternalGeneral) &
+                ~p. followExternalRef THEN
+            p. builder. SkippedEntity (entityRef. name, entity)
           ELSE
-            PushEntity (decl(DTD.Entity), TRUE);
+            p. builder. StartEntity (entity);
+            PushEntity (entity, TRUE);
             StorePosition (pos);
             (* recursivly enter replacement; FIXME: endless loop? *)
-            IF (decl(DTD.Entity). type = DTD.entityExternalGeneral) &
+            IF (entity. type = DTD.entityExternalGeneral) &
                LookingAt ("<?xml", followedByNonName) THEN
               XMLDecl (decl(DTD.ExternalEntity))
             END;
@@ -1759,7 +1782,8 @@ PROCEDURE document (p: Parser);
               lastError. SetLStringAttrib ("name",
                                           Msg.GetLStringPtr (entityRef. name^))
             END;
-            PopEntity
+            PopEntity;
+            p. builder. EndEntity (entity);
           END
         END FollowEntityRef;
       
@@ -1784,7 +1808,7 @@ PROCEDURE document (p: Parser);
             IF LookingAt ("&#", followedByAny) THEN (* character reference *)
               CharData
             ELSE
-              FollowEntityRef (EntityRef (FALSE))
+              FollowEntityRef (EntityRef (FALSE, TRUE))
             END
           ELSE
             CharData
@@ -1865,7 +1889,7 @@ PROCEDURE document (p: Parser);
                 CharRef();
                 attValue. Append (dtd. NewCharacters (chars, cstart, cpos-cdelta, FALSE))
               ELSE
-                attValue. Append (EntityRef (TRUE))
+                attValue. Append (EntityRef (TRUE, FALSE))
               END;
               cstart := cpos
             ELSE
@@ -1949,7 +1973,7 @@ PROCEDURE document (p: Parser);
         END IsLetter;
       
       BEGIN
-        string := attrValue. Flatten (FALSE);
+        string := attrValue. Flatten (NIL);
         err := FALSE;
         pos := 0;
         (* parse language code *)
@@ -2021,8 +2045,8 @@ PROCEDURE document (p: Parser);
             IF (attrDecl. name^ = "xml:lang") THEN
               CheckXmlLang (attrDecl. defaultValue)
             END;
-            p. builder. ElementAttribute (decl. name, attrDecl. type,
-                                          attrDecl. defaultValue)
+            p. builder. ElementAttribute (NIL, decl. name, attrDecl,
+                                          attrDecl. defaultValue, FALSE)
           END;
           decl := decl. next
         END
@@ -2043,7 +2067,7 @@ PROCEDURE document (p: Parser);
         emptyElementTag := FALSE;
         startName := Name();
         decl := dtd. elementNamespace. Get (startName);
-        p. builder. StartElement (startName);
+        p. builder. StartElement (NIL, startName);
         LOOP
           IF (chars[cpos] = Buffer.markerEOD) THEN
             EXIT
@@ -2066,14 +2090,11 @@ PROCEDURE document (p: Parser);
           END;
           NoteName (attrName);
           Eq;
-          IF (decl = NIL) THEN
-            attrType := DTD.attrUnknownType
-          ELSE
-            attrDecl := decl(DTD.ElementDecl). attrNamespace. Get (attrName);
-            IF (attrDecl = NIL) THEN
-              attrType := DTD.attrUnknownType
-            ELSE
-              attrType := attrDecl(DTD.AttrDecl). type
+          attrDecl := NIL;
+          IF (decl # NIL) THEN
+            decl0 := decl(DTD.ElementDecl). attrNamespace. Get (attrName);
+            IF (decl0 # NIL) THEN
+              attrDecl := decl0(DTD.AttrDecl)
             END
           END;
           attrValue := AttValue (TRUE);
@@ -2081,7 +2102,7 @@ PROCEDURE document (p: Parser);
           IF (attrName^ = "xml:lang") THEN
             CheckXmlLang (attrValue)
           END;
-          p. builder. ElementAttribute (attrName, attrType, attrValue)
+          p. builder. ElementAttribute (NIL, attrName, attrDecl, attrValue, TRUE)
         END;
         
         IF (decl # NIL) THEN
@@ -2092,7 +2113,7 @@ PROCEDURE document (p: Parser);
         CheckChar (">");
         DiscardPreviousInput;
         IF emptyElementTag THEN
-          p. builder. EndElement (startName)
+          p. builder. EndElement (NIL, startName)
         ELSE
           content;
           StorePosition (pos);
@@ -2102,7 +2123,7 @@ PROCEDURE document (p: Parser);
           CheckChar ("/");
           endName := Name();
           IF (endName^ # startName^) THEN ErrEndTag END;
-          p. builder. EndElement (startName);
+          p. builder. EndElement (NIL, startName);
           OptS (TRUE);
           CheckChar (">")
         END
@@ -2240,7 +2261,8 @@ PROCEDURE document (p: Parser);
         elementName: DTD.String;
         cp: DTD.CP;
         elementDecl: DTD.ElementDecl;
-
+        dummy: BOOLEAN;
+        
       PROCEDURE contentspec(): DTD.CP;
         PROCEDURE Mixed(): DTD.CP;
         (* pre: looking at "#PCDATA"+nonNameChar *)
@@ -2375,7 +2397,7 @@ PROCEDURE document (p: Parser);
         OptS (FALSE);
 
         elementDecl := dtd. NewElementDecl (elementName, cp);
-        dtd. elementNamespace. Add (elementDecl);
+        dummy := dtd. elementNamespace. Add (elementDecl);
 
         CheckChar (">")
       END elementdecl;
@@ -2518,6 +2540,7 @@ PROCEDURE document (p: Parser);
         baseURI: URI.URI;
         entity: DTD.Entity;
         entityType: DTD.EntityType;
+        dummy: BOOLEAN;
 
       PROCEDURE EntityValue (isPEntity: BOOLEAN): DTD.String;
       (* pre: chars[cpos] # Buffer.markerEOB *)
@@ -2574,7 +2597,7 @@ PROCEDURE document (p: Parser);
                   CharRef()
                 ELSE
                   storedPos := cpos+p. in. offsetFromPos0;
-                  fragment := EntityRef (FALSE);
+                  fragment := EntityRef (FALSE, TRUE);
                   Copy (storedPos-p. in. offsetFromPos0, cpos)
                 END
               ELSE
@@ -2589,7 +2612,7 @@ PROCEDURE document (p: Parser);
                 END
               END
             END;
-            string := p. currEntityValue. Flatten (FALSE);
+            string := p. currEntityValue. Flatten (NIL);
             IF isPEntity THEN
               string[LEN (string^)-2] := Buffer.markerEOB
             ELSE
@@ -2624,22 +2647,22 @@ PROCEDURE document (p: Parser);
           entity := dtd. NewInternalEntity (name, entityType, entityValue, FALSE)
         ELSE
           entityValue := NIL;
+          IF isPEntity THEN
+            entityType := DTD.entityExternalParameter
+          ELSE
+            entityType := DTD.entityExternalGeneral
+          END;
           ExternalID (FALSE, public, system, baseURI);
 
           ndata := NIL;
           IF ~isPEntity & LookingAtS() THEN
             S;
             IF LookingAt ("NDATA", followedByNonName) THEN
+              entityType := DTD.entityUnparsed;
               INC (cpos, 5);           (* skipt over "NDATA" *)
               S;
               ndata := Name()
             END
-          END;
-
-          IF isPEntity THEN
-            entityType := DTD.entityExternalParameter
-          ELSE
-            entityType := DTD.entityExternalGeneral
           END;
           entity := dtd. NewExternalEntity (name, entityType, public, system, ndata, baseURI)
         END;
@@ -2648,9 +2671,9 @@ PROCEDURE document (p: Parser);
 
         IF p. processDeclarations THEN
           IF isPEntity THEN
-            dtd. peNamespace. Add (entity)
-          ELSE
-            dtd. geNamespace. Add (entity)
+            dummy := dtd. peNamespace. Add (entity)
+          ELSIF dtd. geNamespace. Add (entity) THEN
+            p. builder. EntityDecl (entity)
           END
         END
       END EntityDecl;
@@ -2665,10 +2688,9 @@ PROCEDURE document (p: Parser);
         S;
         name := Name();
         S;
-        public := NIL; system := NIL;
         ExternalID (TRUE, public, system, baseURI);
         OptS (FALSE);
-        p. builder. Notation (name, public, system, baseURI);
+        p. builder. Notation (dtd. NewNotation (name, public, system, baseURI));
         CheckChar (">")
       END NotationDecl;
 
@@ -3034,6 +3056,10 @@ PROCEDURE SetErrorMessages;
         t := "Replacement text of general entity `${name}' is not valid content"
       | accessError:
         t := "Could not access URL `${uri}': ${channel_error}"
+      | referenceToUnparsed:
+        t := "Reference to unparsed entity `${name}' not allowed"
+      | externalRefInAtttribute:
+        t := "Attribute value contains reference to external entity `${name}'"
       ELSE
         t := ""
       END;

@@ -1,0 +1,170 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<parser-protocol xml:base='file:/usr/home/ooc-devel/sourceforge/libxml/tests/protocol/'>
+  <start-document>
+    <entity>
+      <type>document</type>
+      <base-uri>valid/004.xml</base-uri>
+    </entity>
+  </start-document>
+  
+  <start-dtd>
+  </start-dtd>
+  
+  <end-dtd>
+  </end-dtd>
+  
+  <start-element>
+    <local-name>doc</local-name>
+  </start-element>
+  
+  <attributes-done/>
+  
+  <characters>
+    <chars>&#10;  </chars>
+    <element-whitespace>unknown</element-whitespace>
+    <predefined-entity>no</predefined-entity>
+  </characters>
+  
+  <start-element>
+    <local-name>a</local-name>
+  </start-element>
+  
+  <element-attribute>
+    <local-name>v1</local-name>
+    <attr-type>CDATA</attr-type>
+    <default-type>#REQUIRED</default-type>
+    <value></value>
+    <specified>yes</specified>
+  </element-attribute>
+  
+  <element-attribute>
+    <local-name>v3</local-name>
+    <attr-type>CDATA</attr-type>
+    <default-type>#DEFAULT</default-type>
+    <value> foo  bar   </value>
+    <specified>no</specified>
+  </element-attribute>
+  
+  <element-attribute>
+    <local-name>v4</local-name>
+    <attr-type>CDATA</attr-type>
+    <default-type>#FIXED</default-type>
+    <value>furbie</value>
+    <specified>no</specified>
+  </element-attribute>
+  
+  <attributes-done/>
+  
+  <end-element>
+    <local-name>a</local-name>
+  </end-element>
+  
+  <characters>
+    <chars>&#10;  </chars>
+    <element-whitespace>unknown</element-whitespace>
+    <predefined-entity>no</predefined-entity>
+  </characters>
+  
+  <start-element>
+    <local-name>a</local-name>
+  </start-element>
+  
+  <element-attribute>
+    <local-name>v1</local-name>
+    <attr-type>CDATA</attr-type>
+    <default-type>#REQUIRED</default-type>
+    <value>1</value>
+    <specified>yes</specified>
+  </element-attribute>
+  
+  <element-attribute>
+    <local-name>v2</local-name>
+    <attr-type>NMTOKENS</attr-type>
+    <default-type>#IMPLIED</default-type>
+    <value>a b</value>
+    <specified>yes</specified>
+  </element-attribute>
+  
+  <element-attribute>
+    <local-name>v3</local-name>
+    <attr-type>CDATA</attr-type>
+    <default-type>#DEFAULT</default-type>
+    <value> foo  bar   </value>
+    <specified>no</specified>
+  </element-attribute>
+  
+  <element-attribute>
+    <local-name>v4</local-name>
+    <attr-type>CDATA</attr-type>
+    <default-type>#FIXED</default-type>
+    <value>furbie</value>
+    <specified>no</specified>
+  </element-attribute>
+  
+  <attributes-done/>
+  
+  <end-element>
+    <local-name>a</local-name>
+  </end-element>
+  
+  <characters>
+    <chars>&#10;  </chars>
+    <element-whitespace>unknown</element-whitespace>
+    <predefined-entity>no</predefined-entity>
+  </characters>
+  
+  <start-element>
+    <local-name>a</local-name>
+  </start-element>
+  
+  <element-attribute>
+    <local-name>v1</local-name>
+    <attr-type>CDATA</attr-type>
+    <default-type>#REQUIRED</default-type>
+    <value>2</value>
+    <specified>yes</specified>
+  </element-attribute>
+  
+  <element-attribute>
+    <local-name>v2</local-name>
+    <attr-type>NMTOKENS</attr-type>
+    <default-type>#IMPLIED</default-type>
+    <value>a b</value>
+    <specified>yes</specified>
+  </element-attribute>
+  
+  <element-attribute>
+    <local-name>v3</local-name>
+    <attr-type>CDATA</attr-type>
+    <default-type>#DEFAULT</default-type>
+    <value>no-default</value>
+    <specified>yes</specified>
+  </element-attribute>
+  
+  <element-attribute>
+    <local-name>v4</local-name>
+    <attr-type>CDATA</attr-type>
+    <default-type>#FIXED</default-type>
+    <value>furbie</value>
+    <specified>no</specified>
+  </element-attribute>
+  
+  <attributes-done/>
+  
+  <end-element>
+    <local-name>a</local-name>
+  </end-element>
+  
+  <characters>
+    <chars>&#10;</chars>
+    <element-whitespace>unknown</element-whitespace>
+    <predefined-entity>no</predefined-entity>
+  </characters>
+  
+  <end-element>
+    <local-name>doc</local-name>
+  </end-element>
+  
+  <end-document>
+  </end-document>
+</parser-protocol>

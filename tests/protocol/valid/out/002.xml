@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<parser-protocol xml:base='file:/usr/home/ooc-devel/sourceforge/libxml/tests/protocol/'>
+  <start-document>
+    <entity>
+      <type>document</type>
+      <base-uri>valid/002.xml</base-uri>
+    </entity>
+  </start-document>
+  
+  <start-dtd>
+  </start-dtd>
+  
+  <notation>
+    <name>notation-in-DTD-1</name>
+    <public-identifier>foobar</public-identifier>
+  </notation>
+  
+  <notation>
+    <name>notation-in-DTD-2</name>
+    <system-identifier>file://absolute2</system-identifier>
+    <public-identifier>foobar</public-identifier>
+    <base-uri>file://absolute2</base-uri>
+  </notation>
+  
+  <notation>
+    <name>notation-in-DTD-3</name>
+    <system-identifier>file://absolute3</system-identifier>
+    <base-uri>file://absolute3</base-uri>
+  </notation>
+  
+  <notation>
+    <name>notation-external-DTD-1</name>
+    <public-identifier>foobar</public-identifier>
+  </notation>
+  
+  <end-dtd>
+    <entity>
+      <type>external DTD subset</type>
+      <system-identifier>002.ent</system-identifier>
+      <base-uri>valid/002.ent</base-uri>
+    </entity>
+  </end-dtd>
+  
+  <start-element>
+    <local-name>doc</local-name>
+  </start-element>
+  
+  <attributes-done/>
+  
+  <end-element>
+    <local-name>doc</local-name>
+  </end-element>
+  
+  <end-document>
+  </end-document>
+</parser-protocol>

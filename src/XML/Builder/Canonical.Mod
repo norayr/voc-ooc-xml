@@ -1,4 +1,4 @@
-(*      $Id: Canonical.Mod,v 1.1.1.1 2000/07/10 15:24:39 mva Exp $   *)
+(*      $Id: Canonical.Mod,v 1.1.1.2 2000/07/10 20:32:02 mva Exp $   *)
 MODULE XML:Builder:Canonical [OOC_EXTENSIONS];
 (*  Translates XML document to canonical XML.
     Copyright (C) 2000  Michael van Acken
@@ -33,16 +33,16 @@ CONST
 TYPE
   Attribute = RECORD
     name: DTD.String;
-    type: DTD.AttributeType;
+    decl: DTD.AttrDecl;
     value: DTD.AttValue;
   END;
   AttributeList = POINTER TO ARRAY OF Attribute;
   
 TYPE
-  Notation = POINTER TO NotationDesc;
-  NotationDesc = RECORD
-    next: Notation;
-    name, public, system: DTD.String;
+  Node = POINTER TO NodeDesc;
+  NodeDesc = RECORD
+    next: Node;
+    notation: DTD.Notation;
   END;
 
 TYPE
@@ -52,7 +52,7 @@ TYPE
     out-: UnicodeBuffer.Output;
     format: SHORTINT;
     
-    notationList: Notation;
+    notationList: Node;
     attrList: AttributeList;
     lenAttrList: LONGINT;
   END;
@@ -128,16 +128,16 @@ PROCEDURE WriteQuoted (out: UnicodeBuffer.Output; str[NO_COPY]: DTD.StringVar;
 
 PROCEDURE WriteDTD (b: Builder; root: DTD.String);
   VAR
-    notation: Notation;
+    node: Node;
   
-  PROCEDURE GetNext(): Notation;
+  PROCEDURE GetNext(): Node;
     VAR
-      ptr, best: Notation;
+      ptr, best: Node;
     BEGIN
       best := b. notationList;
       ptr := b. notationList. next;
       WHILE (ptr # NIL) DO
-        IF (ptr. name^ < best. name^) THEN
+        IF (ptr. notation. name^ < best. notation. name^) THEN
           best := ptr
         END;
         ptr := ptr. next
@@ -145,7 +145,7 @@ PROCEDURE WriteDTD (b: Builder; root: DTD.String);
       RETURN best
     END GetNext;
   
-  PROCEDURE Remove (VAR list: Notation; ptr: Notation);
+  PROCEDURE Remove (VAR list: Node; ptr: Node);
     BEGIN
       IF (ptr = list) THEN
         list := list. next
@@ -159,22 +159,22 @@ PROCEDURE WriteDTD (b: Builder; root: DTD.String);
     b. out. Write (root^);
     b. out. WriteLatin1 (" ["+Ascii.lf);
     WHILE (b. notationList # NIL) DO
-      notation := GetNext();
-      Remove (b. notationList, notation);
+      node := GetNext();
+      Remove (b. notationList, node);
       b. out. WriteLatin1 ("<!NOTATION ");
-      b. out. Write (notation. name^);
-      IF (notation. public # NIL) THEN
+      b. out. Write (node. notation. name^);
+      IF (node. notation. public # NIL) THEN
         b. out. WriteLatin1 (" PUBLIC '");
-        b. out. Write (notation. public^);
+        b. out. Write (node. notation. public^);
         b. out. WriteLatin1 ("'");
-        IF (notation. system # NIL) THEN
+        IF (node. notation. system # NIL) THEN
           b. out. WriteLatin1 (" '");
-          b. out. Write (notation. system^);
+          b. out. Write (node. notation. system^);
           b. out. WriteLatin1 ("'")
         END
       ELSE
         b. out. WriteLatin1 (" SYSTEM '");
-        b. out. Write (notation. system^);
+        b. out. Write (node. notation. system^);
         b. out. WriteLatin1 ("'")
       END;
       b. out. Write (">"+Ascii.lf)
@@ -195,25 +195,30 @@ PROCEDURE (b: Builder) EndDocument*;
     b. out. Flush
   END EndDocument;
 
-PROCEDURE (b: Builder) StartElement* (name: DTD.String);
+PROCEDURE (b: Builder) StartElement* (namespaceURI: DTD.NamespaceURI;
+                                      localName: DTD.String);
   BEGIN
+    ASSERT (namespaceURI = NIL);
     IF (b. notationList # NIL) & (b. format # firstCanonicalForm) THEN
-      WriteDTD (b, name)
+      WriteDTD (b, localName)
     END;
     b. lenAttrList := 0;
     
     b. out. WriteLatin1 ("<");
-    b. out. Write (name^);
+    b. out. Write (localName^);
 (*    IF b. writePosition THEN WritePos (b. writer, b) END*)
   END StartElement;
 
-PROCEDURE (b: Builder) ElementAttribute* (name: DTD.String;
-                                          type: DTD.AttributeType;
-                                          value: DTD.AttValue);
+PROCEDURE (b: Builder) ElementAttribute* (namespaceURI: DTD.NamespaceURI; 
+                                          localName: DTD.String;
+                                          attrDecl: DTD.AttrDecl;
+                                          value: DTD.AttValue;
+                                          specified: BOOLEAN);
   VAR
     newList: AttributeList;
     i: LONGINT;
   BEGIN
+    ASSERT (namespaceURI = NIL);
     IF (b. lenAttrList = LEN (b. attrList^)) THEN
       NEW (newList, LEN (b. attrList^)+incrAttrList);
       FOR i := 0 TO LEN (b. attrList^)-1 DO
@@ -221,8 +226,8 @@ PROCEDURE (b: Builder) ElementAttribute* (name: DTD.String;
       END;
       b. attrList := newList
     END;
-    b. attrList[b. lenAttrList]. name := name;
-    b. attrList[b. lenAttrList]. type := type;
+    b. attrList[b. lenAttrList]. name := localName;
+    b. attrList[b. lenAttrList]. decl := attrDecl;
     b. attrList[b. lenAttrList]. value := value;
     INC (b. lenAttrList)
   END ElementAttribute;
@@ -251,7 +256,7 @@ PROCEDURE (b: Builder) AttributesDone*;
       b. out. WriteLatin1 (" ");
       b. out. Write (b. attrList[j]. name^);
       b. out. WriteLatin1 ('="');
-      str := b. attrList[j]. value. Flatten (b. attrList[j]. type < DTD.attrCDATA);
+      str := b. attrList[j]. value. Flatten (b. attrList[j]. decl);
       WriteQuoted (b. out, str^, 0, LongStrings.Length (str^));
       b. out. WriteLatin1 ('"');
       b. attrList[j] := b. attrList[i]
@@ -259,28 +264,24 @@ PROCEDURE (b: Builder) AttributesDone*;
     b. out. WriteLatin1 (">")
   END AttributesDone;
 
-PROCEDURE (b: Builder) EndElement* (name: DTD.String);
+PROCEDURE (b: Builder) EndElement* (namespaceURI: DTD.NamespaceURI;
+                                    localName: DTD.String);
   BEGIN
     b. out. WriteLatin1 ("</");
-    b. out. Write (name^);
+    b. out. Write (localName^);
     b. out. WriteLatin1 (">");
 (*    IF b. writePosition THEN WritePos (b. writer, b) END*)
   END EndElement;
 
-PROCEDURE (b: Builder) Notation* (name: DTD.String;
-                                  publicIdentifier: DTD.String;
-                                  systemIdentifier: DTD.String;
-                                  baseURI: URI.URI);
+PROCEDURE (b: Builder) Notation* (notation: DTD.Notation);
 (**Called for notation declarations, see 2.10.  *)
   VAR
-    notation: Notation;
+    node: Node;
   BEGIN
-    NEW (notation);
-    notation. next := b. notationList;
-    notation. name := name;
-    notation. public := publicIdentifier;
-    notation. system := systemIdentifier;
-    b. notationList := notation
+    NEW (node);
+    node. next := b. notationList;
+    node. notation := notation;
+    b. notationList := node
   END Notation;
 
 PROCEDURE (b: Builder) ProcessingInstruction* (

@@ -1,0 +1,66 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<parser-protocol xml:base='file:/usr/home/ooc-devel/sourceforge/libxml/tests/protocol/'>
+  <start-document>
+    <entity>
+      <type>document</type>
+      <base-uri>valid/005.xml</base-uri>
+    </entity>
+  </start-document>
+  
+  <start-dtd>
+  </start-dtd>
+  
+  <end-dtd>
+  </end-dtd>
+  
+  <start-element>
+    <local-name>doc</local-name>
+  </start-element>
+  
+  <attributes-done/>
+  
+  <characters>
+    <chars>foo</chars>
+    <element-whitespace>unknown</element-whitespace>
+    <predefined-entity>no</predefined-entity>
+  </characters>
+  
+  <start-cdata/>
+  
+  <characters>
+    <chars>frobozz</chars>
+    <element-whitespace>unknown</element-whitespace>
+    <predefined-entity>no</predefined-entity>
+  </characters>
+  
+  <end-cdata/>
+  
+  <characters>
+    <chars> bar </chars>
+    <element-whitespace>unknown</element-whitespace>
+    <predefined-entity>no</predefined-entity>
+  </characters>
+  
+  <start-entity name='amp'/>
+  
+  <characters>
+    <chars>&amp;</chars>
+    <element-whitespace>unknown</element-whitespace>
+    <predefined-entity>no</predefined-entity>
+  </characters>
+  
+  <end-entity name='amp'/>
+  
+  <characters>
+    <chars> yow!</chars>
+    <element-whitespace>unknown</element-whitespace>
+    <predefined-entity>no</predefined-entity>
+  </characters>
+  
+  <end-element>
+    <local-name>doc</local-name>
+  </end-element>
+  
+  <end-document>
+  </end-document>
+</parser-protocol>

@@ -1,6 +1,7 @@
 MODULE XML:BuilderDTD [OOC_EXTENSIONS];
 
 IMPORT
+Log,
   LongStrings, URI, XML:UnicodeBuffer;
 
 
@@ -16,7 +17,7 @@ TYPE
 CONST
   standaloneYes* = 0;
   standaloneNo* = 1;
-  standaloneUnknown* = 2;
+  standaloneNotPresent* = 2;
   standaloneNotApplicable* = 3;
   
 TYPE
@@ -27,10 +28,6 @@ TYPE
     geNamespace-: Namespace;
     peNamespace-: Namespace;
     elementNamespace-: Namespace;
-    
-    version-: String;
-    encoding-: String;
-    standalone-: StandaloneType;
     
     attributeList, attributeTail: Declaration;
   END;
@@ -124,7 +121,6 @@ CONST
   attrNOTATION* = 7;
   attrENUMERATED* = 8;
   attrCDATA* = 9;
-  attrUnknownType* = 10;
 
 TYPE
   DefaultType* = SHORTINT;
@@ -170,7 +166,8 @@ TYPE
     entityValue-: String;
     (**This is either the value of an internal entity, or the internalized
        version of an external entity.  For an internal entity, this field
-       is never @code{NIL}.  *)
+       is never @code{NIL}.  This string is not terminated with an @code{0X},
+       use @oproc{Entity.LengthValue} to determine its length.  *)
 
     expanding*: BOOLEAN;
     (**This field is used internally by the parser.  While expanding the 
@@ -199,6 +196,18 @@ TYPE
     version-: String;
     encoding-: String;
     standalone-: StandaloneType;
+  END;
+
+
+(* Notations
+   ------------------------------------------------------------------------ *)
+
+TYPE
+  Notation* = POINTER TO NotationDesc;
+  NotationDesc = RECORD
+    (DeclarationDesc)
+    public-, system-: String;
+    baseURI-: URI.URI;
   END;
 
 
@@ -248,8 +257,6 @@ TYPE
 
 (* ------------------------------------------------------------------------ *)
 
-
-
 TYPE
   ElementWhitespaceType* = SHORTINT;
 
@@ -260,12 +267,11 @@ CONST
 
 
 TYPE
-  Notation* = POINTER TO NotationDesc;
-  NotationDesc = RECORD
-    
+  NamespaceURI* = POINTER TO NamespaceURIDesc;
+  NamespaceURIDesc = RECORD
+    prefix-: String;
+    uri-: URI.URI;
   END;
-
-
 
 
 (* Declarations and Namespace
@@ -291,22 +297,27 @@ PROCEDURE NewNamespace*(): Namespace;
     RETURN ns
   END NewNamespace;
 
-PROCEDURE (ns: Namespace) Add* (decl: Declaration);
+PROCEDURE (ns: Namespace) Add* (decl: Declaration): BOOLEAN;
 (**Adds the declaration @oparam{decl} to the namespace @oparam{ns}.  Nothing is
-   done if the namespace already contains a declaration of the same name.  *)
+   done if the namespace already contains a declaration of the same name.  In
+   this case, the value @code{FALSE} is returned.  If the declaration was
+   added to the namespace, then the result is @code{TRUE}.  *)
    
-  PROCEDURE RecAdd (VAR list: Declaration);
+  PROCEDURE RecAdd (VAR list: Declaration): BOOLEAN;
     BEGIN
       IF (list = NIL) THEN
-        list := decl
+        list := decl;
+        RETURN TRUE
       ELSIF (list. name^ # decl. name^) THEN
-        RecAdd (list. next)
+        RETURN RecAdd (list. next)
+      ELSE
+        RETURN FALSE
       END
     END RecAdd;
   
   BEGIN
     decl. next := NIL;
-    RecAdd (ns. declList)
+    RETURN RecAdd (ns. declList)
   END Add;
 
 PROCEDURE (ns: Namespace) Get* (name: String): Declaration;
@@ -457,11 +468,12 @@ PROCEDURE (attValue: AttValue) Length* (): LONGINT;
     RETURN len
   END Length;
 
-PROCEDURE (attValue: AttValue) Flatten* (normalizeWhitespace: BOOLEAN): String;
+PROCEDURE (attValue: AttValue) Flatten* (attrDecl: AttrDecl): String;
   VAR
     str: String;
     len, pos: LONGINT;
     skipSpace: BOOLEAN;
+    normalizeWhitespace: BOOLEAN;
   
   PROCEDURE Append (attValue: AttValue);
     VAR
@@ -507,6 +519,7 @@ PROCEDURE (attValue: AttValue) Flatten* (normalizeWhitespace: BOOLEAN): String;
     END Append;
   
   BEGIN
+    normalizeWhitespace := (attrDecl # NIL) & (attrDecl. type # attrCDATA);
     len := attValue. Length();
     NEW (str, len+2);
     (* the second additional character is used for entity value padding
@@ -590,6 +603,7 @@ PROCEDURE (b: Builder) AttachAttributes*;
   VAR
     attrDecl: AttrDecl;
     elemDecl: Declaration;
+    dummy: BOOLEAN;
   BEGIN
     WHILE (b. attributeList # NIL) DO
       attrDecl := b. attributeList(AttrDecl);
@@ -597,7 +611,7 @@ PROCEDURE (b: Builder) AttachAttributes*;
       
       elemDecl := b. elementNamespace. Get (attrDecl. elementName);
       IF (elemDecl # NIL) THEN
-        elemDecl(ElementDecl). attrNamespace. Add (attrDecl)
+        dummy := elemDecl(ElementDecl). attrNamespace. Add (attrDecl)
       END
     END;
     b. attributeTail := NIL
@@ -621,6 +635,12 @@ PROCEDURE (entity: Entity) SetEntityValue* (entityValue: String);
   BEGIN
     entity. entityValue := entityValue
   END SetEntityValue;
+
+PROCEDURE (entity: Entity) LengthValue*(): LONGINT;
+  BEGIN
+    RETURN LEN (entity. entityValue^)-2
+  END LengthValue;
+
 
 PROCEDURE InitInternalEntity (ent: InternalEntity;
                               name: String; type: EntityType;
@@ -700,9 +720,30 @@ PROCEDURE (b: Builder) NewDocumentEntity* (baseURI: URI.URI): ExternalEntity;
     NEW (entity);
     InitExternalEntity (entity, NIL, entityDocument,
                         NIL, NIL, NIL, baseURI);
+    entity. standalone := standaloneNotPresent;
     RETURN entity
   END NewDocumentEntity;
 
+
+(* Notations
+   ------------------------------------------------------------------------ *)
+
+PROCEDURE InitNotation (notation: Notation; name, public, system: String; baseURI: URI.URI);
+  BEGIN
+    InitDeclaration (notation, name);
+    notation. public := public;
+    notation. system := system;
+    notation. baseURI := baseURI
+  END InitNotation;
+
+PROCEDURE (b: Builder) NewNotation* (name, public, system: String; baseURI: URI.URI): Notation;
+  VAR
+    notation: Notation;
+  BEGIN
+    NEW (notation);
+    InitNotation (notation, name, public, system, baseURI);
+    RETURN notation
+  END NewNotation;
 
 
 (* Element Declaration and Element Content
@@ -795,6 +836,7 @@ PROCEDURE Init* (b: Builder);
     VAR
       nameString, replString: String;
       entity: Entity;
+      dummy: BOOLEAN;
     BEGIN
       NEW (nameString, LongStrings.Length (name)+1);
       COPY (name, nameString^);
@@ -804,17 +846,13 @@ PROCEDURE Init* (b: Builder);
       
       entity := b. NewInternalEntity (nameString, entityInternalGeneral, 
                                       replString, TRUE);
-      b. geNamespace. Add (entity)
+      dummy := b. geNamespace. Add (entity)
     END PredefEntity;
   
   BEGIN
     b. geNamespace := NewNamespace();
     b. peNamespace := NewNamespace();
     b. elementNamespace := NewNamespace();
-    
-    b. version := NIL;
-    b. encoding := NIL;
-    b. standalone := standaloneUnknown;
     
     b. attributeList := NIL;
     b. attributeTail := NIL;
@@ -823,8 +861,7 @@ PROCEDURE Init* (b: Builder);
     PredefEntity ("gt", ">");
     PredefEntity ("amp", "&#38;");
     PredefEntity ("apos", "'");
-    PredefEntity ("quot", '"');
-    
+    PredefEntity ("quot", '"')
   END Init;
 
 PROCEDURE New*(): Builder;

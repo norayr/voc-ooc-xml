@@ -50,6 +50,16 @@
   
   <comment>after internal DTD</comment>
   
+  <start-element>
+    <local-name>doc</local-name>
+  </start-element>
+  
+  <attributes-done/>
+  
+  <end-element>
+    <local-name>doc</local-name>
+  </end-element>
+  
   <processing-instruction>
     <target>pi</target>
     <content>after element</content>
