@@ -23,6 +23,7 @@
   </start-dtd>
   
   <end-dtd>
+    <all-declarations-processed>yes</all-declarations-processed>
     <locator>
       <char-index>51</char-index>
       <line>2</line>

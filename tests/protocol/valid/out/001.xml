@@ -94,6 +94,7 @@
       <system-identifier>001.ent</system-identifier>
       <base-uri>valid/001.ent</base-uri>
     </entity>
+    <all-declarations-processed>yes</all-declarations-processed>
     <locator>
       <char-index>122</char-index>
       <line>5</line>

@@ -81,6 +81,7 @@
       <system-identifier>003.ent</system-identifier>
       <base-uri>valid/003.ent</base-uri>
     </entity>
+    <all-declarations-processed>yes</all-declarations-processed>
     <locator>
       <char-index>172</char-index>
       <line>4</line>
