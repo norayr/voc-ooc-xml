@@ -1,4 +1,4 @@
-(*      $Id: Writer.Mod,v 1.3 2000/07/12 22:28:05 mva Exp $   *)
+(*      $Id: Writer.Mod,v 1.4 2000/08/08 13:46:18 mva Exp $   *)
 MODULE XML:Writer [OOC_EXTENSIONS];
 (*  Support for generating XML documents.
     Copyright (C) 2000  Michael van Acken
@@ -65,7 +65,7 @@ PROCEDURE New* (ch: Channel.Channel; codecFactory: Codec.Factory;
     
     NEW (w. elementStack, 8);
     w. lenElementStack := 0;
-    w. doIndent := (indentLevel >= 0);
+    w. doIndent := FALSE;                (* don't indent first start tag *)
     w. openStartTag := FALSE;
     
     RETURN w
@@ -95,7 +95,8 @@ PROCEDURE (w: Writer) WriteTextDecl* (version, standalone: ARRAY OF CHAR);
       w. Write8 (standalone);
       w. Write8 ("'")
     END;
-    w. Write8 ("?>")
+    w. Write8 ("?>");
+    w. doIndent := (w. indentLevel >= 0)
   END WriteTextDecl;
 
 PROCEDURE (w: Writer) NewLine*;
@@ -350,7 +351,7 @@ PROCEDURE (w: Writer) EndTag*;
     
     w. doIndent := (w. indentLevel >= 0);
     IF (w. lenElementStack > 0) THEN
-      w. doIndent := w. doIndent&
+      w. doIndent := w. doIndent &
                      ~(w. elementStack[w. lenElementStack-1]. mixedContent)
     END
   END EndTag;
