@@ -1,6 +1,6 @@
-subdirs=uri codecs xmltest sun oasis miscxml bulk
+subdirs=uri codecs xmltest sun oasis miscxml bulk protocol
 
-export DIFF=diff -u
+export DIFF=diff -c
 
 .PHONY: clean test
 

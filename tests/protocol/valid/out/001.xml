@@ -1,0 +1,63 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<parser-protocol xml:base='file:/usr/home/ooc-devel/sourceforge/libxml/tests/protocol/'>
+  <start-document>
+    <entity>
+      <type>document</type>
+      <base-uri>valid/001.xml</base-uri>
+    </entity>
+  </start-document>
+  
+  <processing-instruction>
+    <target>pi</target>
+    <content>before DTD</content>
+    <base-uri>valid/001.xml</base-uri>
+  </processing-instruction>
+  
+  <comment>before DTD</comment>
+  
+  <start-dtd>
+  </start-dtd>
+  
+  <processing-instruction>
+    <target>pi</target>
+    <content>in internal DTD</content>
+    <base-uri>valid/001.xml</base-uri>
+  </processing-instruction>
+  
+  <comment>in internal DTD</comment>
+  
+  <processing-instruction>
+    <target>pi</target>
+    <content>in external DTD subset</content>
+    <base-uri>valid/001.ent</base-uri>
+  </processing-instruction>
+  
+  <comment>in external DTD subset</comment>
+  
+  <end-dtd>
+    <entity>
+      <type>external DTD subset</type>
+      <system-identifier>001.ent</system-identifier>
+      <base-uri>valid/001.ent</base-uri>
+    </entity>
+  </end-dtd>
+  
+  <processing-instruction>
+    <target>pi</target>
+    <content>after internal DTD</content>
+    <base-uri>valid/001.xml</base-uri>
+  </processing-instruction>
+  
+  <comment>after internal DTD</comment>
+  
+  <processing-instruction>
+    <target>pi</target>
+    <content>after element</content>
+    <base-uri>valid/001.xml</base-uri>
+  </processing-instruction>
+  
+  <comment>after element</comment>
+  
+  <end-document>
+  </end-document>
+</parser-protocol>

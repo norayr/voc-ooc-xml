@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<parser-protocol xml:base='file:/usr/home/ooc-devel/sourceforge/libxml/tests/protocol/'>
+  <start-document>
+    <entity>
+      <type>document</type>
+      <base-uri>not-wf/001.xml</base-uri>
+    </entity>
+  </start-document>
+  
+  <end-document>
+  </end-document>
+</parser-protocol>

@@ -31,9 +31,13 @@ TYPE
   PEInfoList = POINTER TO ARRAY OF PEInfo;
   ParserDesc = RECORD
     errList-: Error.List;
-    
+       
     in: Buffer.Input;
-    builder: Builder.Builder;
+    initialBuilder, builder: Builder.Builder;
+    (* When parsing starts, both @ofield{initialBuilder} and @ofield{builder}
+       refer to the builder that was passed to @oproc{New}.  The first fatal
+       error changes @ofield{builder} to an instance of the empty builder
+       @otype{Builder.Builder}.  *)
     dtd: DTD.Builder;
     
     documentEntity: DTD.ExternalEntity;
@@ -526,6 +530,9 @@ PROCEDURE document (p: Parser);
         lastError. SetLStringAttrib ("publicId", pos. publicId)
       END*)
       p. errList. Append (lastError);
+      IF (p. builder = p. initialBuilder) THEN
+        p. builder := Builder.New()
+      END;
       
 (*      Log.LongInt ("ERROR CODE", code);
       Log.Msg ("Position: ");
@@ -2770,6 +2777,7 @@ PROCEDURE document (p: Parser);
         externalSubset: DTD.ExternalEntity;
       BEGIN  (* pre: looking at "<!DOCTYPE"+NonName *)
         p. inDTD := TRUE;
+        p. builder. StartDTD;
         INC (cpos, 9);                   (* skip over "<!DOCTYPE" *)
         S;
         rootName := Name();
@@ -2817,8 +2825,10 @@ PROCEDURE document (p: Parser);
             Err (junkAfterExtSubset)
           END;
           PopEntity
+        ELSE
+          externalSubset := NIL;
         END;
-        
+        p. builder. EndDTD (externalSubset);
         p. inDTD := FALSE
       END doctypedecl;
     
@@ -2855,7 +2865,7 @@ PROCEDURE document (p: Parser);
       Err (junkAfterDocument)
     END;
     CheckInvalidChars;
-    p. builder. EndDocument
+    p. initialBuilder. EndDocument
   END document;
 
 
@@ -2884,6 +2894,7 @@ PROCEDURE New* (ch: Channel.Channel; codecFactory: Codec.Factory;
     END;
     p. in := Buffer.NewInput (ch, codecFactory, p. errList);
     p. builder := builder;
+    p. initialBuilder := builder;
     p. dtd := DTD.New();
     
     p. documentEntity := p. dtd. NewDocumentEntity (baseURI);
