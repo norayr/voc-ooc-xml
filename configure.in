@@ -1,5 +1,8 @@
 dnl Process this file with autoconf to produce a configure script.
 AC_INIT(src/XML/Parser.Mod)
+for i in sym obj; do
+  if test ! -d $i; then mkdir $i; fi
+done
 
 dnl Check for compiler, initialization file, installation directory,
 dnl ooconfig.sh script, and whether the compiler supports --make-lib.

@@ -523,11 +523,14 @@ else
 fi
 
 
+for i in sym obj; do
+  if ! test -d $i; then mkdir $i; fi
+done
 
 # Extract the first word of "oo2c", so it can be a program name with args.
 set dummy oo2c; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:531: checking for $ac_word" >&5
+echo "configure:534: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_OOC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -632,7 +635,7 @@ else
 fi
 
 echo $ac_n "checking initialization file""... $ac_c" 1>&6
-echo "configure:636: checking initialization file" >&5
+echo "configure:639: checking initialization file" >&5
 if eval "test \"`echo '$''{'ooc_cv_path_ooc_init'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -646,7 +649,7 @@ OOC_INIT="$ooc_cv_path_ooc_init"
 
 
 echo $ac_n "checking installation directory""... $ac_c" 1>&6
-echo "configure:650: checking installation directory" >&5
+echo "configure:653: checking installation directory" >&5
 if eval "test \"`echo '$''{'ooc_cv_path_ooc_libdir'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -670,7 +673,7 @@ fi
 
 
 echo $ac_n "checking for ooconfig""... $ac_c" 1>&6
-echo "configure:674: checking for ooconfig" >&5
+echo "configure:677: checking for ooconfig" >&5
 if eval "test \"`echo '$''{'ooc_cv_prog_ooconfig'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -691,7 +694,7 @@ rm -f $ooc_config
 touch $ooc_config
 
 echo $ac_n "checking for library support""... $ac_c" 1>&6
-echo "configure:695: checking for library support" >&5
+echo "configure:698: checking for library support" >&5
 if eval "test \"`echo '$''{'ooc_cv_ooc_have_libs'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -745,7 +748,7 @@ ac_configure=$ac_aux_dir/configure # This should be Cygnus configure.
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:749: checking for a BSD compatible install" >&5
+echo "configure:752: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -799,7 +802,7 @@ test -z "$INSTALL_DATA" && INSTALL_DATA='${INSTALL} -m 644'
 
 
 echo $ac_n "checking "for socket in -lxnet"""... $ac_c" 1>&6
-echo "configure:803: checking "for socket in -lxnet"" >&5
+echo "configure:806: checking "for socket in -lxnet"" >&5
 if eval "test \"`echo '$''{'ooc_cv_have_libxnet'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -814,7 +817,7 @@ for i in Strings ; do
 done
 i="$ooc_save_i"
 cat > conftest.$ac_ext <<EOF
-#line 818 "configure"
+#line 821 "configure"
 char socket();
 int test_fct() {
 socket(); return 0; }
@@ -827,7 +830,7 @@ IMPORT $ooc_import;
 END conftest.
 EOF
 
-if { (eval echo configure:831: \"$ooc_link\") 1>&5; (eval $ooc_link) 2>&5; } && test -s conftest; then
+if { (eval echo configure:834: \"$ooc_link\") 1>&5; (eval $ooc_link) 2>&5; } && test -s conftest; then
   rm -rf *conftest* sym/conftest* obj/conftest*
   eval "ooc_lib_$ac_lib_var=yes"
 else
@@ -858,7 +861,7 @@ for i in Strings ; do
 done
 i="$ooc_save_i"
 cat > conftest.$ac_ext <<EOF
-#line 862 "configure"
+#line 865 "configure"
 char socket();
 int test_fct() {
 socket(); return 0; }
@@ -871,7 +874,7 @@ IMPORT $ooc_import;
 END conftest.
 EOF
 
-if { (eval echo configure:875: \"$ooc_link\") 1>&5; (eval $ooc_link) 2>&5; } && test -s conftest; then
+if { (eval echo configure:878: \"$ooc_link\") 1>&5; (eval $ooc_link) 2>&5; } && test -s conftest; then
   rm -rf *conftest* sym/conftest* obj/conftest*
   eval "ooc_lib_$ac_lib_var=yes"
 else
@@ -903,7 +906,7 @@ for i in Strings ; do
 done
 i="$ooc_save_i"
 cat > conftest.$ac_ext <<EOF
-#line 907 "configure"
+#line 910 "configure"
 char socket();
 int test_fct() {
 socket(); return 0; }
@@ -916,7 +919,7 @@ IMPORT $ooc_import;
 END conftest.
 EOF
 
-if { (eval echo configure:920: \"$ooc_link\") 1>&5; (eval $ooc_link) 2>&5; } && test -s conftest; then
+if { (eval echo configure:923: \"$ooc_link\") 1>&5; (eval $ooc_link) 2>&5; } && test -s conftest; then
   rm -rf *conftest* sym/conftest* obj/conftest*
   eval "ooc_lib_$ac_lib_var=yes"
 else
@@ -966,7 +969,7 @@ echo "--append-line $ooc_option_name DEFINE\ LibxnetPrefix:=\\\"$ooc_xnet_prefix
 
 
 echo $ac_n "checking whether ${MAKE-make} sets \${MAKE}""... $ac_c" 1>&6
-echo "configure:970: checking whether ${MAKE-make} sets \${MAKE}" >&5
+echo "configure:973: checking whether ${MAKE-make} sets \${MAKE}" >&5
 set dummy ${MAKE-make}; ac_make=`echo "$2" | sed 'y%./+-%__p_%'`
 if eval "test \"`echo '$''{'ac_cv_prog_make_${ac_make}_set'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
