@@ -1,7 +1,7 @@
-(* 	$Id: Error.Mod,v 1.3 2000/07/17 07:44:41 mva Exp $	 *)
+(* 	$Id: Error.Mod,v 1.4 2000/07/31 18:37:07 mva Exp $	 *)
 MODULE XML:Error;
 (*  Creates lists of error messages and converts them to text.
-    Copyright (C) 2000  Michael van Acken
+    Copyright (C) 2000, 2001  Michael van Acken
 
     This module is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License
@@ -55,6 +55,19 @@ TYPE
     (M.MsgListDesc)
     cwdURI: URI.HierarchicalURI;
   END;
+
+
+VAR
+  errMsgLineBase*: LONGINT;
+  (**Line number used to refer to the first line in a file in an error message.
+     The default is @samp{0}.  Most programs count lines beginning at @samp{1},
+     so you might want to change this before calling the XML parser.  *)
+  errMsgColumnBase*: LONGINT;
+  (**Column number used to refer to the first character of a line in an error
+     message.  The default is @samp{0}.  *)
+  errMsgCharPosBase*: LONGINT;
+  (**Character position used to refer to the first character of a file in an
+     error message.  The default is @samp{0}.  *)
 
 
 PROCEDURE InitContext* (c: Context; id: M.String);
@@ -233,4 +246,6 @@ PROCEDURE (errList: List) Write* (ch: Channel.Channel);
     END
   END Write;
 
+BEGIN
+  errMsgLineBase := 0; errMsgColumnBase := 0; errMsgCharPosBase := 0;
 END XML:Error.
