@@ -94,6 +94,10 @@ void OS_Files__ErrorContextDesc_GetTemplate(OS_Files__ErrorContext context, Msg_
     str = "A file of this name already exists";
   } else if (res == OS_Files__writeError) {
     str = "Write error";
+  } else if (res == OS_Files__fileBusy) {
+    str = "File in use";
+  } else if (res == OS_Files__noSuchFile) {
+    str = "File does not exist";
   }
 
   _string_copy2l(templ, str, templ_0d);
@@ -126,7 +130,9 @@ static Msg__Msg get_error(const OS_Files__Path path) {
   
   switch (errno) {
   case EACCES: code = OS_Files__accessDenied; break;
+  case EBUSY: code = OS_Files__fileBusy; break;
   case EEXIST: code = OS_Files__fileExists; break;
+  case ENOENT: code = OS_Files__noSuchFile; break;
   default: code = OS_Files__writeError;
   }
   
@@ -190,6 +196,18 @@ void OS_Files__makedirs(const OS_Files__Path path, LONGINT path_0d,
       /* path is not directory: let mkdir get the error message */
       OS_Files__mkdir(path, path_0d, mode, res);
     }
+  }
+}
+
+void OS_Files__remove(const OS_Files__Path path, LONGINT path_0d,
+                      Msg__Msg *res) {
+  int rc;
+
+  rc = unlink((const char*)path);
+  if (rc) {
+    *res = get_error(Msg__GetStringPtr(path, path_0d));
+  } else {
+    *res = OS_Files__done;
   }
 }
 

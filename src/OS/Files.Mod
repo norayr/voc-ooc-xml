@@ -1,4 +1,4 @@
-(* 	$Id: Files.Mod,v 1.1.1.2 2000/07/10 20:31:52 mva Exp $	 *)
+(* 	$Id: Files.Mod,v 1.2 2000/07/25 12:21:29 mva Exp $	 *)
 MODULE OS:Files [FOREIGN "C"; LINK FILE "OS_Files.c" END];
 (*  Manipulation of file and directory entries.
     Copyright (C) 2000  Michael van Acken
@@ -46,6 +46,13 @@ CONST
   writeError* = 3;
   (**Any other error, e.g. too many links in the parent directory, no
      space left in the file system, or the file system is read-only.  *)
+  fileBusy* = 4;
+  (**This error indicates that the file is being used by the
+     system in such a way that it can't be unlinked.  For example,
+     you might see this error if the file name specifies the root
+     directory or a mount point for a file system.  *)
+  noSuchFile* = 5;
+  (**The file name to be deleted doesn't exist.  *)
   
     
 CONST
@@ -80,5 +87,8 @@ PROCEDURE makedirs* (path: Path; mode: Mode; VAR res: Result);
    message is returned in @oparam{res}.  Otherwise, @oparam{res} is set to
    @code{NIL}.  [Note: Python actually considers it an error if the directory
    @oparam{path} already exists.  Should we do the same?] *)
+
+PROCEDURE remove* (path: Path; VAR res: Result);
+(**Removes the file @oparam{path}.  *)
 
 END OS:Files.
