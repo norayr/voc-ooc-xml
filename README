@@ -9,8 +9,8 @@ To install the files into the compiler's installation directory, do
   ./configure
   make install
 
-The socket modules are known to work under Linux and Solaris 2.6.  I
-would like to get some feedback for other platforms.
+The socket modules are known to work under Linux, Solaris 2.6, and
+CygWin.  I would like to get some feedback for other platforms.
 
 
 IMPORTANT: You'll need oo2c-1.5.3.4 or later to compile the sources.
@@ -42,8 +42,8 @@ current errata list in all points.  Another point some people will
 like: the sources are published under the LGPL, _not_ GPL.
 
 
-This is development stuff and I expect it is only interesting to a
-select few.  To get the goodies, check the instructions at
+To get at the latest and greatest sources, use the CVS repository at
+SourceForge.  To get the goodies, check the instructions at
 
   https://sourceforge.net/cvs/?group_id=3539
 
@@ -55,13 +55,14 @@ only want to browse the source code,
 is probably the interface of your choice.
 
 
-There is no configure magic, which means you must add the directory to
-the compiler's search path yourself (libxml/src must be included for
-*.Mod and *.c).  To run the test cases, please use oo2c-1.5.3 or
-later.  Set the environment variable OOC to point to your oo2c
-compiler.  Then, do "make test" in the root directory.  (I'm not sure
-what happens if your make is not of the GNU persuasion.  I've tried
-this setup under both Linux and SunOS 5.6.)
+Due to changes in the installation process, "make test" will currently
+only work _after_ "make install" has been done once.  Otherwise,
+compilation will complain about undefined pragma variables.  Anyway,
+to run the tests set the environment variable OOC to point to your
+oo2c compiler.  Then, do "make test" in the root directory.  (I'm not
+sure what happens if your make is not of the GNU persuasion.  I've
+tried this setup under both Linux and SunOS 5.6.  Under CygWin, there
+seems to be a problem with patching the Sun tests.  Ignore it.)
 
 The C compiler emits some warnings about missing type casts for
 `XML_Parser.c'.  They can be safely ignored.
