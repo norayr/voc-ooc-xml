@@ -1,4 +1,4 @@
-(* 	$Id: CharClass.Mod,v 1.1.1.2 2000/07/10 20:31:52 mva Exp $	 *)
+(* 	$Id: CharClass.Mod,v 1.2 2000/07/23 17:36:27 mva Exp $	 *)
 MODULE URI:CharClass;
 (*  Predicates and auxiliary functions for URI character classes.
     Copyright (C) 2000  Michael van Acken
@@ -27,9 +27,14 @@ CONST
   unreservedUserinfo* = ";:&=+$,";
   (**All characters that are classified as reserved, but need not to be
      escaped if used within a userinfo string.  *)
-  reserved* = ";/?:@&=+$,";
+  reserved* = ";/?:@&=+$,[]";
   (**The list of characters that are allowed within a URI, but may not be
-     allowed within a particular component of the generic URI syntax.  *)
+     allowed within a particular component of the generic URI syntax.  Note:
+     RFC 2732, @cite{Format for Literal IPv6 Addresses in URL's}, adds the
+     characters @samp{[} and @samp{]} to the set of reserved characters.  Until
+     @omodule{URI:Authority:ServerBased} implements literal IPv6 addresses,
+     extending @oconst{reserved} only prevents other modules (e.g., the XML
+     parser) from escaping these characters.  *)
 
 
 PROCEDURE IsAlpha* (ch: CHAR): BOOLEAN;
