@@ -1,0 +1,3 @@
+Error: The opaque part of an URI must not be empty
+uri=mailto:
+uri_pos=7

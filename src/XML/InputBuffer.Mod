@@ -1,4 +1,4 @@
-(* 	$Id: InputBuffer.Mod,v 1.1 1999/11/28 20:26:28 ooc-devel Exp ooc-devel $	 *)
+(* 	$Id: InputBuffer.Mod,v 1.1.1.1 2000/07/10 15:24:30 mva Exp $	 *)
 MODULE XML:InputBuffer;
 (*  Defines input buffer for OOC's scanner.
     Copyright (C) 2000  Michael van Acken

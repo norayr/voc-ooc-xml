@@ -1,4 +1,4 @@
-(* 	$Id: Strings.Mod,v 1.4 1999/10/03 11:45:07 ooc-devel Exp $	 *)
+(* 	$Id: String.Mod,v 1.1.1.1 2000/07/10 15:24:40 mva Exp $	 *)
 MODULE URI:String;
 (*  Auxiliary string functions for URI parser.
     Copyright (C) 2000  Michael van Acken

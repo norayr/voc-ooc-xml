@@ -1,0 +1,3 @@
+Error: Illegal character for opaque component of an URI
+uri=foobar:a%b
+uri_pos=8

@@ -1,4 +1,4 @@
-(*      $Id: CanonicalUTF8.Mod,v 1.3 1999/09/05 01:04:57 acken Exp $   *)
+(*      $Id: Writer.Mod,v 1.2 2000/07/10 20:29:34 mva Exp $   *)
 MODULE XML:Writer [OOC_EXTENSIONS];
 (*  Auxiliary functions to write nice looking XML text.
     Copyright (C) 2000  Michael van Acken
@@ -21,7 +21,7 @@ MODULE XML:Writer [OOC_EXTENSIONS];
 
 
 IMPORT
-  Ascii, Channel, LongStrings, IntStr, URI,
+  Ascii, Channel, Strings, LongStrings, IntStr, URI,
   Codec := XML:UnicodeCodec, XML:UnicodeBuffer;
 
 
@@ -117,10 +117,42 @@ PROCEDURE (w: Writer) WriteQuotedI* (str[NO_COPY]: ARRAY OF Char;
     END
   END WriteQuotedI;
 
+PROCEDURE (w: Writer) WriteQuotedLatin1I* (str[NO_COPY]: ARRAY OF CHAR;
+                                           s, e: LONGINT);
+  VAR
+    last: LONGINT;
+  BEGIN
+    WHILE (s # e) DO
+      last := s;
+      WHILE (s # e) &
+            (str[s] # "&") & (str[s] # "<") & (str[s] # ">") & 
+            (str[s] # 09X) & (str[s] # 0AX) & (str[s] # 0DX) DO
+        INC (s)
+      END;
+      w. WriteLatin1I (str, last, s);
+      IF (s # e) THEN
+        CASE str[s] OF
+        | "&": w. WriteLatin1 ("&amp;")
+        | "<": w. WriteLatin1 ("&lt;")
+        | ">": w. WriteLatin1 ("&gt;")
+        | 09X: w. WriteLatin1 ("&#9;")
+        | 0AX: w. WriteLatin1 ("&#10;")
+        | 0DX: w. WriteLatin1 ("&#13;")
+        END;
+        INC (s)
+      END
+    END
+  END WriteQuotedLatin1I;
+
 PROCEDURE (w: Writer) WriteQuoted* (str[NO_COPY]: ARRAY OF Char);
   BEGIN
     w. WriteQuotedI (str, 0, LongStrings.Length (str))
   END WriteQuoted;
+
+PROCEDURE (w: Writer) WriteQuotedLatin1* (str[NO_COPY]: ARRAY OF CHAR);
+  BEGIN
+    w. WriteQuotedLatin1I (str, 0, Strings.Length (str))
+  END WriteQuotedLatin1;
 
 PROCEDURE (w: Writer) WriteURI* (uri: URI.URI; absolute: BOOLEAN);
   VAR

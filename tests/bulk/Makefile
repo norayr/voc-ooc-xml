@@ -1,8 +1,6 @@
 TEST_PROG=../../TestParser
 scripts=./valid.sh
 
-export DIFF=diff -u
-
 .PHONY: all clean test ${TEST_PROG} nortc
 
 test-output:

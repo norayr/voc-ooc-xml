@@ -1,0 +1,3 @@
+Error: The URI scheme name must be followed by a slash `/'
+uri=http:foobar
+uri_pos=5

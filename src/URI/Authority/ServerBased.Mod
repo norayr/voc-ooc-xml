@@ -1,4 +1,4 @@
-(* 	$Id: Strings.Mod,v 1.4 1999/10/03 11:45:07 ooc-devel Exp $	 *)
+(* 	$Id: ServerBased.Mod,v 1.1.1.1 2000/07/10 15:24:41 mva Exp $	 *)
 MODULE URI:Authority:ServerBased;
 (*  Implements class for registry-based authority components.
     Copyright (C) 2000  Michael van Acken

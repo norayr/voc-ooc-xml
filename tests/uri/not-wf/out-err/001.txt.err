@@ -1,0 +1,3 @@
+Error: The opaque part of an URI must not be empty
+uri=foo:
+uri_pos=4
