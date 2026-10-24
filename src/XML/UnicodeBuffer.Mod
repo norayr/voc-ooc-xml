@@ -1,22 +1,21 @@
-MODULE XML:UnicodeBuffer [OOC_EXTENSIONS];
+MODULE XMLUnicodeBuffer;
 
 IMPORT
-  SYSTEM, Channel, Msg, Strings, LongStrings,
-  XML:InputBuffer, Codec := XML:UnicodeCodec;
+  SYSTEM, Channel, Msg, LongStrings, Unicode := XMLUnicode,
+  InputBuffer := XMLInputBuffer, Codec := XMLUnicodeCodec;
 
 
 TYPE
-  Char* = LONGCHAR;
+  Char* = Unicode.LONGCHAR;
   (**Character type used to represent the Unicode input data.  *)
   CharArray* = POINTER TO ARRAY OF Char;
   (**Character array of arbitrary length.  This type is used for the 
      character data of the input buffer.  *)
   CharPos* = LONGINT;
-  (**Character position for a channel.  The very first byte that would
-     be read from the channel has position 0.  *)
+  (**UTF-16 code-unit position. The first code unit has position 0. *)
      
 CONST
-  markerEOB* = 0FFFEX;
+  markerEOB* = 0FFFEH;
   (**This is the character value that is used to mark the end of the Unicode
      buffer.  It is the first non-input character after the last valid document
      character in the buffer.  Because this character code is never produced
@@ -24,7 +23,7 @@ CONST
      a definitive answer.  Calling @oproc{Input.NextBlock} will replace
      the character with a valid character from the input document, or with
      @oconst{markerEOD}.  *)
-  markerEOD* = 0FFFFX;
+  markerEOD* = 0FFFFH;
   (**This character value marks the end of the document.  It is the first
      non-input character after the last valid document character in the buffer.
      This character is never emitted by the Unicode decoders, and it is
@@ -38,6 +37,7 @@ TYPE
   InputDesc = RECORD
     byteBuffer: InputBuffer.Buffer;
     byteEndOfData: BOOLEAN;
+    bomSkip: LONGINT;
     codecFactory-: Codec.Factory;
     codec-: Codec.Codec;
     autoDetectedCodec-: BOOLEAN;
@@ -51,7 +51,7 @@ TYPE
        range [0..@ofield{endOfBuffer}-1] hold valid characters.  The value
        of @samp{chars[endOfBuffer]} is @oconst{markerEOB}.  *)
     discardable*: CharPos;
-    (**The client can define here how many bytes that have been read into
+    (**The client can define here how many code units that have been read into
        the buffer will not be inspected again later, and can therefore be
        discarded by @oproc{Input.NextBlock}.  Possible values for this field
        are [0..@ofield{endOfBuffer}].  *)
@@ -93,7 +93,7 @@ TYPE
     
     byteBuffer: POINTER TO ARRAY sizeOutputByteBuffer OF CHAR;
     byteStart, byteEnd: LONGINT;
-    unicodeBuffer: POINTER TO ARRAY sizeOutputUnicodeBuffer OF LONGCHAR;
+     unicodeBuffer: POINTER TO ARRAY sizeOutputUnicodeBuffer OF Char;
     unicodeEnd: LONGINT;
   END;
 
@@ -141,7 +141,7 @@ PROCEDURE AutodetectEnc (input: Input; VAR enc: ARRAY OF CHAR): LONGINT;
           (* UCS-4, 3412 order *)
           str := "UCS-4-3412"
         ELSIF (x[1] = 3CX) & (x[2] = 0X) & (x[3] = 3FX) THEN  (* UTF-16LE *)
-          str := "UTF16-LE"
+            str := "UTF-16BE"
         END
       | 03CX:
         IF (x[1] = 0X) THEN
@@ -184,6 +184,12 @@ PROCEDURE AutodetectEnc (input: Input; VAR enc: ARRAY OF CHAR): LONGINT;
         END
       ELSE  (* use default *)
       END
+    ELSIF input. byteBuffer. endOfBuffer >= 2 THEN
+      IF (x[0] = 0FEX) & (x[1] = 0FFX) THEN str := "UTF-16BE"; skip := 2
+      ELSIF (x[0] = 0FFX) & (x[1] = 0FEX) THEN str := "UTF-16LE"; skip := 2
+      ELSIF (input. byteBuffer. endOfBuffer >= 3) &
+            (x[0] = 0EFX) & (x[1] = 0BBX) & (x[2] = 0BFX) THEN skip := 3
+      END
     END;
     COPY (str, enc);
     RETURN skip
@@ -218,45 +224,43 @@ PROCEDURE (in: Input) NextBlock* (): BOOLEAN;
    part of the buffer is discarded, @ofield{Input.discardable} is 
    set to zero.  *)
   VAR
-    len: CharPos;
+    len, i: CharPos;
     nChars: CharArray;
   BEGIN
     IF (in. chars[in. endOfBuffer] = markerEOD) THEN
       RETURN FALSE
-    ELSIF ~in. byteEndOfData &
-       (in. byteBuffer. discardable >= LEN (in. byteBuffer. chars^) DIV 2) THEN
+    END;
+    (* Preserve a possibly incomplete encoded character until more bytes or
+       the actual end of the stream are available. *)
+    WHILE ~in. byteEndOfData &
+          (in. byteBuffer. endOfBuffer-in. byteBuffer. discardable < Codec.maxUTF8EncodingLength) DO
       in. byteEndOfData := ~in. byteBuffer. NextBlock()
     END;
     
     ASSERT (in. chars[in. endOfBuffer] = markerEOB);
+    ASSERT ((0 <= in. discardable) & (in. discardable <= in. endOfBuffer));
     IF (in. discardable >= charsPerRead) THEN
       (* move data to beginning of buffer *)
       len := in. endOfBuffer - in. discardable;
-      IF (len < in. discardable) THEN
-        (* can use MOVE only when the memory areas do not intersect; the 
-           chance that we cannot MOVE is so small, that we simply ignore 
-           this case and add more memory to the buffer if it ever happens *)
-        SYSTEM.MOVE (SYSTEM.ADR (in. chars[in. discardable]), 
-                     SYSTEM.ADR (in. chars^),
-                     (len+1)*SIZE (Char));
-        INC (in. offsetFromPos0, in. discardable);
-        in. endOfBuffer := len;
-        in. discardable := 0
-      END
+      (* Code-unit copies also handle overlapping ranges. *)
+      FOR i := 0 TO len DO in. chars[i] := in. chars[in. discardable+i] END;
+      ASSERT (in. offsetFromPos0 <= MAX (LONGINT)-in. discardable);
+      INC (in. offsetFromPos0, in. discardable);
+      in. endOfBuffer := len;
+      in. discardable := 0
     END;
     ASSERT (in. chars[in. endOfBuffer] = markerEOB);
 
-    IF (in. endOfBuffer+charsPerRead >= LEN (in. chars^)) THEN
+    IF (LEN (in. chars^)-in. endOfBuffer <= charsPerRead) THEN
       (* extend buffer so that it can hold in. endOfBuffer+charsPerRead+1 
          bytes *)
       len := LEN (in. chars^);
       REPEAT
+        ASSERT (len <= MAX (LONGINT)-charsPerRead);
         INC (len, charsPerRead)
-      UNTIL (in. endOfBuffer+charsPerRead < len);
+      UNTIL (len-in. endOfBuffer > charsPerRead);
       NEW (nChars, len);
-      SYSTEM.MOVE (SYSTEM.ADR (in. chars^),
-                   SYSTEM.ADR (nChars^),
-                   (in. endOfBuffer+1)*SIZE (Char));
+      FOR i := 0 TO in. endOfBuffer DO nChars[i] := in. chars[i] END;
       in. chars := nChars
     END;
     
@@ -291,12 +295,21 @@ PROCEDURE (in: Input) SetCodec* (cf: Codec.Factory; autoDetect: BOOLEAN);
 (* pre: in.byteBuffer.offsetFromPos0=0 *)
   VAR
     dummy: BOOLEAN;
+    name: ARRAY 32 OF CHAR;
   BEGIN
     ASSERT (in. byteBuffer. offsetFromPos0 = 0);
+    ASSERT (cf # NIL);
     in. codecFactory := cf;
     in. codec := cf. NewCodecBOM
       (in. byteBuffer. chars^, 0, in. byteBuffer. endOfBuffer,
-       in. byteBuffer. discardable);
+        in. byteBuffer. discardable);
+    cf. GetEncodingName (name);
+    IF (name = "UTF-8") & (in. byteBuffer. endOfBuffer >= 3) &
+       (in. byteBuffer. chars[0] = 0EFX) & (in. byteBuffer. chars[1] = 0BBX) &
+       (in. byteBuffer. chars[2] = 0BFX) THEN in. bomSkip := 3 END;
+    IF in. bomSkip > in. byteBuffer. discardable THEN
+      in. byteBuffer. discardable := in. bomSkip
+    END;
     in. chars[0] := markerEOB;
     in. discardable := 0;
     in. offsetFromPos0 := 0;
@@ -312,23 +325,42 @@ PROCEDURE InitInput* (input: Input; new: BOOLEAN;
     encoding: ARRAY 256 OF CHAR;
     skip: LONGINT;
     autoDetect: BOOLEAN;
+    progress: BOOLEAN;
+    error: Msg.Msg;
+    context: Msg.Context;
   BEGIN
     IF new THEN
       input. byteBuffer := InputBuffer.New (reader, errList);
       NEW (input. chars, sizeOfInputBuffer);
     ELSE
-      ASSERT (FALSE);
+      HALT (127);
       (*input. byteBuffer. Reset (reader, errList)*)
     END;
     
     input. byteEndOfData := FALSE;
+    input. bomSkip := 0;
     input. errList := errList;
+    WHILE ~input. byteEndOfData & (input. byteBuffer. endOfBuffer < 4) DO
+      progress := input. byteBuffer. NextBlock();
+      input. byteEndOfData := ~progress
+    END;
     
     autoDetect := FALSE;
     IF (codecFactory = NIL) THEN
       skip := AutodetectEnc (input, encoding);
+      input. bomSkip := skip;
       codecFactory := Codec.GetFactory (encoding);
-      ASSERT (codecFactory # NIL);
+      IF codecFactory = NIL THEN
+        NEW (context); Msg.InitContext (context, "XMLUnicodeBuffer");
+        error := Msg.New (context, Channel.invalidFormat);
+        error. SetStringAttrib ("encoding", Msg.GetStringPtr (encoding));
+        errList. Append (error);
+        input. codecFactory := NIL; input. codec := NIL;
+        input. autoDetectedCodec := TRUE;
+        input. discardable := 0; input. offsetFromPos0 := 0; input. endOfBuffer := 0;
+        input. chars[0] := markerEOD;
+        RETURN
+      END;
       autoDetect := TRUE
     END;
     
@@ -352,8 +384,10 @@ PROCEDURE InitInput* (input: Input; new: BOOLEAN;
 PROCEDURE NewInput* (reader: Channel.Reader; codecFactory: Codec.Factory;
                      errList: Msg.MsgList): Input;
 (**Create new input buffer for reader @oparam{reader} and try to read the first
-   block of data from it.  Returns an initialized input buffer with up to
-   @oconst{sizeOfInputBuffer} characters of input.  *)
+    block of data from it.  Returns an initialized input buffer with up to
+    @oconst{sizeOfInputBuffer} characters of input. An unsupported detected
+    encoding is reported in errList; the returned input is at end of document
+    with NIL codec and codecFactory. Check errList before using codec metadata. *)
   VAR
     input: Input;
   BEGIN
@@ -365,109 +399,100 @@ PROCEDURE NewInput* (reader: Channel.Reader; codecFactory: Codec.Factory;
 (* ------------------------------------------------------------------------ *)
 
 PROCEDURE FlushBytes (out: Output);
+  VAR count: LONGINT; context: Msg.Context;
   BEGIN
-    out. writer. WriteBytes (out. byteBuffer^, 0, out. byteEnd);
-    out. byteEnd := 0
+    WHILE (out. byteStart < out. byteEnd) & (out. writer. res = Channel.done) DO
+      count := out. byteEnd-out. byteStart;
+      out. writer. WriteBytes (out. byteBuffer^, out. byteStart, count);
+      ASSERT ((0 <= out. writer. bytesWritten) & (out. writer. bytesWritten <= count));
+      INC (out. byteStart, out. writer. bytesWritten);
+      IF (out. writer. bytesWritten = 0) & (out. writer. res = Channel.done) THEN
+        NEW (context); Msg.InitContext (context, "XMLUnicodeBuffer");
+        out. writer. res := Msg.New (context, Channel.writeError)
+      END
+    END;
+    IF out. byteStart = out. byteEnd THEN out. byteStart := 0; out. byteEnd := 0 END
   END FlushBytes;
 
 PROCEDURE Encode (out: Output; all: BOOLEAN);
   VAR
-    start, limit, i, len: LONGINT;
+    start, limit, i, len, done, written: LONGINT;
   BEGIN
     start := 0;
-    IF all THEN
-      limit := out. unicodeEnd-Codec.maxUCS2EncodingLength
-    ELSE
-      limit := out. unicodeEnd-LEN (out. byteBuffer^) DIV 8
+    limit := out. unicodeEnd;
+    IF ~all & (limit > 0) & (0D800H <= out. unicodeBuffer[limit-1]) &
+       (out. unicodeBuffer[limit-1] < 0DC00H) THEN
+      DEC (limit) (* hold a possible split surrogate pair until the next write *)
     END;
-    WHILE (start <= limit) DO
+    LOOP
+      IF (start >= limit) OR (out. writer. res # Channel.done) THEN EXIT END;
       IF (LEN (out. byteBuffer^)-out. byteEnd < Codec.maxUTF8EncodingLength) THEN
         FlushBytes (out)
       END;
-      out. codec. Encode (out. unicodeBuffer^, start, out. unicodeEnd,
+      IF out. writer. res # Channel.done THEN EXIT END;
+      out. codec. Encode (out. unicodeBuffer^, start, limit,
                         out. byteBuffer^, out. byteEnd, LEN (out. byteBuffer^),
-                        start, out. byteEnd)
+                         done, written);
+      ASSERT ((start < done) & (done <= limit));
+      ASSERT ((out. byteEnd < written) & (written <= LEN (out. byteBuffer^)));
+      start := done; out. byteEnd := written
     END;
-    
-    IF all & (start # out. unicodeEnd) THEN
-      IF (LEN (out. byteBuffer^)-out. byteEnd < Codec.maxUTF8EncodingLength) THEN
-        FlushBytes (out)
-      END;
-      out. codec. Encode (out. unicodeBuffer^, start, out. unicodeEnd,
-                        out. byteBuffer^, out. byteEnd, LEN (out. byteBuffer^),
-                        start, out. byteEnd);
-      ASSERT (start = out. unicodeEnd)
-    ELSE
-      len := out. unicodeEnd-start;
-      FOR i := 0 TO len-1 DO
-        out. unicodeBuffer[i] := out. unicodeBuffer[start+i]
-      END;
-      out. unicodeEnd := len
-    END
+    len := out. unicodeEnd-start;
+    FOR i := 0 TO len-1 DO out. unicodeBuffer[i] := out. unicodeBuffer[start+i] END;
+    out. unicodeEnd := len
   END Encode;
 
-PROCEDURE (out: Output) Write16I* (str[NO_COPY]: ARRAY OF Char;
-                                         start, end: CharPos);
+PROCEDURE (out: Output) Write16I* (VAR str: ARRAY OF Char;
+                                          start, end: CharPos);
+(**Appends code units from [start..end[. The source is treated as read-only. *)
   VAR
     len: LONGINT;
   BEGIN
-    len := end-start;
-    IF (len # 0) & (out. unicodeEnd+len <= LEN (out. unicodeBuffer^)) THEN
+    ASSERT ((0 <= start) & (start <= end) & (end <= LEN (str)));
+    LOOP
+      IF (start >= end) OR (out. writer. res # Channel.done) THEN EXIT END;
+      IF out. unicodeEnd = LEN (out. unicodeBuffer^) THEN Encode (out, FALSE) END;
+      IF out. writer. res # Channel.done THEN EXIT END;
+      len := LEN (out. unicodeBuffer^)-out. unicodeEnd;
+      IF len > end-start THEN len := end-start END;
       SYSTEM.MOVE (SYSTEM.ADR (str[start]),
                    SYSTEM.ADR (out. unicodeBuffer[out. unicodeEnd]),
                    len*SIZE (Char));
-      INC (out. unicodeEnd, len)
-    ELSE
-      WHILE (start # end) DO
-        IF (out. unicodeEnd = LEN (out. unicodeBuffer^)) THEN
-          Encode (out, FALSE)
-        END;
-        len := LEN (out. unicodeBuffer^)-out. unicodeEnd;
-        IF (len > end-start) THEN
-          len := end-start
-        END;
-        out. Write16I (str, start, start+len);
-        INC (start, len)
-      END
+      INC (out. unicodeEnd, len); INC (start, len)
     END
   END Write16I;
 
-PROCEDURE (out: Output) Write8I* (str[NO_COPY]: ARRAY OF CHAR;
-                                  start, end: CharPos);
+PROCEDURE (out: Output) Write8I* (VAR str: ARRAY OF CHAR;
+                                   start, end: CharPos);
+(**Widens Latin-1 octets from [start..end[. The source is treated as read-only. *)
   VAR
     pos, len: LONGINT;
   BEGIN
-    len := end-start;
-    IF (len # 0) & (out. unicodeEnd+len <= LEN (out. unicodeBuffer^)) THEN
-      pos := out. unicodeEnd-start;
-      WHILE (start # end) DO
-        out. unicodeBuffer[pos+start] := str[start];
+    ASSERT ((0 <= start) & (start <= end) & (end <= LEN (str)));
+    LOOP
+      IF (start >= end) OR (out. writer. res # Channel.done) THEN EXIT END;
+      IF out. unicodeEnd = LEN (out. unicodeBuffer^) THEN Encode (out, FALSE) END;
+      IF out. writer. res # Channel.done THEN EXIT END;
+      len := LEN (out. unicodeBuffer^)-out. unicodeEnd;
+      IF len > end-start THEN len := end-start END;
+      pos := 0;
+      WHILE pos < len DO
+        out. unicodeBuffer[out. unicodeEnd+pos] := ORD (str[start]);
+        INC (pos);
         INC (start)
       END;
       INC (out. unicodeEnd, len)
-    ELSE
-      WHILE (start # end) DO
-        IF (out. unicodeEnd = LEN (out. unicodeBuffer^)) THEN
-          Encode (out, FALSE)
-        END;
-        len := LEN (out. unicodeBuffer^)-out. unicodeEnd;
-        IF (len > end-start) THEN
-          len := end-start
-        END;
-        out. Write8I (str, start, start+len);
-        INC (start, len)
-      END
     END
   END Write8I;
 
-PROCEDURE (out: Output) Write16* (str[NO_COPY]: ARRAY OF Char);
+PROCEDURE (out: Output) Write16* (VAR str: ARRAY OF Char);
   BEGIN
     out. Write16I (str, 0, LongStrings.Length (str))
   END Write16;
 
-PROCEDURE (out: Output) Write8* (str[NO_COPY]: ARRAY OF CHAR);
+PROCEDURE (out: Output) Write8* (str: ARRAY OF CHAR);
   BEGIN
-    out. Write8I (str, 0, Strings.Length (str))
+    out. Write8I (str, 0, LongStrings.Length8 (str))
   END Write8;
 
 PROCEDURE (out: Output) Flush*;
@@ -527,4 +552,4 @@ PROCEDURE NewOutput* (writer: Channel.Writer; codecFactory: Codec.Factory;
 
 BEGIN
   ASSERT (charsPerRead >= Codec.maxUCS2EncodingLength)
-END XML:UnicodeBuffer.
+  END XMLUnicodeBuffer.

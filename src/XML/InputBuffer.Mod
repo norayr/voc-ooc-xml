@@ -1,5 +1,5 @@
 (* 	$Id: InputBuffer.Mod,v 1.3 2000/10/29 20:22:07 mva Exp $	 *)
-MODULE XML:InputBuffer;
+MODULE XMLInputBuffer;
 (*  Defines input buffer for OOC's scanner.
     Copyright (C) 2000  Michael van Acken
 *)
@@ -27,6 +27,7 @@ TYPE
   Buffer* = POINTER TO BufferDesc;
   BufferDesc = RECORD
     r: Channel.Reader;
+    stopped: BOOLEAN;
     chars-: CharArray;
     (**Character data from input channel.  *)
     offsetFromPos0-: CharPos;
@@ -65,11 +66,14 @@ PROCEDURE (b: Buffer) NextBlock* (): BOOLEAN;
    part of the buffer is discarded, @ofield{Buffer.discardable} is 
    set to zero.  *)
   VAR
-    len: CharPos;
+    len, i: CharPos;
     nChars: CharArray;
   BEGIN
     ASSERT (b. chars[b. endOfBuffer] = markerEOB);
+    ASSERT ((0 <= b. discardable) & (b. discardable <= b. endOfBuffer));
+    IF b. stopped THEN RETURN FALSE END;
     IF (b. r. res # Channel.done) THEN
+      b. stopped := TRUE;
       IF (b. r. res. code # Channel.readAfterEnd) THEN
         b. errList. Append (b. r. res)
       END;
@@ -77,30 +81,26 @@ PROCEDURE (b: Buffer) NextBlock* (): BOOLEAN;
       RETURN FALSE
     ELSE
       ASSERT (b. chars[b. endOfBuffer] = markerEOB);
-      IF (b. discardable >= bytesPerRead) THEN
+      IF (b. discardable > 0) THEN
         (* move data to beginning of buffer *)
         len := b. endOfBuffer - b. discardable;
-        IF (len < b. discardable) THEN
-          (* can use MOVE only when the memory areas do not intersect; the 
-             chance that we cannot MOVE is so small, that we simply ignore 
-             this case and add more memory to the buffer if it ever happens *)
-          SYSTEM.MOVE (SYSTEM.ADR (b. chars[b. discardable]), 
-                       SYSTEM.ADR (b. chars^),
-                       len+1);
-          INC (b. offsetFromPos0, b. discardable);
-          b. endOfBuffer := len;
-          b. discardable := 0
-        END
+        (* Copy forward so overlapping source and destination are safe. *)
+        FOR i := 0 TO len DO b. chars[i] := b. chars[b. discardable+i] END;
+        ASSERT (b. offsetFromPos0 <= MAX (LONGINT)-b. discardable);
+        INC (b. offsetFromPos0, b. discardable);
+        b. endOfBuffer := len;
+        b. discardable := 0
       END;
       ASSERT (b. chars[b. endOfBuffer] = markerEOB);
 
-      IF (b. endOfBuffer+bytesPerRead >= LEN (b. chars^)) THEN
+      IF (LEN (b. chars^)-b. endOfBuffer <= bytesPerRead) THEN
         (* extend buffer so that it can hold b. endOfBuffer+bytesPerRead+1 
            bytes *)
         len := LEN (b. chars^);
         REPEAT
+          ASSERT (len <= MAX (LONGINT)-bytesPerRead);
           INC (len, bytesPerRead)
-        UNTIL (b. endOfBuffer+bytesPerRead < len);
+        UNTIL (len-b. endOfBuffer > bytesPerRead);
         NEW (nChars, len);
         SYSTEM.MOVE (SYSTEM.ADR (b. chars^),
                      SYSTEM.ADR (nChars^),
@@ -113,7 +113,15 @@ PROCEDURE (b: Buffer) NextBlock* (): BOOLEAN;
       len := LEN (b. chars^) - b. endOfBuffer - 1;
       len := (len DIV bytesPerRead)*bytesPerRead;
       b. r. ReadBytes (b. chars^, b. endOfBuffer, len);
+      ASSERT ((0 <= b. r. bytesRead) & (b. r. bytesRead <= len));
+      IF b. r. res # Channel.done THEN
+        b. stopped := TRUE;
+        IF b. r. res. code # Channel.readAfterEnd THEN
+          b. errList. Append (b. r. res)
+        END
+      END;
       IF (b. r. bytesRead = 0) THEN
+        b. stopped := TRUE;
         ASSERT (b. chars[b. endOfBuffer] = markerEOB);
         RETURN FALSE
       ELSE
@@ -156,6 +164,7 @@ PROCEDURE Init (b: Buffer; new: BOOLEAN;
     dummy: BOOLEAN;
   BEGIN
     b. r := reader;
+    b. stopped := FALSE;
     b. discardable := 0;
     b. offsetFromPos0 := 0;
     b. endOfBuffer := 0;
@@ -191,4 +200,4 @@ PROCEDURE New* (reader: Channel.Reader; errList: Msg.MsgList): Buffer;
     RETURN b
   END New;
 
-END XML:InputBuffer.
+END XMLInputBuffer.

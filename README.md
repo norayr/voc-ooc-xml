@@ -20,16 +20,16 @@ must not be stored in `LONGINT`.
 
 ### Working so far
 
-The Unicode codecs, string operations and message diagnostics build with VOC:
+The Unicode support, memory channels and XML buffers build with VOC:
 
 ```sh
 make test
 ```
 
-This requires VOC with its oo2c `CharClass` and `IntStr` support modules
+This requires VOC with its oo2c `CharClass`, `IntStr` and `Time` support modules
 and their dependencies installed.
 
-This builds and tests the Unicode support layer. The XML parser remains under
+This builds and tests the support and buffering layers. The XML parser remains under
 development. `XMLUnicodeCodecImportAll` registers the bundled ASCII, Latin-1,
 UTF-8 and UTF-16 encodings at startup. The codec source paths are unchanged so
 the changes remain easy to compare with CVS.
@@ -45,9 +45,15 @@ comparison. `Msg` preserves Unicode message attributes through `GetLText`.
 Both are built from `src/oo2c/`; their unchanged source baselines and provenance
 are recorded in [history/oo2c-support.md](history/oo2c-support.md).
 
+`Channel` is rebuilt against this message interface. `IOMemory` provides
+seekable, growable memory files. `XMLInputBuffer` reads bytes, and
+`XMLUnicodeBuffer` decodes input and encodes buffered output. They support
+short reads, partial writes, UTF-8/UTF-16 BOM handling and bounded operations.
+
 The Oberon tests cover ASCII, Latin-1, Armenian, supplementary characters,
 both UTF-16 byte orders, malformed/truncated input, buffer boundaries,
-string-edit combinations, Unicode diagnostics and lengths above 32767.
+string-edit combinations, Unicode diagnostics, streaming boundaries,
+flush/retry behavior and lengths above 32767.
 They pass with GCC and Clang in C23 mode, and TCC. XML conformance testing
 will follow the parser port.
 

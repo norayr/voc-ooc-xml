@@ -1,5 +1,5 @@
 (*	$Id: Memory.Mod,v 1.4 2000/12/08 21:41:23 mva Exp $	*)
-MODULE IO:Memory;
+MODULE IOMemory;
 (*  Implementation of a simple file system in memory.
     Copyright (C) 1999-2001  Michael van Acken
 
@@ -19,7 +19,7 @@ MODULE IO:Memory;
 *)
 
 IMPORT
-  Ch := Channel, Msg, Time, Strings, SYSTEM;
+  Ch := Channel, Msg, Time, LongStrings, SYSTEM;
 
 
 CONST
@@ -30,7 +30,7 @@ CONST
   channelClosed* = Ch.channelClosed;
   noModTime* = Ch.noModTime;
   noReadAccess* = Ch.noReadAccess;
-  noWriteAccess* = Ch.noReadAccess;
+  noWriteAccess* = Ch.noWriteAccess;
   outOfRange* = Ch.outOfRange;
   readAfterEnd* = Ch.readAfterEnd;
   
@@ -124,7 +124,7 @@ PROCEDURE (context: ErrorContext) GetTemplate* (msg: Msg.Msg; VAR templ: Msg.LSt
       str := ""; context. GetTemplate^ (msg, templ)
     END;
     IF (str # "") THEN
-      COPY (str, templ)
+      LongStrings.Long (str, templ)
     END
   END GetTemplate;
 
@@ -135,7 +135,7 @@ PROCEDURE NewFile (VAR name: ARRAY OF CHAR): File;
   BEGIN
     NEW (b);
     b. next := NIL;
-    NEW (b. name, Strings.Length (name)+1);
+    NEW (b. name, LongStrings.Length8 (name)+1);
     COPY (name, b. name^);
     b. length := 0;
     b. dataLength := 512-slack;
@@ -149,19 +149,36 @@ PROCEDURE ExtendFile (b: File; newLen: LONGINT);
     i: LONGINT;
     newData: Data;
   BEGIN
-    INC (newLen, slack);
-    i := b. dataLength+slack;
+    ASSERT (newLen >= 0);
+    i := b. dataLength;
     WHILE (i < newLen) DO
-      i := i*2
+      IF i > (MAX (LONGINT)-slack) DIV 2 THEN i := newLen
+      ELSE i := 2*i+slack END
     END;
-    newLen := i-slack;
+    newLen := i;
     NEW (newData, newLen);
-    SYSTEM.MOVE (SYSTEM.VAL (SYSTEM.ADDRESS, b. data),
-                 SYSTEM.VAL (SYSTEM.ADDRESS, newData),
+    SYSTEM.MOVE (SYSTEM.ADR (b. data[0]),
+                 SYSTEM.ADR (newData[0]),
                  b. length);
     b. dataLength := newLen;
     b. data := newData
   END ExtendFile;
+
+PROCEDURE CopyBytes (VAR source, dest: ARRAY OF SYSTEM.BYTE;
+                     sourceStart, destStart, count: LONGINT);
+  VAR sourceAddr, destAddr: SYSTEM.ADDRESS; i: LONGINT;
+  BEGIN
+    IF count = 0 THEN RETURN END;
+    sourceAddr := SYSTEM.ADR (source[sourceStart]);
+    destAddr := SYSTEM.ADR (dest[destStart]);
+    IF (destAddr > sourceAddr) & (destAddr-sourceAddr < count) THEN
+      FOR i := count-1 TO 0 BY -1 DO dest[destStart+i] := source[sourceStart+i] END
+    ELSIF (sourceAddr >= destAddr) & (sourceAddr-destAddr < count) THEN
+      FOR i := 0 TO count-1 DO dest[destStart+i] := source[sourceStart+i] END
+    ELSE
+      SYSTEM.MOVE (sourceAddr, destAddr, count)
+    END
+  END CopyBytes;
 
 PROCEDURE FindFile (VAR name: ARRAY OF CHAR): File;
   VAR
@@ -221,6 +238,7 @@ PROCEDURE (r: Reader) Pos* (): LONGINT;
 PROCEDURE (r: Reader) Available* (): LONGINT;
   BEGIN
     IF r. base. open THEN
+      IF r. pos >= r. base(Channel). file. length THEN RETURN 0 END;
       RETURN r. base(Channel). file. length-r. pos
     ELSE
       RETURN -1
@@ -244,13 +262,14 @@ PROCEDURE (r: Reader) ReadByte* (VAR x: SYSTEM.BYTE);
   VAR
     b: File;
   BEGIN
+    r. bytesRead := 0;
     IF (r. res = done) THEN
       b := r. base(Channel). file;
       IF ~r. base. open THEN
         r. res := GetError (channelClosed);
         r. bytesRead := 0
       ELSIF (r. pos < b. length) THEN
-        x := b. data[r. pos];
+        x := SYSTEM.VAL (SYSTEM.BYTE, b. data[r. pos]);
         r. bytesRead := 1;
         INC (r. pos)
       ELSE
@@ -265,20 +284,23 @@ PROCEDURE (r: Reader) ReadBytes* (VAR x: ARRAY OF SYSTEM.BYTE;
   VAR
     b: File;
   BEGIN
+    r. bytesRead := 0;
     IF (r. res = done) THEN
       b := r. base(Channel). file;
       IF ~r. base. open THEN
         r. res := GetError (channelClosed);
         r. bytesRead := 0
+      ELSIF (start < 0) OR (start > LEN (x)) OR (n < 0) OR (n > LEN (x)-start) THEN
+        r. res := GetError (outOfRange)
       ELSIF (n = 0) THEN
         r. bytesRead := 0
-      ELSIF (r. pos+n <= b. length) THEN
-        SYSTEM.MOVE (SYSTEM.ADR (b. data[r. pos]), SYSTEM.ADR (x[start]), n);
+      ELSIF (r. pos <= b. length) & (n <= b. length-r. pos) THEN
+        CopyBytes (b. data^, x, r. pos, start, n);
         r. bytesRead := n;
         INC (r. pos, n)
       ELSIF (r. pos < b. length) THEN
         n := b. length - r. pos;
-        SYSTEM.MOVE (SYSTEM.ADR (b. data[r. pos]), SYSTEM.ADR (x[start]), n);
+        CopyBytes (b. data^, x, r. pos, start, n);
         r. bytesRead := n;
         INC (r. pos, n);
         r. res := GetError (readAfterEnd)
@@ -319,6 +341,8 @@ PROCEDURE (w: Writer) Truncate* (newLength: LONGINT);
     b: File;
   BEGIN
     IF (w. res = done) THEN
+      IF ~w. base. open THEN w. res := GetError (channelClosed); RETURN END;
+      IF newLength < 0 THEN w. res := GetError (outOfRange); RETURN END;
       b := w. base(Channel). file;
       IF (newLength > b. length) THEN
         IF (newLength > b. dataLength) THEN
@@ -336,11 +360,14 @@ PROCEDURE (w: Writer) WriteByte* (x: SYSTEM.BYTE);
   VAR
     b: File;
   BEGIN
+    w. bytesWritten := 0;
     IF (w. res = done) THEN
       b := w. base(Channel). file;
       IF ~w. base. open THEN
         w. res := GetError (channelClosed);
         w. bytesWritten := 0
+      ELSIF w. pos = MAX (LONGINT) THEN
+        w. res := GetError (outOfRange)
       ELSE
         IF (w. pos >= b. dataLength) THEN
           ExtendFile (b, w. pos+1)
@@ -363,11 +390,15 @@ PROCEDURE (w: Writer) WriteBytes* (VAR x: ARRAY OF SYSTEM.BYTE;
   VAR
     b: File;
   BEGIN
+    w. bytesWritten := 0;
     IF (w. res = done) THEN
       b := w. base(Channel). file;
       IF ~w. base. open THEN
         w. res := GetError (channelClosed);
         w. bytesWritten := 0
+      ELSIF (start < 0) OR (start > LEN (x)) OR (n < 0) OR (n > LEN (x)-start) OR
+            (n > MAX (LONGINT)-w. pos) THEN
+        w. res := GetError (outOfRange)
       ELSIF (n = 0) THEN
         w. bytesWritten := 0
       ELSE
@@ -377,7 +408,7 @@ PROCEDURE (w: Writer) WriteBytes* (VAR x: ARRAY OF SYSTEM.BYTE;
         IF (w. pos > b. length) THEN
           w. Truncate (w. pos)
         END;
-        SYSTEM.MOVE (SYSTEM.ADR (x[start]), SYSTEM.ADR (b. data[w. pos]), n);
+        CopyBytes (x, b. data^, start, w. pos, n);
         w. bytesWritten := n;
         INC (w. pos, n);
         IF (w. pos > b. length) THEN
@@ -390,7 +421,7 @@ PROCEDURE (w: Writer) WriteBytes* (VAR x: ARRAY OF SYSTEM.BYTE;
 
 
 
-PROCEDURE (ch: Channel) NewReader* (): Reader;
+PROCEDURE (ch: Channel) NewReader* (): Ch.Reader;
   VAR
     r: Reader;
   BEGIN
@@ -412,7 +443,7 @@ PROCEDURE (ch: Channel) NewReader* (): Reader;
     END
   END NewReader;
 
-PROCEDURE (ch: Channel) NewWriter* (): Writer;
+PROCEDURE (ch: Channel) NewWriter* (): Ch.Writer;
   VAR
     w: Writer;
   BEGIN
@@ -460,9 +491,11 @@ PROCEDURE (ch: Channel) Fingerprint* (VAR key: ARRAY OF SYSTEM.BYTE;
     fpSize = SIZE(LONGINT);
   VAR
     pos: LONGINT;
-    i, j, new, old: INTEGER;
+    i, j, bit, new, old: LONGINT;
     byte: CHAR;
   BEGIN
+    ASSERT (LEN (key) = fpSize);
+    ASSERT ((0 <= start) & (start <= end) & (end <= ch. file. length));
     FOR i := 0 TO fpSize-1 DO
       key[i] := 0
     END;
@@ -471,8 +504,9 @@ PROCEDURE (ch: Channel) Fingerprint* (VAR key: ARRAY OF SYSTEM.BYTE;
     FOR pos := start TO end-1 DO
       byte := SYSTEM.VAL (CHAR, ch. file. data[pos]);
       old := ORD (SYSTEM.VAL (CHAR, key[i]));
-      new := ORD (SYSTEM.VAL (CHAR, SYSTEM.ROT (byte, j)));
-      key[i] := CHR ((old+new) MOD 256);
+      new := ORD (byte);
+      FOR bit := 1 TO j DO new := (2*new) MOD 256 + new DIV 128 END;
+      key[i] := SYSTEM.VAL (SYSTEM.BYTE, CHR ((old+new) MOD 256));
       INC (i); 
       IF (i = fpSize) THEN
         j := (j + 1) MOD 8; i := 0
@@ -484,6 +518,8 @@ PROCEDURE (ch: Channel) Flush*;
   BEGIN
     IF ~ch. open THEN
       ch. res := GetError (channelClosed)
+    ELSE
+      ch. ClearError
     END
   END Flush;
 
@@ -496,6 +532,7 @@ PROCEDURE (ch: Channel) Register*;
 (**Registers the file under @oparam{ch} under the name passed to @oproc{Tmp}.
    Afterwards, the file can be accessed with @oproc{Old}.  *)
   BEGIN
+    IF ~ch. open THEN ch. res := GetError (channelClosed); RETURN END;
     InsertFile (ch. file);
     ch. ClearError
   END Register;
@@ -513,12 +550,21 @@ PROCEDURE (ch: Channel) Close*;
 
 PROCEDURE (ch: Channel) CopyToWriter* (writer: Ch.Writer);
 (**Copies the file under @oparam{ch} to the given writer @oparam{writer}.  *)
+  VAR pos, length: LONGINT;
   BEGIN
-    IF ch. open THEN
-      writer. WriteBytes (ch. file. data^, 0, ch. file. length);
-      IF (writer. res # NIL) THEN
-        ch. res := writer. res
-      END
+    IF ch. open & ~ch. readable THEN
+      ch. res := GetError (noReadAccess)
+    ELSIF ch. open THEN
+      pos := 0; length := ch. file. length;
+      WHILE (pos < length) & (writer. res = done) DO
+        writer. WriteBytes (ch. file. data^, pos, length-pos);
+        ASSERT ((0 <= writer. bytesWritten) & (writer. bytesWritten <= length-pos));
+        INC (pos, writer. bytesWritten);
+        IF (writer. bytesWritten = 0) & (writer. res = done) THEN
+          writer. res := GetError (Ch.writeError)
+        END
+      END;
+      ch. res := writer. res
     ELSE
       ch. res := GetError (channelClosed)
     END
@@ -614,6 +660,6 @@ PROCEDURE Tmp* (name: ARRAY OF CHAR; flags: SET; VAR res: Msg.Msg): Channel;
 
 BEGIN
   NEW (errorContext);
-  Msg.InitContext (errorContext, "IO:Memory");
+  Msg.InitContext (errorContext, "IOMemory");
   fileList := NIL
-END IO:Memory.
+END IOMemory.

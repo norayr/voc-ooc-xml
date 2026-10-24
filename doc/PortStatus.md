@@ -1,8 +1,8 @@
 # VOC port status
 
-`make test` currently builds and tests the Unicode codecs, `LongStrings` and
-the Unicode-safe `Msg` implementation under VOC's Oberon-2 model. The parser,
-DTD handling, builders and writer are the next porting stages.
+`make test` builds and tests the Unicode codecs, strings, diagnostics, memory
+channels and XML byte/Unicode buffers under VOC's Oberon-2 model. URI support,
+the parser, DTD handling, builders and XML writer are the next porting stages.
 
 ## Dependencies
 
@@ -11,11 +11,14 @@ integer widths, record extensions and method signatures must agree.
 
 | Dependency | Status |
 | --- | --- |
-| XML parser, DTDs, builders, resolver, buffers and writer | Included in the CVS import; still need porting. |
+| XML parser, DTDs, builders, resolver and writer | Included in the CVS import; still need porting. |
+| `XMLInputBuffer`, `XMLUnicodeBuffer` | Ported and tested with short reads, BOMs, growth, compaction, repeated flushes and partial-write retries. |
+| `IOMemory` | Ported and tested: permissions, seeking, sparse writes, truncation, growth, overlapping copies, bounds and fingerprints. |
 | Unicode codec registry, ASCII, Latin-1, UTF-8, UTF-16 | Adapted to `-O2`; new Oberon tests pass with GCC/C23, Clang/C23 and TCC. |
 | `LongStrings` | Adapted in `src/oo2c/`, using `XMLUnicode.LONGCHAR` for code units and `LONGINT` for positions and lengths. |
 | `Msg` | Adapted in `src/oo2c/`; wide attributes, template replacement and message-list transfers are tested. `GetLText` preserves UTF-16; `GetText` retains the original Latin-1 conversion. |
-| `Channel`, `TextRider`, `Time` | VOC has oo2c ports. Channel and rider modules must be rebuilt against this Unicode-safe `Msg` interface before use together. |
+| `Channel` | Imported and rebuilt locally against the Unicode-safe `Msg`; memory channels implement its abstract methods. |
+| `TextRider`, `Time` | `Time` is an installed dependency. `TextRider` still needs rebuilding against the local `Channel` and `Msg`. |
 | `Ascii`, `CharClass`, `IntStr`, `RealStr` | VOC has ports; retain only the required interfaces and test their use. |
 | `Strings` | XML expects oo2c semantics. VOC also has Oakwood `Strings` and `oocStrings`; choose explicitly, not just by module name. |
 | `Files` | XML expects oo2c channels, whereas VOC's ordinary `Files` is an Oberon file/rider API. An explicit channel adapter is needed. |
@@ -44,7 +47,30 @@ support modules need the same recorded provenance and unmodified baseline.
 - A UTF-8 round trip through the string and diagnostic interfaces checks that
   Armenian and supplementary characters survive the complete support path.
 
-The three test programs pass with GCC/C23, Clang/C23 and TCC. An additional
+## Memory channel and buffer checks
+
+- Memory growth copies array contents using native-width addresses. Reads and
+  writes validate ranges before address calculations, and overlapping copies
+  are handled explicitly.
+- Byte-buffer tests retain 50000 bytes, grow buffers, compact overlapping
+  ranges and distinguish embedded zero octets from the end marker. Read
+  errors are recorded once, including errors delivered with partial data.
+- Unicode input waits for sufficient bytes before decoding a split character.
+  Tests include one-byte reads, a split character at the normal block boundary,
+  empty and BOM-only input, UTF-8/UTF-16 detection, truncated sequences and
+  unsupported detected encodings.
+- Unicode output preserves split surrogate pairs, retries short writes and
+  retains unwritten bytes after errors. Repeated flushes preserve output
+  exactly. A writer returning zero progress is reported as a write error.
+- Round trips exercise 40001 UTF-16 code units, supplementary characters and
+  an embedded U+FEFF through UTF-8 and both UTF-16 byte orders, with retained
+  and discarded input blocks.
+- Channel `WriteBytes` and buffer interval-write methods pass source arrays
+  by `VAR` to avoid implicit full-array copies; these sources are read-only.
+
+## Verification
+
+The four test programs pass with GCC/C23, Clang/C23 and TCC. An additional
 Clang build instruments the ported modules and tests with AddressSanitizer
 and UndefinedBehaviorSanitizer:
 
@@ -77,7 +103,7 @@ runtime and support dependencies are used as provided by the compiler.
 
 ## Next stages
 
-1. Port memory channels, URI types and XML buffers with bounded operations.
+1. Port URI types and the resolver/diagnostic dependencies required by the parser.
 2. Build and test the in-memory parser and basic builders, then namespaces,
    DTD validation and the writer.
 3. Adapt file resolution and upstream test drivers. Review entity expansion,
