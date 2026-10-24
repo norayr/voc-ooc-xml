@@ -1,11 +1,11 @@
-MODULE XML:UnicodeCodec [OOC_EXTENSIONS];
+MODULE XMLUnicodeCodec;
 
 IMPORT
   Strings;
 
 
 CONST
-  decodeError* = 0FFFDX;
+  decodeError* = 0FFFDH;
   (**This character is used to replace incoming characters whose value is
      unknown or unrepresentable in Unicode.  This character is assigned the
      Unicode name "REPLACEMENT CHARACTER".  *)
@@ -13,7 +13,7 @@ CONST
   (**This character is used to replace outgoing characters whose value cannot
      be represented by the used encoding scheme.  It is assumed, that all
      character encodings know the question mark character (Unicode Ux003F).  *)
-  byteOrderMark* = 0FEFFX;
+  byteOrderMark* = 0FEFFH;
   (**The Unicode byte order mark.  Also known as
      @samp{ZERO WIDTH NO-BREAK SPACE}.  *)
 
@@ -63,8 +63,13 @@ CONST
      used.  *)
   
 TYPE
+  (* VOC -O2 CHAR is an octet. Preserve the original UCS-2/UTF-16 code
+     units as non-negative LONGINT values, never as signed INTEGERs or
+     truncated CHARs. Supplementary characters still use surrogate pairs. *)
+  Char* = LONGINT;
+
   Factory* = POINTER TO FactoryDesc;
-  FactoryDesc* = RECORD [ABSTRACT]
+  FactoryDesc* = RECORD
     bom-: SHORTINT;
     (**This flag describes how the generated codes deal with byte order
        markers.  It can be one of @oconst{bomNotApplicable},
@@ -73,7 +78,7 @@ TYPE
 
 TYPE
   Codec* = POINTER TO CodecDesc;
-  CodecDesc* = RECORD [ABSTRACT]
+  CodecDesc* = RECORD
     invalidChars*: LONGINT;
     bom-: SHORTINT;
     (**This is a copy of the creating factory's @ofield{Factory.bom}.  *)
@@ -98,9 +103,9 @@ PROCEDURE Init* (codec: Codec; bom: SHORTINT);
     codec. bom := bom;
   END Init;
 
-PROCEDURE (codec: Codec) [ABSTRACT] Decode* (VAR source: ARRAY OF CHAR;
+PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
                                              sourceStart, sourceEnd: LONGINT;
-                                             VAR dest: ARRAY OF LONGCHAR;
+                                             VAR dest: ARRAY OF Char;
                                              destStart, destEnd: LONGINT;
                                              VAR sourceDone,destDone: LONGINT);
 (**Decodes the bytes in @samp{@oparam{source}[@oparam{sourceStart}, 
@@ -178,9 +183,10 @@ PROCEDURE (codec: Codec) [ABSTRACT] Decode* (VAR source: ARRAY OF CHAR;
    @samp{@oparam{source}[@oparam{sourceStart}, @oparam{sourceDone}[}.
    @end itemize
    @end postcond *)
+  BEGIN HALT (127)
   END Decode;
 
-PROCEDURE (codec: Codec) [ABSTRACT] Encode* (VAR source: ARRAY OF LONGCHAR;
+PROCEDURE (codec: Codec) Encode* (VAR source: ARRAY OF Char;
                                              sourceStart, sourceEnd: LONGINT;
                                              VAR dest: ARRAY OF CHAR;
                                              destStart, destEnd: LONGINT;
@@ -260,6 +266,7 @@ PROCEDURE (codec: Codec) [ABSTRACT] Encode* (VAR source: ARRAY OF LONGCHAR;
    @samp{@oparam{source}[@oparam{sourceStart}, @oparam{sourceDone}[}.
    @end itemize
    @end postcond *)
+  BEGIN HALT (127)
   END Encode;
 
 PROCEDURE (codec: Codec) EncodeBOM* (VAR dest: ARRAY OF CHAR;
@@ -278,13 +285,13 @@ PROCEDURE (codec: Codec) EncodeBOM* (VAR dest: ARRAY OF CHAR;
    least one UCS-4 character, possibly encoded as a sequence of 6 bytes.
    @end precond  *)
   VAR
-    source: ARRAY maxUCS2EncodingLength OF LONGCHAR;
+    source: ARRAY maxUCS2EncodingLength OF Char;
     sourceDone: LONGINT;
   BEGIN
     IF (codec. bom = bomNotApplicable) THEN
       destDone := destStart
     ELSE
-      source := byteOrderMark;
+      source[0] := byteOrderMark;
       codec. Encode (source, 0, 1,
                      dest, destStart, destEnd, sourceDone, destDone);
       ASSERT (sourceDone = 1)
@@ -299,13 +306,14 @@ PROCEDURE InitFactory* (f: Factory; bom: SHORTINT);
     f. bom := bom
   END InitFactory;
 
-PROCEDURE (f: Factory) [ABSTRACT] NewCodec* (): Codec;
+PROCEDURE (f: Factory) NewCodec* (): Codec;
 (**Creates a new codec from factory @oparam{f}.  This should not be called for
    factories with an @ofield{Factory.bom} of @oconst{bomOptional} or
    @oconst{bomRequired}.  *)
+  BEGIN HALT (127); RETURN NIL
   END NewCodec;
 
-PROCEDURE (f: Factory) [ABSTRACT] NewCodecBOM* (VAR source: ARRAY OF CHAR;
+PROCEDURE (f: Factory) NewCodecBOM* (VAR source: ARRAY OF CHAR;
                                                sourceStart, sourceEnd: LONGINT;
                                                VAR sourceDone: LONGINT): Codec;
 (**Creates a new codec from factoriy @oparam{f}, taking the byte order 
@@ -338,10 +346,12 @@ PROCEDURE (f: Factory) [ABSTRACT] NewCodecBOM* (VAR source: ARRAY OF CHAR;
    in the input sequence, or the input sequence ends with a possibly 
    incomplete character.
    @end precond  *)
+  BEGIN HALT (127); RETURN NIL
   END NewCodecBOM;
 
-PROCEDURE (f: Factory) [ABSTRACT] GetEncodingName* (VAR name: ARRAY OF CHAR);
+PROCEDURE (f: Factory) GetEncodingName* (VAR name: ARRAY OF CHAR);
 (**Returns the preferred MIME name for the factory's encoding.  *)
+  BEGIN HALT (127)
   END GetEncodingName;
 
 
@@ -366,7 +376,7 @@ PROCEDURE Register* (name: ARRAY OF CHAR; factory: Factory);
     END ScanList;
   
   BEGIN
-    Strings.Capitalize (name);
+    Strings.Cap (name);
     ScanList (factoryList)
   END Register;
 
@@ -387,7 +397,7 @@ PROCEDURE Unregister* (name: ARRAY OF CHAR);
     END ScanList;
   
   BEGIN
-    Strings.Capitalize (name);
+    Strings.Cap (name);
     ScanList (factoryList)
   END Unregister;
 
@@ -397,7 +407,7 @@ PROCEDURE GetFactory* (name: ARRAY OF CHAR): Factory;
   VAR
     n: Node;
   BEGIN
-    Strings.Capitalize (name);
+    Strings.Cap (name);
     n := factoryList;
     WHILE (n # NIL) & (n. name^ # name) DO
       n := n. next
@@ -411,4 +421,4 @@ PROCEDURE GetFactory* (name: ARRAY OF CHAR): Factory;
 
 BEGIN
   factoryList := NIL
-END XML:UnicodeCodec.
+END XMLUnicodeCodec.

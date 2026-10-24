@@ -1,7 +1,7 @@
-MODULE XML:UnicodeCodec:UTF16;
+MODULE XMLUnicodeCodecUTF16;
 
 IMPORT
-  UC := XML:UnicodeCodec;
+  UC := XMLUnicodeCodec;
 
 
 (* Notes:
@@ -83,7 +83,7 @@ PROCEDURE NewLE (bom: SHORTINT): Codec;
 
 PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
                                   sourceStart, sourceEnd: LONGINT;
-                                  VAR dest: ARRAY OF LONGCHAR;
+                                  VAR dest: ARRAY OF UC.Char;
                                   destStart, destEnd: LONGINT;
                                   VAR sourceDone, destDone: LONGINT);
   VAR
@@ -120,13 +120,12 @@ PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
       cval := LONG (ORD (source[i+high]))*256 + ORD (source[i+low]);
       IF (cval < 0D800H) OR (cval >= 0E000H) & (cval < 0FFFEH) THEN
         (* a Unicode character encoded in 2 bytes *)
-        dest[j] := LONGCHR (cval); INC (i, 2); INC (j)
+         dest[j] := cval; INC (i, 2); INC (j)
       ELSIF (cval < 0DC00H) &
             (0DCX <= source[i+2+high]) & (source[i+2+high] < 0E0X) THEN
         (* a Unicode character encoded as a (high, low) surrogate pair *)
-        dest[j] := LONGCHR (cval);
-        dest[j+1] := LONGCHR (LONG (ORD (source[i+2+high]))*256 +
-                              ORD (source[i+2+low]));
+        dest[j] := cval;
+        dest[j+1] := LONG (ORD (source[i+2+high]))*256 + ORD (source[i+2+low]);
         INC (i, 4); INC (j, 2)
       ELSE
         (* error: character from low surrogate area, or invalid FFFE or FFFF *)
@@ -166,7 +165,7 @@ PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
     END
   END Decode;
 
-PROCEDURE (codec: Codec) Encode* (VAR source: ARRAY OF LONGCHAR;
+PROCEDURE (codec: Codec) Encode* (VAR source: ARRAY OF UC.Char;
                                     sourceStart, sourceEnd: LONGINT;
                                     VAR dest: ARRAY OF CHAR;
                                     destStart, destEnd: LONGINT;
@@ -178,9 +177,9 @@ PROCEDURE (codec: Codec) Encode* (VAR source: ARRAY OF LONGCHAR;
     offsetSource = UC.maxUCS2EncodingLength-1;
     offsetDest = UC.maxUTF8EncodingLength-1;
     
-  PROCEDURE WordsPerEncoding (ch: LONGCHAR): LONGINT;
+  PROCEDURE WordsPerEncoding (ch: UC.Char): LONGINT;
     BEGIN
-      IF (0D800X <= ch) & (ch < 0DC00X) THEN
+      IF (0D800H <= ch) & (ch < 0DC00H) THEN
         RETURN 2
       ELSE
         RETURN 1
@@ -202,21 +201,27 @@ PROCEDURE (codec: Codec) Encode* (VAR source: ARRAY OF LONGCHAR;
     (* iterate over all characters in the source interval *)
     i := sourceStart; j := destStart;
     WHILE (i < testSourceEnd) & (j < testDestEnd) DO
-      dest[j+high] := CHR (ORD (source[i]) DIV 256);
-      dest[j+low] := CHR (ORD (source[i]) MOD 256);
-      IF (source[i] < 0D800X) OR
-         (source[i] >= 0E000X) & (source[i] < 0FFFEX) THEN
-        INC (i); INC (j, 2)
-      ELSIF (source[i] < 0DC00X) &
-            (0DC00X <= source[i+1]) & (source[i+1] < 0E000X) THEN
-        dest[j+2+high] := CHR (ORD (source[i+1]) DIV 256);
-        dest[j+2+low] := CHR (ORD (source[i+1]) MOD 256);
-        INC (i, 2); INC (j, 4)
-      ELSE
+      IF (source[i] < 0) OR (source[i] > 0FFFFH) THEN
         INC (codec. invalidChars);
-        dest[j+high] := CHR (ORD (UC.encodeError) DIV 256);
-        dest[j+low] := CHR (ORD (UC.encodeError) MOD 256);
+        dest[j+high] := 0X; dest[j+low] := UC.encodeError;
         INC (i); INC (j, 2)
+      ELSE
+        dest[j+high] := CHR (source[i] DIV 256);
+        dest[j+low] := CHR (source[i] MOD 256);
+        IF (source[i] < 0D800H) OR
+           (source[i] >= 0E000H) & (source[i] < 0FFFEH) THEN
+          INC (i); INC (j, 2)
+        ELSIF (source[i] < 0DC00H) &
+              (0DC00H <= source[i+1]) & (source[i+1] < 0E000H) THEN
+          dest[j+2+high] := CHR (source[i+1] DIV 256);
+          dest[j+2+low] := CHR (source[i+1] MOD 256);
+          INC (i, 2); INC (j, 4)
+        ELSE
+          INC (codec. invalidChars);
+          dest[j+high] := CHR (ORD (UC.encodeError) DIV 256);
+          dest[j+low] := CHR (ORD (UC.encodeError) MOD 256);
+          INC (i); INC (j, 2)
+        END
       END
     END;
     
@@ -372,4 +377,4 @@ BEGIN
   NEW (factoryBE);
   InitFactoryBE (factoryBE);
   UC.Register ("UTF-16BE", factoryBE);
-END XML:UnicodeCodec:UTF16.
+END XMLUnicodeCodecUTF16.

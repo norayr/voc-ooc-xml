@@ -1,7 +1,7 @@
-MODULE XML:UnicodeCodec:ImportAll;
+MODULE XMLUnicodeCodecImportAll;
 
 IMPORT
-  XML:UnicodeCodec:ASCII, XML:UnicodeCodec:Latin1,
-  XML:UnicodeCodec:UTF16, XML:UnicodeCodec:UTF8;
+  XMLUnicodeCodecASCII, XMLUnicodeCodecLatin1,
+  XMLUnicodeCodecUTF16, XMLUnicodeCodecUTF8;
   
-END XML:UnicodeCodec:ImportAll.
+END XMLUnicodeCodecImportAll.

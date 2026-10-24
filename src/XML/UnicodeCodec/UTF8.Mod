@@ -1,7 +1,7 @@
-MODULE XML:UnicodeCodec:UTF8;
+MODULE XMLUnicodeCodecUTF8;
 
 IMPORT
-  UC := XML:UnicodeCodec;
+  UC := XMLUnicodeCodec;
 
 
 (* Notes:
@@ -49,7 +49,7 @@ PROCEDURE New (bom: SHORTINT): Codec;
 
 PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
                                   sourceStart, sourceEnd: LONGINT;
-                                  VAR dest: ARRAY OF LONGCHAR;
+                                  VAR dest: ARRAY OF UC.Char;
                                   destStart, destEnd: LONGINT;
                                   VAR sourceDone, destDone: LONGINT);
   VAR
@@ -78,9 +78,10 @@ PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
       INC (codec. invalidChars);
       dest[j] := UC.decodeError;
       INC (j); INC (i, offset);
-      WHILE (i # sourceEnd) & (80X <= source[i]) & (source[i] < 0C0X) DO
-        INC (i)                        (* skip to next valid char *)
-      END
+      (* Do not scan forward here: the short-buffer fallback temporarily
+         pads sourceEnd for the main loop. Scanning continuation bytes to
+         that artificial end can consume bytes outside the caller's range.
+         A following unexpected continuation is a separate decoding error. *)
     END Invalid;
   
   BEGIN
@@ -100,7 +101,7 @@ PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
          
       (* loop over ASCII characters *)
       WHILE (i < testSourceEnd) & (j < testDestEnd) & (source[i] < 80X) DO
-        dest[j] := source[i];
+        dest[j] := ORD (source[i]);
         INC (i); INC (j)
       END;
       
@@ -112,9 +113,8 @@ PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
           IF (ORD (source[i+1]) DIV 64 # 2) THEN
             Invalid (2)
           ELSE
-            dest[j] := LONGCHR ((ORD (source[i]) MOD 32)*64 + 
-                                ORD (source[i+1]) MOD 64);
-            IF (dest[j] < 80X) THEN
+            dest[j] := (ORD (source[i]) MOD 32)*64 + ORD (source[i+1]) MOD 64;
+            IF (dest[j] < 80H) THEN
               dest[j] := UC.decodeError;
               INC (codec. invalidChars)
             END;
@@ -138,6 +138,7 @@ PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
             cval := ORD (source[i]) MOD  4; bytes := 4; low :=  200000H;
           | 0FCX .. 0FDX:
             cval := ORD (source[i]) MOD  2; bytes := 5; low := 4000000H;
+          ELSE HALT (127) (* guarded above: only E0..FD can reach this CASE *)
           END;
 
           (* iterate over the octets 2, 3, .., 6 *)
@@ -161,12 +162,12 @@ PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
             INC (codec. invalidChars);
             INC (j)
           ELSIF (cval <= 0FFFFH) THEN      (* encode as single Unicode char *)
-            dest[j] := LONGCHR (cval);
+            dest[j] := cval;
             INC (j)
           ELSE                             (* split into high/low surrogate *)
             DEC (cval, 10000H);
-            dest[j] := LONGCHR (0D800H + cval DIV 1024);
-            dest[j+1] := LONGCHR (0DC00H + cval MOD 1024);
+            dest[j] := 0D800H + cval DIV 1024;
+            dest[j+1] := 0DC00H + cval MOD 1024;
             INC (j, 2)
           END
         END
@@ -203,7 +204,7 @@ PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
     END
   END Decode;
 
-PROCEDURE (codec: Codec) Encode* (VAR source: ARRAY OF LONGCHAR;
+PROCEDURE (codec: Codec) Encode* (VAR source: ARRAY OF UC.Char;
                                   sourceStart, sourceEnd: LONGINT;
                                   VAR dest: ARRAY OF CHAR;
                                   destStart, destEnd: LONGINT;
@@ -215,9 +216,9 @@ PROCEDURE (codec: Codec) Encode* (VAR source: ARRAY OF LONGCHAR;
     offsetSource = UC.maxUCS2EncodingLength-1;
     offsetDest = UC.maxUTF8EncodingLength-1;
     
-  PROCEDURE WordsPerEncoding (ch: LONGCHAR): LONGINT;
+  PROCEDURE WordsPerEncoding (ch: UC.Char): LONGINT;
     BEGIN
-      IF (0D800X <= ch) & (ch < 0DC00X) THEN
+      IF (0D800H <= ch) & (ch < 0DC00H) THEN
         RETURN 2
       ELSE
         RETURN 1
@@ -233,19 +234,21 @@ PROCEDURE (codec: Codec) Encode* (VAR source: ARRAY OF LONGCHAR;
     (* iterate over all characters in the source interval *)
     i := sourceStart; j := destStart;
     WHILE (i < testSourceEnd) & (j < testDestEnd) DO
-      IF (source[i] < 80X) THEN          (* 1 byte encoding *)
-        dest[j] := SHORT (source[i]);
+      IF source[i] < 0 THEN
+        INC (codec. invalidChars); dest[j] := UC.encodeError;
         INC (i); INC (j)
-      ELSIF (source[i] < 0800X) THEN     (* 2 byte encoding *)
-        dest[j] := CHR (192+ORD (source[i]) DIV 64);
-        dest[j+1] := CHR (128+ORD (source[i]) MOD 64);
+      ELSIF (source[i] < 80H) THEN          (* 1 byte encoding *)
+        dest[j] := CHR (source[i]);
+        INC (i); INC (j)
+      ELSIF (source[i] < 0800H) THEN     (* 2 byte encoding *)
+        dest[j] := CHR (192+source[i] DIV 64);
+        dest[j+1] := CHR (128+source[i] MOD 64);
         INC (i); INC (j, 2)
-      ELSIF (0D800X <= source[i]) & (source[i] < 0DC00X) THEN
+      ELSIF (0D800H <= source[i]) & (source[i] < 0DC00H) THEN
         (* high level surrogate area: should be followed by low level;
            this is mapped to a 4 byte encoding *)
-        IF (0DC00X <= source[i+1]) & (source[i+1] < 0E000X) THEN
-          cval := ORD (source[i]) MOD 1024*1024 +
-                  ORD (source[i+1]) MOD 1024 + 10000H;
+        IF (0DC00H <= source[i+1]) & (source[i+1] < 0E000H) THEN
+          cval := source[i] MOD 1024*1024 + source[i+1] MOD 1024 + 10000H;
           dest[j] := CHR (0F0H + ASH (cval, -3*6));
           dest[j+1] := CHR (ASH (cval, -2*6) MOD 64 + 128);
           dest[j+2] := CHR (ASH (cval, -1*6) MOD 64 + 128);
@@ -256,14 +259,14 @@ PROCEDURE (codec: Codec) Encode* (VAR source: ARRAY OF LONGCHAR;
           dest[j] := UC.encodeError;
           INC (i); INC (j)
         END
-      ELSIF (0DC00X <= source[i]) & (source[i] < 0E000X) OR
-            (source[i] >= 0FFFEX) THEN
+      ELSIF (0DC00H <= source[i]) & (source[i] < 0E000H) OR
+            (source[i] >= 0FFFEH) THEN
         (* character from low surrogate area, or invalid char: error *)
         INC (codec. invalidChars);
         dest[j] := UC.encodeError;
         INC (i); INC (j)
       ELSE                               (* 3 byte encoding *)
-        cval := ORD (source[i]);
+        cval := source[i];
         dest[j] := CHR (0E0H + ASH (cval, -2*6));
         dest[j+1] := CHR (ASH (cval, -1*6) MOD 64 + 128);
         dest[j+2] := CHR (cval MOD 64 + 128);
@@ -339,4 +342,4 @@ BEGIN
   InitFactory (factory);
   
   UC.Register ("UTF-8", factory);
-END XML:UnicodeCodec:UTF8.
+END XMLUnicodeCodecUTF8.

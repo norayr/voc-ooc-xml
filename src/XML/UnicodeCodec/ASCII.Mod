@@ -1,4 +1,4 @@
-MODULE XML:UnicodeCodec:ASCII;
+MODULE XMLUnicodeCodecASCII;
 
 (*
 Please check file ../Codec.Mod for the specifications.
@@ -19,7 +19,7 @@ Alias: csASCII
 *)
 
 IMPORT
-  UC := XML:UnicodeCodec;
+  UC := XMLUnicodeCodec;
 
 
 TYPE
@@ -55,7 +55,7 @@ PROCEDURE New (bom: SHORTINT): Codec;
 
 PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
                                   sourceStart, sourceEnd: LONGINT;
-                                  VAR dest: ARRAY OF LONGCHAR;
+                                  VAR dest: ARRAY OF UC.Char;
                                   destStart, destEnd: LONGINT;
                                   VAR sourceDone, destDone: LONGINT);
   BEGIN
@@ -67,7 +67,7 @@ PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
         INC (codec. invalidChars);
         dest[destStart] := UC.decodeError
       ELSE
-        dest[destStart] := source[sourceStart]
+        dest[destStart] := ORD (source[sourceStart])
       END;
       INC (sourceStart);
       INC (destStart)
@@ -76,7 +76,7 @@ PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
     destDone := destStart
   END Decode;
 
-PROCEDURE (codec: Codec) Encode* (VAR source: ARRAY OF LONGCHAR;
+PROCEDURE (codec: Codec) Encode* (VAR source: ARRAY OF UC.Char;
                                   sourceStart, sourceEnd: LONGINT;
                                   VAR dest: ARRAY OF CHAR;
                                   destStart, destEnd: LONGINT;
@@ -95,17 +95,17 @@ PROCEDURE (codec: Codec) Encode* (VAR source: ARRAY OF LONGCHAR;
     (* iterate over all characters in the source interval *)
     i := sourceStart; j := destStart;
     WHILE (i < testSourceEnd) & (j # destEnd) DO
-      IF (source[i] > 7FX) THEN
+      IF (source[i] < 0) OR (source[i] > 7FH) THEN
         INC (codec. invalidChars);
         dest[j] := UC.encodeError;
-        IF (0D800X <= source[i]) & (source[i] < 0DC00X) &
-           (0DC00X <= source[i+1]) & (source[i+1] < 0E000X) THEN
+        IF (0D800H <= source[i]) & (source[i] < 0DC00H) &
+           (0DC00H <= source[i+1]) & (source[i+1] < 0E000H) THEN
           INC (i, 2)                     (* skip over surrogate pair *)
         ELSE
           INC (i)
         END
       ELSE
-        dest[j] := SHORT (source[i]);
+        dest[j] := CHR (source[i]);
         INC (i)
       END;
       INC (j)
@@ -116,8 +116,8 @@ PROCEDURE (codec: Codec) Encode* (VAR source: ARRAY OF LONGCHAR;
          inspect the characters that we excluded above for convenience reasons;
          the pre condition guarantees us, that we can encode at least one
          character *)
-      IF (source[i] < 80X) THEN
-        dest[j] := SHORT (source[i])
+      IF (0 <= source[i]) & (source[i] < 80H) THEN
+        dest[j] := CHR (source[i])
       ELSE  (* out of range, or invalid surrogate; either way it's an error *)
         INC (codec. invalidChars);
         dest[j] := UC.encodeError
@@ -133,14 +133,14 @@ PROCEDURE InitFactory (f: Factory);
     UC.InitFactory (f, UC.bomNotApplicable)
   END InitFactory;
 
-PROCEDURE (f: Factory) NewCodec* (): Codec;
+PROCEDURE (f: Factory) NewCodec* (): UC.Codec;
   BEGIN
     RETURN New (f. bom)
   END NewCodec;
 
 PROCEDURE (f: Factory) NewCodecBOM* (VAR source: ARRAY OF CHAR;
                                   sourceStart, sourceEnd: LONGINT;
-                                  VAR sourceDone: LONGINT): Codec;
+                                  VAR sourceDone: LONGINT): UC.Codec;
   BEGIN
     sourceDone := sourceStart;
     RETURN New (f. bom)
@@ -166,4 +166,4 @@ BEGIN
   UC.Register ("IBM367", factory);
   UC.Register ("cp367", factory);
   UC.Register ("csASCII", factory);
-END XML:UnicodeCodec:ASCII.
+END XMLUnicodeCodecASCII.
