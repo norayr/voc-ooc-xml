@@ -1,7 +1,7 @@
 MODULE XMLUnicodeBuffer;
 
 IMPORT
-  SYSTEM, Channel, Msg, LongStrings, Unicode := XMLUnicode,
+  SYSTEM, Channel, Msg, LongStrings, Unicode := oocUnicode,
   InputBuffer := XMLInputBuffer, Codec := XMLUnicodeCodec;
 
 

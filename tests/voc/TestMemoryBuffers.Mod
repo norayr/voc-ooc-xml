@@ -1,7 +1,7 @@
 MODULE TestMemoryBuffers;
 
 IMPORT Out, SYSTEM, M := Msg, Ch := Channel, Mem := IOMemory,
-  U := XMLUnicode, C := XMLUnicodeCodec,
+  U := oocUnicode, C := XMLUnicodeCodec,
   XMLUnicodeCodecImportAll, B := XMLInputBuffer, UB := XMLUnicodeBuffer;
 
 TYPE

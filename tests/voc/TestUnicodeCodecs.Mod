@@ -1,6 +1,6 @@
 MODULE TestUnicodeCodecs;
 
-IMPORT Out, Unicode := XMLUnicode, UC := XMLUnicodeCodec, XMLUnicodeCodecImportAll;
+IMPORT Out, Unicode := oocUnicode, UC := XMLUnicodeCodec, XMLUnicodeCodecImportAll;
 
 VAR
 	bytes, encoded: ARRAY 64 OF CHAR;

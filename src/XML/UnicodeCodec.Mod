@@ -1,7 +1,7 @@
 MODULE XMLUnicodeCodec;
 
 IMPORT
-  Strings, Unicode := XMLUnicode;
+  Strings, Unicode := oocUnicode;
 
 
 CONST

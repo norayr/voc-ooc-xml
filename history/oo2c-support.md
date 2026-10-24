@@ -1,7 +1,7 @@
 # oo2c support modules
 
 The XML port also needs string, message and channel support from oo2c.
-Their original sources are imported unchanged into `src/oo2c/` before
+Their original sources were imported unchanged into `src/oo2c/` before
 the VOC adaptations, so that each adaptation has a byte-for-byte baseline.
 Original copyright and LGPL notices are retained in each module.
 
@@ -20,3 +20,18 @@ The source runtime's `lib/src/__oo2c.h`, lines 136–138, defines `CAP` for
 `LONGCHAR` using the same ASCII and Latin-1 uppercase mapping as for `CHAR`.
 The string port preserves that mapping explicitly when replacing the built-in
 operation on wide characters.
+
+## Shared VOC package
+
+The tested implementations now live in VOC's `src/ports/ooc/`, transferred in
+[commit 9ec25546ab07cd37df96088d1dc5f7e64bf93d73](https://github.com/vishapoberon/compiler/commit/9ec25546ab07cd37df96088d1dc5f7e64bf93d73).
+`Msg` and `Channel` replace the existing VOC implementations; `LongStrings`,
+`IOMemory` and the shared `oocUnicode` code-unit type are supplied there too.
+The string and message unit tests live in VOC's confidence suite. XML keeps
+its codec/message integration test and memory/buffer integration tests.
+
+The transferred versions were recorded in this repository at commit
+`083e443`, before removing the staging copies. The original alias module
+`src/XML/Unicode.Mod` is named `oocUnicode` in VOC so shared support can be
+built independently of XML. The original `IOMemory` implementation is also
+preserved as `src/IO/Memory.Mod` in the CVS branches and release tags.

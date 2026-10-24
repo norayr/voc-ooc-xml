@@ -20,21 +20,26 @@ must not be stored in `LONGINT`.
 
 ### Working so far
 
-The Unicode support, memory channels and XML buffers build with VOC:
+The Unicode codecs and XML buffers build with VOC:
 
 ```sh
 make test
 ```
 
-This requires VOC with its oo2c `CharClass`, `IntStr` and `Time` support modules
-and their dependencies installed.
+This requires VOC with the
+[shared ooc update](https://github.com/vishapoberon/compiler/commit/9ec25546ab07cd37df96088d1dc5f7e64bf93d73)
+installed, including
+`oocUnicode`, `LongStrings`, Unicode-safe `Msg`, `Channel` and `IOMemory`.
+Their sources and unit tests live in VOC's `src/ports/ooc/` and confidence
+tests. Rebuild VOC and its dependent modules together when updating this
+package.
 
 This builds and tests the support and buffering layers. The XML parser remains under
 development. `XMLUnicodeCodecImportAll` registers the bundled ASCII, Latin-1,
 UTF-8 and UTF-16 encodings at startup. The codec source paths are unchanged so
 the changes remain easy to compare with CVS.
 
-`XMLUnicode.LONGCHAR` is the shared type for UTF-16 code units. VOC and
+`oocUnicode.LONGCHAR` is the shared type for UTF-16 code units. VOC and
 standard Oberon-2 have no built-in `LONGCHAR`, so this alias uses `LONGINT`
 storage for values in the original 0..65535 range. Supplementary characters
 use surrogate pairs. `XMLUnicodeCodec.Char` uses this same type, and encoders
@@ -42,18 +47,19 @@ reject out-of-range values.
 
 `LongStrings` supplies UTF-16 code-unit copying, editing, searching and
 comparison. `Msg` preserves Unicode message attributes through `GetLText`.
-Both are built from `src/oo2c/`; their unchanged source baselines and provenance
-are recorded in [history/oo2c-support.md](history/oo2c-support.md).
+Both are supplied by VOC's ooc package. Their original source baselines and
+transfer provenance are recorded in
+[history/oo2c-support.md](history/oo2c-support.md).
 
-`Channel` is rebuilt against this message interface. `IOMemory` provides
+VOC's `Channel` uses this message interface. `IOMemory` provides
 seekable, growable memory files. `XMLInputBuffer` reads bytes, and
 `XMLUnicodeBuffer` decodes input and encodes buffered output. They support
 short reads, partial writes, UTF-8/UTF-16 BOM handling and bounded operations.
 
-The Oberon tests cover ASCII, Latin-1, Armenian, supplementary characters,
+The XML tests cover ASCII, Latin-1, Armenian, supplementary characters,
 both UTF-16 byte orders, malformed/truncated input, buffer boundaries,
-string-edit combinations, Unicode diagnostics, streaming boundaries,
-flush/retry behavior and lengths above 32767.
+Unicode diagnostics, streaming boundaries, flush/retry behavior and lengths
+above 32767. String-edit and message-framework unit tests run in VOC.
 They pass with GCC and Clang in C23 mode, and TCC. XML conformance testing
 will follow the parser port.
 
@@ -63,12 +69,27 @@ the original regression suites follow. Optional network facilities need a
 separate native-ABI review; they are not a prerequisite for an in-memory
 parser.
 
+### Testing with a VOC source build
+
+The ooc package can be built and tested in a VOC checkout using an installed
+VOC compiler and matching runtime libraries. XML can then use that package's
+Oberon-2 build directory directly. For a sibling VOC checkout:
+
+```sh
+make -C ../compiler/src/ports/ooc test
+make BUILD=../compiler/build/ports/ooc/2 test
+```
+
+The shared build directory contains the matching `.sym`, `.h` and `.o`
+files. A normal `make test` uses the installed VOC library.
+
 [Port status and dependencies](doc/PortStatus.md) lists what is present and
 what still needs adapting.
 
-This library is **not yet ready for use with VOC**. The upstream `configure`
-and `Makefile.in` still target oo2c. No VOC ports-tree integration has been
-made; that will follow a working, tested standalone port.
+The XML parser is still being ported. Its VOC ports-tree integration will
+follow a working, tested standalone port. The shared support modules have
+been transferred into VOC's existing ooc package. The upstream `configure`
+and `Makefile.in` describe the original oo2c build.
 
 Original copyright and per-file licence notices apply. Most parser modules
 are LGPL-2.0-or-later. Test data and bundled third-party test archives retain

@@ -1,7 +1,7 @@
 # VOC port status
 
-`make test` builds and tests the Unicode codecs, strings, diagnostics, memory
-channels and XML byte/Unicode buffers under VOC's Oberon-2 model. URI support,
+`make test` builds and tests the Unicode codecs and XML byte/Unicode buffers
+against VOC's shared ooc support under the Oberon-2 model. URI support,
 the parser, DTD handling, builders and XML writer are the next porting stages.
 
 ## Dependencies
@@ -13,23 +13,40 @@ integer widths, record extensions and method signatures must agree.
 | --- | --- |
 | XML parser, DTDs, builders, resolver and writer | Included in the CVS import; still need porting. |
 | `XMLInputBuffer`, `XMLUnicodeBuffer` | Ported and tested with short reads, BOMs, growth, compaction, repeated flushes and partial-write retries. |
-| `IOMemory` | Ported and tested: permissions, seeking, sparse writes, truncation, growth, overlapping copies, bounds and fingerprints. |
+| `IOMemory` | Transferred to VOC's ooc package. Tests cover permissions, seeking, sparse writes, truncation, growth, overlapping copies, bounds and fingerprints. |
 | Unicode codec registry, ASCII, Latin-1, UTF-8, UTF-16 | Adapted to `-O2`; new Oberon tests pass with GCC/C23, Clang/C23 and TCC. |
-| `LongStrings` | Adapted in `src/oo2c/`, using `XMLUnicode.LONGCHAR` for code units and `LONGINT` for positions and lengths. |
-| `Msg` | Adapted in `src/oo2c/`; wide attributes, template replacement and message-list transfers are tested. `GetLText` preserves UTF-16; `GetText` retains the original Latin-1 conversion. |
-| `Channel` | Imported and rebuilt locally against the Unicode-safe `Msg`; memory channels implement its abstract methods. |
-| `TextRider`, `Time` | `Time` is an installed dependency. `TextRider` still needs rebuilding against the local `Channel` and `Msg`. |
+| `oocUnicode`, `LongStrings` | Supplied by VOC's ooc package, using the shared `LONGCHAR` alias for code units and `LONGINT` for positions and lengths. |
+| `Msg` | VOC's ooc module now uses the tested Unicode-safe implementation. `GetLText` preserves UTF-16; `GetText` retains the original Latin-1 conversion. |
+| `Channel` | VOC's existing ooc module now uses the tested implementation, rebuilt against the Unicode-safe `Msg`. |
+| `TextRider`, `BinaryRider`, `Time` | Supplied by VOC. The riders are rebuilt against the updated interfaces; text diagnostics widen their templates explicitly. |
 | `Ascii`, `CharClass`, `IntStr`, `RealStr` | VOC has ports; retain only the required interfaces and test their use. |
 | `Strings` | XML expects oo2c semantics. VOC also has Oakwood `Strings` and `oocStrings`; choose explicitly, not just by module name. |
-| `Files` | XML expects oo2c channels, whereas VOC's ordinary `Files` is an Oberon file/rider API. An explicit channel adapter is needed. |
+| `Files` | XML expects oo2c channels. VOC already provides that interface as `oocFiles`, backed by `FilesHost` and `Platform`; adapt the URI file scheme to use it. |
 | `StdChannels`, `Err`, `Log` | Original sources are available; not in the current VOC source tree under these names. Needed by upstream drivers/examples, not all by the parser itself. |
 | `URI`, its parsers and scheme modules | Included here. Need legal VOC module names and compatible string/channel/error interfaces. |
-| `OS:*`, `IO:PFD`, sockets and select | Included here, with original C bindings. Require a separate native-width/opaque-structure review; not part of the tested codec build. |
+| `OS:*`, `IO:PFD`, sockets and select | The imported sources include upstream C bindings. Use VOC's system interfaces for the port; file I/O and current-directory access already have Oberon interfaces. Network support remains a separate stage. |
 | `ADT:ArrayList`, `ADT:Dictionary`, `ADT:Object`, `ADT:String` | Used by optional `URI:Query:WWWForm`, not directly by the XML parser. Do not import newer generic replacements unnecessarily. |
 
 Support-module provenance is recorded in
 [history/oo2c-support.md](../history/oo2c-support.md). Additional imported
 support modules need the same recorded provenance and unmodified baseline.
+
+## VOC integration boundary
+
+VOC's XML port will contain the XML-specific modules. Reusable dependencies,
+including strings, diagnostics, channels, memory files and URI support, belong
+in VOC's `src/ports/ooc/` package.
+
+VOC's `Msg` and `Channel` have been replaced by the tested implementations.
+`LongStrings`, `IOMemory` and the shared `oocUnicode.LONGCHAR` alias also live
+in VOC's ooc directory. The XML build imports these modules from VOC.
+The shared package and its dependents, including `oocFiles`, `TextRider`,
+`BinaryRider` and `ProgramArgs`, are rebuilt and tested together.
+
+Use the existing Oberon `oocFiles`, `FilesHost` and `Platform` interfaces for
+system access. Add portable `Platform` functions only for verified missing
+operations. The upstream C adapters remain in the preserved history; they
+will not be part of the VOC port's implementation.
 
 ## String and diagnostic checks
 
@@ -70,11 +87,18 @@ support modules need the same recorded provenance and unmodified baseline.
 
 ## Verification
 
-The four test programs pass with GCC/C23, Clang/C23 and TCC. An additional
-Clang build instruments the ported modules and tests with AddressSanitizer
-and UndefinedBehaviorSanitizer:
+The three XML test programs and six ooc regression programs pass with
+GCC/C23, Clang/C23 and TCC under `-O2`. The shared ooc package is rebuilt
+before each XML test run. An additional Clang build instruments the shared
+package, ported XML modules and tests with AddressSanitizer and
+UndefinedBehaviorSanitizer:
 
 ```sh
+env CC=clang \
+  CFLAGS='-std=c23 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer' \
+  ASAN_OPTIONS=detect_leaks=0:detect_stack_use_after_return=0 \
+  UBSAN_OPTIONS=halt_on_error=1 \
+  make -C ../compiler/src/ports/ooc BUILD="$PWD/build/sanitize" test
 env CC=clang \
   CFLAGS='-std=c23 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer' \
   ASAN_OPTIONS=detect_leaks=0:detect_stack_use_after_return=0 \
@@ -84,14 +108,16 @@ env CC=clang \
 
 ASan's alternate stack frames must be disabled so VOC's conservative garbage
 collector can find live pointers on the native stack. The installed VOC
-runtime and support dependencies are used as provided by the compiler.
+runtime is used as provided by the compiler. Set `BUILD` to a rebuilt ooc
+directory when testing from source without installing VOC first; see the
+source-build example in the README.
 
 ## Representation rules
 
 - Build explicitly with `-O2`: 8-bit `SHORTINT`, 16-bit `INTEGER`, 32-bit
   `LONGINT`. Do not change the whole library to the C or V type model.
 - Preserve Unicode values. The ported codec interface uses `LONGINT` storage
-  through the shared `XMLUnicode.LONGCHAR` alias for UTF-16 code units.
+  through the shared `oocUnicode.LONGCHAR` alias for UTF-16 code units.
   Its definition documents the representation and valid 0..65535 range.
 - Replace implicit wide-string operations with explicit string helpers.
   Record memory moves must use the actual element size after porting.
@@ -110,5 +136,7 @@ runtime and support dependencies are used as provided by the compiler.
    recursion and external-entity controls before accepting untrusted input.
 4. Run the original XML/namespace/encoding suites. Separate external fixture
    availability from genuine parser failures.
-5. Only then add a VOC port manifest and integrate the tested sources into
-   VOC's ports tree. Optional HTTP/socket support can be handled independently.
+5. Only then add an XML port manifest for the XML-specific modules in a
+   separate VOC port directory, with reusable dependencies in the existing
+   ooc package. Test both packages together. Optional HTTP/socket support can
+   be handled independently.
