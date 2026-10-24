@@ -1,9 +1,9 @@
 # VOC port status
 
 `make test` builds and tests the Unicode codecs, XML byte/Unicode buffers,
-DTD data model and entity resolver against VOC's shared ooc support under
-the Oberon-2 model. The parser, event builders and XML writer are the next
-adaptation stages.
+DTD data model, entity resolver, diagnostics, locator, builder interface and
+parser against VOC's shared ooc support under the Oberon-2 model. Namespace
+and validation builders and the XML writer are the next adaptation stages.
 
 ## Dependencies
 
@@ -12,8 +12,9 @@ integer widths, record extensions and method signatures must agree.
 
 | Dependency | Status |
 | --- | --- |
-| XML parser, event builders and writer | Included in the CVS import; still need adapting to VOC. |
-| `XMLDTD` | Ported data model; tests cover declarations, predefined entities, attribute normalization and content models. DTD parsing and validation await the parser/builders. |
+| `XMLParser`, `XMLBuilder`, `XMLLocator`, `XMLError` | Ported and tested with in-memory and file inputs, UTF-16 callbacks and UTF-8 diagnostics. |
+| Namespace/validation builders and writer | Included in the CVS import; still need adapting to VOC. |
+| `XMLDTD` | Ported data model; parser tests cover internal subsets, parameter entities and default attributes. Full validation awaits its builder. |
 | `XMLEntityResolver` | Ported Unicode system-identifier normalization and relative URI resolution; tested with supplementary characters, malformed UTF-16 and long identifiers. |
 | `XMLInputBuffer`, `XMLUnicodeBuffer` | Ported and tested with short reads, BOMs, growth, compaction, repeated flushes and partial-write retries. |
 | `IOMemory` | Transferred to VOC's ooc package. Tests cover permissions, seeking, sparse writes, truncation, growth, overlapping copies, bounds and fingerprints. |
@@ -105,9 +106,34 @@ will not be part of the VOC port's implementation.
   existing escapes and output larger than the upstream 8 KiB buffer.
   Malformed UTF-16 returns a diagnostic through `Resolver.GetURI`.
 
+## Parser checks
+
+- Applications receive UTF-16 names, attribute values and character data.
+  Locator positions count UTF-16 code units. Diagnostic output uses UTF-8,
+  including when the input has no base URI.
+- Unicode character tables retain the XML 1.0 Second Edition ranges.
+  Sparse classifications use comparisons to fit VOC's 512-value CASE span;
+  dispatch maps buffer-end markers to adjacent labels. A fingerprint checks
+  name classification across all 65,536 code units against the preserved tables.
+- Integration tests exercise empty/nested entities, parameter declarations,
+  default attributes, whitespace normalization, supplementary character
+  references, both UTF-16 byte orders and short-read streaming beyond 32767.
+- Empty copied DTD character fragments allocate a terminator, avoiding VOC's
+  zero-length-array trap. Attribute entity whitespace processing advances the
+  cursor, and invalid-encoding diagnostics tolerate an absent base URI.
+- `make conformance` extracts the bundled James Clark archive into ignored
+  build storage and checks all 360 included well-formedness cases. The
+  upstream exclusion of `valid/sa/065.xml` is recorded in the result file.
+  Timeouts, traps and opening errors are failures, even for negative fixtures.
+  Canonical-output and validity comparisons remain pending.
+- `XMLCheck` disables external references by default. The library retains its
+  upstream `followExternalRef = TRUE` default; applications must set it
+  explicitly. Expansion, recursion and input-size limits remain pending, so
+  use trusted documents while that security review is incomplete.
+
 ## Verification
 
-The four XML test programs and seven ooc regression programs pass with
+The five XML test programs and seven ooc regression programs pass with
 GCC/C23, Clang/C23 and TCC under `-O2`. The shared ooc package is rebuilt
 before each XML test run. An additional Clang build instruments the shared
 package, ported XML modules and tests with AddressSanitizer and
@@ -149,14 +175,12 @@ source-build example in the README.
 
 ## Next stages
 
-1. Adapt XML diagnostics and locator interfaces required by the parser.
-2. Build and test the in-memory parser and basic builders, then namespaces,
-   DTD validation and the writer.
-3. Adapt upstream test drivers. Review entity expansion,
+1. Adapt and test namespace support, DTD validation and the writer.
+2. Adapt the remaining upstream test drivers. Review entity expansion,
    recursion and external-entity controls before accepting untrusted input.
-4. Run the original XML/namespace/encoding suites. Separate external fixture
+3. Run the remaining XML/namespace/encoding suites. Separate external fixture
    availability from genuine parser failures.
-5. Only then add an XML port manifest for the XML-specific modules in a
+4. Only then add an XML port manifest for the XML-specific modules in a
    separate VOC port directory, with reusable dependencies in the existing
    ooc package. Test both packages together. Optional HTTP/socket support can
    be handled independently.

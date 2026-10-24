@@ -1,5 +1,5 @@
 (*      $Id: Builder.Mod,v 1.13 2001/03/20 22:16:31 mva Exp $   *)
-MODULE XML:Builder [OOC_EXTENSIONS];
+MODULE XMLBuilder;
 (*  Low-level builder interface to the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
 
@@ -19,7 +19,7 @@ MODULE XML:Builder [OOC_EXTENSIONS];
 *)
 
 IMPORT
-  URI, XML:DTD, XML:Locator;
+  URI, DTD := XMLDTD, Locator := XMLLocator;
 
 
 TYPE
@@ -105,6 +105,7 @@ PROCEDURE (b: Builder) SetLocator* (locator: Locator.Locator);
    @precond
    @samp{locator} is not @code{NIL}.
    @end precond  *)
+  BEGIN
   END SetLocator;
 
 PROCEDURE (b: Builder) SetErrorListener* (el: Locator.ErrorListener);
@@ -112,6 +113,7 @@ PROCEDURE (b: Builder) SetErrorListener* (el: Locator.ErrorListener);
    error signalling.  Any errors will subsequently be reported through
    @oproc{el.Error}.  This method is called by the parser before it
    begins processing of the document.  *)
+  BEGIN
   END SetErrorListener;
 
 
@@ -122,6 +124,7 @@ PROCEDURE (b: Builder) StartDocument* (documentEntity: DTD.ExternalEntity);
    @oparam{documentEntity}, if it has been passed to
    @oproc{*XML:Parser.NewChannel}.  The locator is positioned at the very
    beginning of the file.  *)
+  BEGIN
   END StartDocument;
 
 PROCEDURE (b: Builder) EndDocument*;
@@ -130,6 +133,7 @@ PROCEDURE (b: Builder) EndDocument*;
    other event reporting methods, this method is even called if the document
    had a fatal error.  The locator is positioned at the very end of the
    file.  *)
+  BEGIN
   END EndDocument;
 
 PROCEDURE (b: Builder) StartDTD* (dtdBuilder: DTD.Builder);
@@ -140,6 +144,7 @@ PROCEDURE (b: Builder) StartDTD* (dtdBuilder: DTD.Builder);
    @oproc{Builder.EndDTD} are part of the DTD.  Events from the internal DTD
    are reported before events of the external DTD.  The locator is positioned
    at the beginning of @samp{<!DOCTYPE}.  *)
+  BEGIN
   END StartDTD;
 
 PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
@@ -154,6 +159,7 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
 
    The locator is positioned after the closing @samp{>} of the DTD, and the
    external DTD subset has been processed.  *)
+  BEGIN
   END EndDTD;
 
 
@@ -173,6 +179,7 @@ b   The locator is positioned at the beginning of the start tag's name.
    For full namespace support, the special builder class
    @otype{*XML:Builder:Namespaces.Builder} must be put between the parser and
    the application.  *)
+  BEGIN
   END StartElement;
 
 PROCEDURE (b: Builder) EndElement* (namespaceDecl: DTD.NamespaceDeclaration; 
@@ -181,6 +188,7 @@ PROCEDURE (b: Builder) EndElement* (namespaceDecl: DTD.NamespaceDeclaration;
    a description of the arguments.  The locator is positioned at the beginning
    of the end tag's name, if an explicit end tag exists.  Otherwise, it is
    placed after the closing @samp{/>} of the empty element tag.  *)
+  BEGIN
   END EndElement;
 
 PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration; 
@@ -215,6 +223,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
    The locator is at the beginning of the attribute's name, if
    @oparam{specified} is @code{TRUE}.  For defaulted attributes, the locator is
    undefined.  *)
+  BEGIN
   END Attribute;
 
 PROCEDURE (b: Builder) NamespaceDeclaration* (namespaceDecl: DTD.NamespaceDeclaration);
@@ -223,12 +232,14 @@ PROCEDURE (b: Builder) NamespaceDeclaration* (namespaceDecl: DTD.NamespaceDeclar
    never calls this method.  Use the adapter builder
    @otype{*XML:Builder:Namespaces.Builder} to introduce namespace information
    into the event stream.  The locator position is undefined.  *)
+  BEGIN
   END NamespaceDeclaration;
 
 PROCEDURE (b: Builder) AttributesDone*;
 (**Called when the all attributes of a start tag, specified or defaulted,
    have been reported to the application.  The locator is positioned after
    the closing @samp{>} of the start or empty element tag.  *)
+  BEGIN
   END AttributesDone;
 
 
@@ -238,6 +249,7 @@ PROCEDURE (b: Builder) SkippedEntity* (name: DTD.String; entity: DTD.Entity);
    @oparam{name} is the name of the skipped entity and @oparam{entity} its
    entity declaration, if this information is available.  The locator refers to
    the beginning of the name of the entity reference.  *)
+  BEGIN
   END SkippedEntity;
 
 
@@ -259,6 +271,7 @@ PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
    references, CDATA sections, and the size of the character content.  It is
    only guaranteed that this procedure is called with an integral number of ISO
    10646 characters (e.g., surrogate pairs are reported in one call).  *)
+  BEGIN
   END Characters;
 
 
@@ -268,11 +281,13 @@ PROCEDURE (b: Builder) StartCDATA*;
    CDATA's character content.
 
    The locator is positioned at @samp{<![CDATA[}.  *)
+  BEGIN
   END StartCDATA;
 
 PROCEDURE (b: Builder) EndCDATA*;
 (**Called at the end of a CDATA section.  The locator refers to the position
    after the @samp{]]>}.  *)
+  BEGIN
   END EndCDATA;
 
 PROCEDURE (b: Builder) StartEntity* (entity: DTD.Entity);
@@ -280,11 +295,13 @@ PROCEDURE (b: Builder) StartEntity* (entity: DTD.Entity);
    is inspected in an element's content.  @oparam{entity} refers to the
    entity that is being expanded.  The locator points to the @samp{&} in front
    of the name of the entity reference.  *)
+  BEGIN
   END StartEntity;
 
 PROCEDURE (b: Builder) EndEntity* (entity: DTD.Entity);
 (**Called when parsing of the replacement text of @oparam{entity} is done.
   The locator points to the first character after the entity reference.  *)
+  BEGIN
   END EndEntity;
 
 
@@ -296,11 +313,13 @@ PROCEDURE (b: Builder) EntityDecl* (entity: DTD.Entity);
    Note: The document entity is passed to @oproc{Builder.StartDocument}, and
    the entity for the external DTD subset to @oproc{Builder.EndDTD}, of it
    exists.  *)
+  BEGIN
   END EntityDecl;
 
 PROCEDURE (b: Builder) Notation* (notation: DTD.Notation);
 (**Called for notation declarations.  The locator points to the 
    first character of the declared name.  *)
+  BEGIN
   END Notation;
 
 PROCEDURE (b: Builder) ProcessingInstruction* (
@@ -312,6 +331,7 @@ PROCEDURE (b: Builder) ProcessingInstruction* (
    absolute URI of the entity in which the PI appears.
 
    The locator is positioned at the @samp{<?}.  *)
+  BEGIN
   END ProcessingInstruction;
 
 PROCEDURE (b: Builder) Comment* (VAR chars: DTD.StringVar;
@@ -321,6 +341,7 @@ PROCEDURE (b: Builder) Comment* (VAR chars: DTD.StringVar;
    comment's content.
 
    The locator is positioned at the @samp{<!--}.  *)
+  BEGIN
   END Comment;
 
 
@@ -357,7 +378,12 @@ PROCEDURE InitAttribute* (attr: Attribute;
     attr. attrDecl := attrDecl;
     attr. value := value;
     attr. specified := specified;
-    attr. pos := locator^
+    IF locator # NIL THEN
+      attr. pos := locator^
+    ELSE
+      attr. pos. charIndex := 0; attr. pos. line := 0; attr. pos. column := 0;
+      attr. pos. entity := NIL; attr. pos. inInternalEntity := NIL
+    END
   END InitAttribute;
 
 PROCEDURE NewAttribute* (namespaceDecl: DTD.NamespaceDeclaration; 
@@ -426,4 +452,4 @@ PROCEDURE (attrList: AttributeList) Append* (attr: Attribute);
     INC (attrList. len)
   END Append;
 
-END XML:Builder.
+END XMLBuilder.

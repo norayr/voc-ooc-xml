@@ -4,10 +4,11 @@ ROOT := $(CURDIR)
 MODULES := XMLUnicodeCodec XMLUnicodeCodecUTF8 XMLUnicodeCodecUTF16 \
 	XMLUnicodeCodecASCII XMLUnicodeCodecLatin1 XMLUnicodeCodecImportAll \
 	XMLInputBuffer XMLUnicodeBuffer XMLDTD XMLEntityResolver \
-	TestUnicodeCodecs TestUnicodeMessages TestMemoryBuffers TestDTDResolver
+	XMLError XMLLocator XMLBuilder XMLParser XMLCheck \
+	TestUnicodeCodecs TestUnicodeMessages TestMemoryBuffers TestDTDResolver TestParser
 
-.PHONY: all codecs buffers resolver test clean
-all: resolver
+.PHONY: all codecs buffers resolver parser xmlcheck conformance test clean
+all: parser
 
 $(BUILD):
 	mkdir -p "$(BUILD)"
@@ -32,7 +33,14 @@ resolver: buffers
 		"$(ROOT)/src/XML/DTD.Mod" \
 		"$(ROOT)/src/XML/EntityResolver.Mod"
 
-test: resolver
+parser: resolver
+	cd "$(BUILD)" && $(VOC) -O2 -s \
+		"$(ROOT)/src/XML/Error.Mod" \
+		"$(ROOT)/src/XML/Locator.Mod" \
+		"$(ROOT)/src/XML/Builder.Mod" \
+		"$(ROOT)/src/XML/Parser.Mod"
+
+test: parser
 	cd "$(BUILD)" && $(VOC) -O2 -s -m "$(ROOT)/tests/voc/TestUnicodeCodecs.Mod"
 	"$(BUILD)/TestUnicodeCodecs"
 	cd "$(BUILD)" && $(VOC) -O2 -s -m "$(ROOT)/tests/voc/TestUnicodeMessages.Mod"
@@ -41,8 +49,17 @@ test: resolver
 	"$(BUILD)/TestMemoryBuffers"
 	cd "$(BUILD)" && $(VOC) -O2 -s -m "$(ROOT)/tests/voc/TestDTDResolver.Mod"
 	"$(BUILD)/TestDTDResolver"
+	cd "$(BUILD)" && $(VOC) -O2 -s -m "$(ROOT)/tests/voc/TestParser.Mod"
+	"$(BUILD)/TestParser"
+
+xmlcheck: parser
+	cd "$(BUILD)" && $(VOC) -O2 -s -m "$(ROOT)/tools/XMLCheck.Mod"
+
+conformance: xmlcheck
+	python3 tests/voc/check-xmltest.py "$(BUILD)/XMLCheck"
 
 clean:
 	rm -f $(foreach module,$(MODULES),$(foreach ext,c h o sym,"$(BUILD)/$(module).$(ext)")) \
 		"$(BUILD)/TestUnicodeCodecs" "$(BUILD)/TestUnicodeMessages" \
-		"$(BUILD)/TestMemoryBuffers" "$(BUILD)/TestDTDResolver"
+		"$(BUILD)/TestMemoryBuffers" "$(BUILD)/TestDTDResolver" "$(BUILD)/TestParser" \
+		"$(BUILD)/XMLCheck"

@@ -1,5 +1,5 @@
 (* 	$Id: Error.Mod,v 1.5 2001/03/24 12:23:34 mva Exp $	 *)
-MODULE XML:Error;
+MODULE XMLError;
 (*  Creates lists of error messages and converts them to text.
     Copyright (C) 2000, 2001  Michael van Acken
 
@@ -20,8 +20,9 @@ MODULE XML:Error;
 
 
 IMPORT
-  Ascii, Strings,Channel, TextRider, LongStrings, M := Msg,
-  URI, URI:Scheme:File;
+  Ascii, Channel, LongStrings, M := Msg,
+  URI, File := URISchemeFile, Buffer := XMLUnicodeBuffer,
+  UTF8 := XMLUnicodeCodecUTF8;
   
   
 TYPE
@@ -90,26 +91,29 @@ PROCEDURE NewContext* (id: M.String): Context;
 PROCEDURE (context: Context) WriteTemplate* (msg: M.Msg; msgText: M.LString; VAR templ: M.LString);
   VAR
     entityName: M.Attribute;
-  CONST
-    eol = Ascii.lf;
+    prefix: ARRAY 128 OF M.LChar;
+    len: LONGINT;
   BEGIN
     entityName := msg. GetAttribute ("entity_name");
     IF (entityName = NIL) THEN
-      COPY ("", templ)
+      templ[0] := 0
     ELSE
-      COPY ("While expanding entity `", templ);
+      LongStrings.Long ("While expanding entity `", templ);
       LongStrings.Append (entityName(M.LStringAttribute). string^, templ);
-      LongStrings.Append ("': ", templ)
+      LongStrings.Append8 ("': ", templ)
     END;
     
     LongStrings.Append (msgText, templ);
-    LongStrings.Insert ("line=${line}, column=${column}"+eol+
-                        "${char}: ", 0, templ);
+    LongStrings.Long ("line=${line}, column=${column}", prefix);
+    len := LongStrings.Length (prefix); prefix[len] := ORD (Ascii.lf); prefix[len+1] := 0;
+    LongStrings.Append8 ("${char}: ", prefix);
+    LongStrings.Insert (prefix, 0, templ)
   END WriteTemplate;
 
 PROCEDURE (context: Context) GetTemplate* (msg: Msg; VAR templ: LString);
   VAR
     m: Mapping;
+    unknown: ARRAY 128 OF M.LChar;
   BEGIN
     m := context. mapping;
     WHILE (m # NIL) & (m. code # msg. code) DO
@@ -118,7 +122,8 @@ PROCEDURE (context: Context) GetTemplate* (msg: Msg; VAR templ: LString);
     IF (m # NIL) THEN
       context. WriteTemplate (msg, m. text^, templ)
     ELSE
-      context. WriteTemplate (msg, "--unknown error code; msg_context=${MSG_CONTEXT}; msg_code=${MSG_CODE}--", templ)
+      LongStrings.Long ("--unknown error code; msg_context=${MSG_CONTEXT}; msg_code=${MSG_CODE}--", unknown);
+      context. WriteTemplate (msg, unknown, templ)
     END
   END GetTemplate;
 
@@ -133,10 +138,10 @@ PROCEDURE (context: Context) SetString* (code: Code; str: String);
         NEW (mlist);
         mlist. next := NIL;
         mlist. code := code;
-        COPY (str, str16);
+        LongStrings.Long (str, str16);
         mlist. text := M.GetLStringPtr (str16)
       ELSIF (mlist. code = code) THEN
-        COPY (str, str16);
+        LongStrings.Long (str, str16);
         mlist. text := M.GetLStringPtr (str16)
       ELSE
         Append (mlist. next)
@@ -165,33 +170,16 @@ PROCEDURE NewList*(): List;
 
 
 PROCEDURE (errList: List) Write* (ch: Channel.Channel);
-(**Writes the list of error messages to the ouput channel @oparam{ch}.  The
-   channel must be writable.  The generated list is prefixed by the name
-   of the file to which the errors refer.  File names relative to the current
-   working directory are rewritten to relative path names, using the list's
-   `cwdURI' as base.  *)
+(**Writes UTF-8 diagnostics to a writable channel, grouping messages by file.
+   File headings use names relative to the current working directory. *)
   VAR
-    writer: TextRider.Writer;
+    output: Buffer.Output;
     msg, prev: Msg;
-    text: ARRAY 8*1024 OF CHAR;
+    text: ARRAY 8*1024 OF M.LChar;
+    name: ARRAY 4096 OF CHAR;
+    newline: ARRAY 2 OF CHAR;
     uriAttr: M.Attribute;
-    uri, prevURI: URI.URI;
-    repl1, repl2: ARRAY 1024 OF CHAR;
-    i: LONGINT;
-
-  PROCEDURE Replace (VAR text: ARRAY OF CHAR; pattern, repl: ARRAY OF CHAR);
-    VAR
-      pos: INTEGER;
-      found: BOOLEAN;
-    BEGIN
-      Strings.FindNext (pattern, text, 0, found, pos);
-      WHILE found DO
-        Strings.Delete (text, pos, Strings.Length (pattern));
-        Strings.Insert (repl, pos, text);
-        INC (pos, Strings.Length (repl));
-        Strings.FindNext (pattern, text, pos, found, pos)
-      END
-    END Replace;
+    uri, relative, prevURI: URI.URI;
   
   PROCEDURE DistanceOk (m0, m1: M.Msg): BOOLEAN;
     VAR
@@ -214,56 +202,32 @@ PROCEDURE (errList: List) Write* (ch: Channel.Channel);
     END DistanceOk;
   
   BEGIN
-    writer := TextRider.ConnectWriter (ch);
-    ASSERT (writer # NIL);
-    
-    errList. cwdURI. GetString (repl1);
-    errList. cwdURI(File.URI). GetPath (repl2);
-    Strings.Insert ("file_name=", 0, repl2);
-    
+    output := Buffer.NewOutput (ch. NewWriter(), UTF8.factory, FALSE);
+    newline[0] := Ascii.lf; newline[1] := 0X;
     prev := NIL; prevURI := NIL;
     msg := errList. msgList;
     WHILE (msg # NIL) DO
-      IF DistanceOk (prev, msg) THEN
-        uriAttr := msg. GetAttribute ("baseURI");
-        IF (uriAttr(URI.URIAttribute). uri # prevURI) THEN
-          uri := uriAttr(URI.URIAttribute). uri. MakeRelative (errList. cwdURI);
-          uri. GetString (text);
-          
-          i := 0;
-          WHILE (text[i] = ".") OR (text[i] = "/") DO
-            INC (i)
-          END;
-          IF (i > 6) THEN
-            (* string begins with ../../..; with this many steps back in the
-               directory hierarchy, a relative file name is pretty useless,
-               so we use the original absolue one *)
-            uri. GetString (text);
-            Strings.Extract (text, 0, 5, repl1);
-            Strings.Capitalize (repl1);
-            IF (repl1 = "FILE:") THEN
-              Strings.Delete (text, 0, 5)
-            END;
-          END;
-          
-          writer. WriteString ("In file ");
-          writer. WriteString (text);
-          writer. WriteString (": ");
-          writer. WriteLn
+      uri := NIL;
+      uriAttr := msg. GetAttribute ("baseURI");
+      IF (uriAttr # NIL) & (uriAttr IS URI.URIAttribute) THEN
+        uri := uriAttr(URI.URIAttribute). uri
+      END;
+      IF (uri # prevURI) OR DistanceOk (prev, msg) THEN
+        IF (uri # NIL) & (uri # prevURI) THEN
+          relative := uri. MakeRelative (errList. cwdURI);
+          relative. GetString (name);
+          output. Write8 ("In file "); output. Write8 (name);
+          output. Write8 (": "); output. Write8 (newline)
         END;
-        prevURI := uriAttr(URI.URIAttribute). uri;
-        
-        msg. GetText (text);
-        Replace (text, repl1, "file:");
-        Replace (text, repl2, "file_name=");
-        writer. WriteString (text);
-        writer. WriteLn;
-        prev := msg
+        msg. GetLText (text);
+        output. Write16 (text); output. Write8 (newline);
+        prev := msg; prevURI := uri
       END;
       msg := msg. nextMsg
-    END
+    END;
+    output. Flush
   END Write;
 
 BEGIN
   errMsgLineBase := 0; errMsgColumnBase := 0; errMsgCharPosBase := 0;
-END XML:Error.
+END XMLError.

@@ -524,13 +524,16 @@ PROCEDURE (b: Builder) NewCharacters* (source: String; start, end: CharPos;
     len, i: CharPos;
     copy: String;
   BEGIN
+    ASSERT ((0 <= start) & (start <= end) & (end <= LEN (source^)));
     NEW (chars);
     IF createCopy THEN
       len := end-start;
-      NEW (copy, len);
+      ASSERT (len < MAX (LONGINT));
+      NEW (copy, len+1);
       FOR i := 0 TO len-1 DO
         copy[i] := source[start+i]
       END;
+      copy[len] := 0;
       InitCharacters (chars, copy, 0, len)
     ELSE
       InitCharacters (chars, source, start, end)

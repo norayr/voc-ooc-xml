@@ -20,8 +20,8 @@ must not be stored in `LONGINT`.
 
 ### Working so far
 
-The Unicode codecs, XML buffers, DTD data model and entity resolver build
-with VOC:
+The Unicode codecs, XML buffers, DTD data model, entity resolver and XML
+parser build with VOC:
 
 ```sh
 make test
@@ -36,7 +36,8 @@ Their sources and unit tests live in VOC's `src/ports/ooc/` and confidence
 tests. Rebuild VOC and its dependent modules together when updating this
 package.
 
-The XML parser is still being adapted from oo2c to VOC.
+`XMLParser` reports document, element, attribute, text and DTD events through
+`XMLBuilder`. Applications extend that builder to consume the events.
 `XMLUnicodeCodecImportAll` registers the bundled ASCII, Latin-1,
 UTF-8 and UTF-16 encodings at startup. The codec source paths are unchanged so
 the changes remain easy to compare with CVS.
@@ -66,14 +67,33 @@ DTD tests cover declaration lookup, predefined entities, attribute values
 and content-model classification. Resolver tests cover relative system
 identifiers, UTF-8 percent escapes, surrogate pairs, malformed UTF-16 and
 40,000-code-unit identifiers.
-They pass with GCC and Clang in C23 mode, and TCC. XML conformance testing
-will follow the parser port.
+Parser tests cover callbacks, internal and parameter entities, default
+attributes, Unicode names, character references, malformed documents and
+70,000-unit text streamed through short reads. The five integration programs
+pass with GCC and Clang in C23 mode, TCC and Clang ASan/UBSan.
+
+The bundled James Clark XML test archive supplies the first well-formedness
+corpus. Run it with:
+
+```sh
+make BUILD=../compiler/build/ports/ooc/2 conformance
+```
+
+All 360 included cases pass, also under ASan/UBSan. The runner records the
+upstream exclusion of `valid/sa/065.xml`, whose entity replacement is malformed.
+This checks acceptance and rejection; canonical output and DTD validation
+remain later stages.
+
+`make xmlcheck` builds `XMLCheck`, a file well-formedness checker. Its default
+disables external references; `XMLCheck --external file.xml` enables them for
+trusted local fixtures. Exit codes are 0 for successful parsing, 1 for XML
+diagnostics and 2 for usage or opening errors.
 
 VOC's ooc package supplies URI parsing, relative resolution and file/memory
 channels. XML's `XMLEntityResolver` converts Unicode system identifiers to
-these URI objects. The parser, event builders, namespaces, validation and
-writer are the next adaptation stages, followed by the original regression
-suites. External-entity controls and resource limits still need review
+these URI objects. Namespace and validation builders, the writer and the
+remaining original regression suites are the next adaptation stages.
+External-entity controls and resource limits still need review
 before the parser can accept untrusted documents.
 
 ### Testing with a VOC source build
@@ -93,8 +113,8 @@ files. A normal `make test` uses the installed VOC library.
 [Port status and dependencies](doc/PortStatus.md) lists what is present and
 what still needs adapting.
 
-The XML parser is still being ported. Its VOC ports-tree integration will
-follow a working, tested standalone port. The shared support modules have
+The XML port is in progress. Its VOC ports-tree integration will follow
+completion of the standalone port and its tests. The shared support modules have
 been transferred into VOC's existing ooc package. The upstream `configure`
 and `Makefile.in` describe the original oo2c build.
 

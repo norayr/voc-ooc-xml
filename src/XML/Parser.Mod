@@ -1,5 +1,5 @@
 (*      $Id: Parser.Mod,v 1.31 2001/03/24 01:11:21 mva Exp $   *)
-MODULE XML:Parser;
+MODULE XMLParser;
 (*  Implements the XML parser.
     Copyright (C) 2000, 2001  Michael van Acken
 
@@ -20,10 +20,10 @@ MODULE XML:Parser;
 
 
 IMPORT
-  Out, Ascii, Channel, Msg, LongStrings, URI, URI:Scheme:File,
-  Codec := XML:UnicodeCodec, XML:UnicodeCodec:UTF8, XML:UnicodeCodec:UTF16,
-  XML:Locator, XML:EntityResolver,
-  Buffer := XML:UnicodeBuffer, XML:Error, XML:DTD, XML:Builder;
+  Out, Ascii, Channel, Msg, LongStrings, URI, File := URISchemeFile,
+  Codec := XMLUnicodeCodec, UTF8 := XMLUnicodeCodecUTF8, UTF16 := XMLUnicodeCodecUTF16,
+  Locator := XMLLocator, EntityResolver := XMLEntityResolver,
+  Buffer := XMLUnicodeBuffer, Error := XMLError, DTD := XMLDTD, Builder := XMLBuilder;
   (* warning: the modules UTF8 and UTF16 are not used in this module, but
      they must be imported to guarantee that these codecs are available to
      the XML parser *)
@@ -158,6 +158,8 @@ TYPE
 
 CONST
   tabWidth = 8;
+  caseEOB = -2;
+  caseEOD = -1;
 
 CONST
   initNameList = 8;
@@ -268,187 +270,202 @@ PROCEDURE IsCharUCS4 (ch: LONGINT): BOOLEAN;
 
 PROCEDURE IsDigit (ch: Buffer.Char): BOOLEAN;
   BEGIN
-    IF (ch < 100X) THEN
-      RETURN (30X <= ch) & (ch <= 39X)
+    IF (ch < 100H) THEN
+      RETURN (30H <= ch) & (ch <= 39H)
     ELSE
-      CASE ch OF
-      | 0660X .. 0669X, 06F0X .. 06F9X, 0966X .. 096FX, 09E6X .. 09EFX,
-        0A66X .. 0A6FX, 0AE6X .. 0AEFX, 0B66X .. 0B6FX, 0BE7X .. 0BEFX,
-        0C66X .. 0C6FX, 0CE6X .. 0CEFX, 0D66X .. 0D6FX, 0E50X .. 0E59X, 
-        0ED0X .. 0ED9X, 0F20X .. 0F29X:
-        RETURN TRUE
-      ELSE
-        RETURN FALSE
-      END
+      RETURN (0660H <= ch) & (ch <= 0669H) OR (06F0H <= ch) & (ch <= 06F9H) OR
+        (0966H <= ch) & (ch <= 096FH) OR (09E6H <= ch) & (ch <= 09EFH) OR
+        (0A66H <= ch) & (ch <= 0A6FH) OR (0AE6H <= ch) & (ch <= 0AEFH) OR
+        (0B66H <= ch) & (ch <= 0B6FH) OR (0BE7H <= ch) & (ch <= 0BEFH) OR
+        (0C66H <= ch) & (ch <= 0C6FH) OR (0CE6H <= ch) & (ch <= 0CEFH) OR
+        (0D66H <= ch) & (ch <= 0D6FH) OR (0E50H <= ch) & (ch <= 0E59H) OR
+        (0ED0H <= ch) & (ch <= 0ED9H) OR (0F20H <= ch) & (ch <= 0F29H)
     END
   END IsDigit;
 
 PROCEDURE IsBaseChar (ch: Buffer.Char): BOOLEAN;
   BEGIN
-    IF (ch < 100X) THEN
+    IF (ch < 100H) THEN
       CASE ch OF
-      | 0041X .. 005AX, 0061X .. 007AX, 00C0X .. 00D6X, 00D8X .. 00F6X, 
-        00F8X .. 00FFX: 
+      | 0041H .. 005AH, 0061H .. 007AH, 00C0H .. 00D6H, 00D8H .. 00F6H,
+        00F8H .. 00FFH:
         RETURN TRUE
       ELSE
         RETURN FALSE
       END
-    ELSIF (ch < 400X) THEN
-      CASE ch OF
-      | 0100X .. 0131X, 0134X .. 013EX, 0141X .. 0148X, 014AX .. 017EX, 
-        0180X .. 01C3X, 01CDX .. 01F0X, 01F4X .. 01F5X, 01FAX .. 0217X, 
-        0250X .. 02A8X, 02BBX .. 02C1X, 0386X, 0388X .. 038AX, 038CX, 
-        038EX .. 03A1X, 03A3X .. 03CEX, 03D0X .. 03D6X, 03DAX, 03DCX, 03DEX, 
-        03E0X, 03E2X .. 03F3X:
-        RETURN TRUE
-      ELSE
-        RETURN FALSE
-      END
-    ELSIF (ch < 800X) THEN
-      CASE ch OF
-      | 0401X .. 040CX, 040EX .. 044FX, 0451X .. 045CX, 045EX .. 0481X, 
-        0490X .. 04C4X, 04C7X .. 04C8X, 04CBX .. 04CCX, 04D0X .. 04EBX, 
-        04EEX .. 04F5X, 04F8X .. 04F9X, 0531X .. 0556X, 0559X, 0561X .. 0586X, 
-        05D0X .. 05EAX, 05F0X .. 05F2X, 0621X .. 063AX, 0641X .. 064AX, 
-        0671X .. 06B7X, 06BAX .. 06BEX, 06C0X .. 06CEX, 06D0X .. 06D3X, 
-        06D5X, 06E5X .. 06E6X:
-        RETURN TRUE
-      ELSE
-        RETURN FALSE
-      END
-    ELSIF (ch < 0C00X) THEN
-      CASE ch OF
-      | 0905X .. 0939X, 093DX, 0958X .. 0961X, 0985X .. 098CX, 098FX .. 0990X,
-        0993X .. 09A8X, 09AAX .. 09B0X, 09B2X, 09B6X .. 09B9X, 09DCX .. 09DDX, 
-        09DFX .. 09E1X, 09F0X .. 09F1X, 0A05X .. 0A0AX, 0A0FX .. 0A10X, 
-        0A13X .. 0A28X, 0A2AX .. 0A30X, 0A32X .. 0A33X, 0A35X .. 0A36X, 
-        0A38X .. 0A39X, 0A59X .. 0A5CX, 0A5EX, 0A72X .. 0A74X, 0A85X .. 0A8BX, 
-        0A8DX, 0A8FX .. 0A91X, 0A93X .. 0AA8X, 0AAAX .. 0AB0X, 0AB2X .. 0AB3X, 
-        0AB5X .. 0AB9X, 0ABDX, 0AE0X, 0B05X .. 0B0CX, 0B0FX .. 0B10X, 
-        0B13X .. 0B28X, 0B2AX .. 0B30X, 0B32X .. 0B33X, 0B36X .. 0B39X, 0B3DX, 
-        0B5CX .. 0B5DX, 0B5FX .. 0B61X, 0B85X .. 0B8AX, 0B8EX .. 0B90X, 
-        0B92X .. 0B95X, 0B99X .. 0B9AX, 0B9CX, 0B9EX .. 0B9FX, 0BA3X .. 0BA4X, 
-        0BA8X .. 0BAAX, 0BAEX .. 0BB5X, 0BB7X .. 0BB9X:
-        RETURN TRUE
-      ELSE
-        RETURN FALSE
-      END
-    ELSIF (ch < 1000X) THEN
-      CASE ch OF
-      | 0C05X .. 0C0CX, 0C0EX .. 0C10X, 0C12X .. 0C28X, 0C2AX .. 0C33X, 
-        0C35X .. 0C39X, 0C60X .. 0C61X, 0C85X .. 0C8CX, 0C8EX .. 0C90X, 
-        0C92X .. 0CA8X, 0CAAX .. 0CB3X, 0CB5X .. 0CB9X, 0CDEX, 0CE0X .. 0CE1X, 
-        0D05X .. 0D0CX, 0D0EX .. 0D10X, 0D12X .. 0D28X, 0D2AX .. 0D39X, 
-        0D60X .. 0D61X, 0E01X .. 0E2EX, 0E30X, 0E32X .. 0E33X, 0E40X .. 0E45X, 
-        0E81X .. 0E82X, 0E84X, 0E87X .. 0E88X, 0E8AX, 0E8DX, 0E94X .. 0E97X, 
-        0E99X .. 0E9FX, 0EA1X .. 0EA3X, 0EA5X, 0EA7X, 0EAAX .. 0EABX, 
-        0EADX .. 0EAEX, 0EB0X, 0EB2X .. 0EB3X, 0EBDX, 0EC0X .. 0EC4X, 
-        0F40X .. 0F47X, 0F49X .. 0F69X:
-        RETURN TRUE
-      ELSE
-        RETURN FALSE
-      END
-    ELSIF (ch < 1400X) THEN
-      CASE ch OF
-      | 10A0X .. 10C5X, 10D0X .. 10F6X, 1100X, 1102X .. 1103X, 1105X .. 1107X, 
-        1109X, 110BX .. 110CX, 110EX .. 1112X, 113CX, 113EX, 1140X, 114CX, 
-        114EX, 1150X, 1154X .. 1155X, 1159X, 115FX .. 1161X, 1163X, 1165X, 
-        1167X, 1169X, 116DX .. 116EX, 1172X .. 1173X, 1175X, 119EX, 11A8X, 
-        11ABX, 11AEX .. 11AFX, 11B7X .. 11B8X, 11BAX, 11BCX .. 11C2X, 11EBX, 
-        11F0X, 11F9X:
-        RETURN TRUE
-      ELSE
-        RETURN FALSE
-      END
+    ELSIF (ch < 400H) THEN
+      RETURN (0100H <= ch) & (ch <= 0131H) OR (0134H <= ch) & (ch <= 013EH) OR
+        (0141H <= ch) & (ch <= 0148H) OR (014AH <= ch) & (ch <= 017EH) OR
+        (0180H <= ch) & (ch <= 01C3H) OR (01CDH <= ch) & (ch <= 01F0H) OR
+        (01F4H <= ch) & (ch <= 01F5H) OR (01FAH <= ch) & (ch <= 0217H) OR
+        (0250H <= ch) & (ch <= 02A8H) OR (02BBH <= ch) & (ch <= 02C1H) OR
+        (ch = 0386H) OR (0388H <= ch) & (ch <= 038AH) OR (ch = 038CH) OR
+        (038EH <= ch) & (ch <= 03A1H) OR (03A3H <= ch) & (ch <= 03CEH) OR
+        (03D0H <= ch) & (ch <= 03D6H) OR (ch = 03DAH) OR (ch = 03DCH) OR
+        (ch = 03DEH) OR (ch = 03E0H) OR (03E2H <= ch) & (ch <= 03F3H)
+    ELSIF (ch < 800H) THEN
+      RETURN (0401H <= ch) & (ch <= 040CH) OR (040EH <= ch) & (ch <= 044FH) OR
+        (0451H <= ch) & (ch <= 045CH) OR (045EH <= ch) & (ch <= 0481H) OR
+        (0490H <= ch) & (ch <= 04C4H) OR (04C7H <= ch) & (ch <= 04C8H) OR
+        (04CBH <= ch) & (ch <= 04CCH) OR (04D0H <= ch) & (ch <= 04EBH) OR
+        (04EEH <= ch) & (ch <= 04F5H) OR (04F8H <= ch) & (ch <= 04F9H) OR
+        (0531H <= ch) & (ch <= 0556H) OR (ch = 0559H) OR
+        (0561H <= ch) & (ch <= 0586H) OR (05D0H <= ch) & (ch <= 05EAH) OR
+        (05F0H <= ch) & (ch <= 05F2H) OR (0621H <= ch) & (ch <= 063AH) OR
+        (0641H <= ch) & (ch <= 064AH) OR (0671H <= ch) & (ch <= 06B7H) OR
+        (06BAH <= ch) & (ch <= 06BEH) OR (06C0H <= ch) & (ch <= 06CEH) OR
+        (06D0H <= ch) & (ch <= 06D3H) OR (ch = 06D5H) OR
+        (06E5H <= ch) & (ch <= 06E6H)
+    ELSIF (ch < 0C00H) THEN
+      RETURN (0905H <= ch) & (ch <= 0939H) OR (ch = 093DH) OR
+        (0958H <= ch) & (ch <= 0961H) OR (0985H <= ch) & (ch <= 098CH) OR
+        (098FH <= ch) & (ch <= 0990H) OR (0993H <= ch) & (ch <= 09A8H) OR
+        (09AAH <= ch) & (ch <= 09B0H) OR (ch = 09B2H) OR
+        (09B6H <= ch) & (ch <= 09B9H) OR (09DCH <= ch) & (ch <= 09DDH) OR
+        (09DFH <= ch) & (ch <= 09E1H) OR (09F0H <= ch) & (ch <= 09F1H) OR
+        (0A05H <= ch) & (ch <= 0A0AH) OR (0A0FH <= ch) & (ch <= 0A10H) OR
+        (0A13H <= ch) & (ch <= 0A28H) OR (0A2AH <= ch) & (ch <= 0A30H) OR
+        (0A32H <= ch) & (ch <= 0A33H) OR (0A35H <= ch) & (ch <= 0A36H) OR
+        (0A38H <= ch) & (ch <= 0A39H) OR (0A59H <= ch) & (ch <= 0A5CH) OR
+        (ch = 0A5EH) OR (0A72H <= ch) & (ch <= 0A74H) OR
+        (0A85H <= ch) & (ch <= 0A8BH) OR (ch = 0A8DH) OR
+        (0A8FH <= ch) & (ch <= 0A91H) OR (0A93H <= ch) & (ch <= 0AA8H) OR
+        (0AAAH <= ch) & (ch <= 0AB0H) OR (0AB2H <= ch) & (ch <= 0AB3H) OR
+        (0AB5H <= ch) & (ch <= 0AB9H) OR (ch = 0ABDH) OR (ch = 0AE0H) OR
+        (0B05H <= ch) & (ch <= 0B0CH) OR (0B0FH <= ch) & (ch <= 0B10H) OR
+        (0B13H <= ch) & (ch <= 0B28H) OR (0B2AH <= ch) & (ch <= 0B30H) OR
+        (0B32H <= ch) & (ch <= 0B33H) OR (0B36H <= ch) & (ch <= 0B39H) OR
+        (ch = 0B3DH) OR (0B5CH <= ch) & (ch <= 0B5DH) OR
+        (0B5FH <= ch) & (ch <= 0B61H) OR (0B85H <= ch) & (ch <= 0B8AH) OR
+        (0B8EH <= ch) & (ch <= 0B90H) OR (0B92H <= ch) & (ch <= 0B95H) OR
+        (0B99H <= ch) & (ch <= 0B9AH) OR (ch = 0B9CH) OR
+        (0B9EH <= ch) & (ch <= 0B9FH) OR (0BA3H <= ch) & (ch <= 0BA4H) OR
+        (0BA8H <= ch) & (ch <= 0BAAH) OR (0BAEH <= ch) & (ch <= 0BB5H) OR
+        (0BB7H <= ch) & (ch <= 0BB9H)
+    ELSIF (ch < 1000H) THEN
+      RETURN (0C05H <= ch) & (ch <= 0C0CH) OR (0C0EH <= ch) & (ch <= 0C10H) OR
+        (0C12H <= ch) & (ch <= 0C28H) OR (0C2AH <= ch) & (ch <= 0C33H) OR
+        (0C35H <= ch) & (ch <= 0C39H) OR (0C60H <= ch) & (ch <= 0C61H) OR
+        (0C85H <= ch) & (ch <= 0C8CH) OR (0C8EH <= ch) & (ch <= 0C90H) OR
+        (0C92H <= ch) & (ch <= 0CA8H) OR (0CAAH <= ch) & (ch <= 0CB3H) OR
+        (0CB5H <= ch) & (ch <= 0CB9H) OR (ch = 0CDEH) OR
+        (0CE0H <= ch) & (ch <= 0CE1H) OR (0D05H <= ch) & (ch <= 0D0CH) OR
+        (0D0EH <= ch) & (ch <= 0D10H) OR (0D12H <= ch) & (ch <= 0D28H) OR
+        (0D2AH <= ch) & (ch <= 0D39H) OR (0D60H <= ch) & (ch <= 0D61H) OR
+        (0E01H <= ch) & (ch <= 0E2EH) OR (ch = 0E30H) OR
+        (0E32H <= ch) & (ch <= 0E33H) OR (0E40H <= ch) & (ch <= 0E45H) OR
+        (0E81H <= ch) & (ch <= 0E82H) OR (ch = 0E84H) OR
+        (0E87H <= ch) & (ch <= 0E88H) OR (ch = 0E8AH) OR (ch = 0E8DH) OR
+        (0E94H <= ch) & (ch <= 0E97H) OR (0E99H <= ch) & (ch <= 0E9FH) OR
+        (0EA1H <= ch) & (ch <= 0EA3H) OR (ch = 0EA5H) OR (ch = 0EA7H) OR
+        (0EAAH <= ch) & (ch <= 0EABH) OR (0EADH <= ch) & (ch <= 0EAEH) OR
+        (ch = 0EB0H) OR (0EB2H <= ch) & (ch <= 0EB3H) OR (ch = 0EBDH) OR
+        (0EC0H <= ch) & (ch <= 0EC4H) OR (0F40H <= ch) & (ch <= 0F47H) OR
+        (0F49H <= ch) & (ch <= 0F69H)
+    ELSIF (ch < 1400H) THEN
+      RETURN (10A0H <= ch) & (ch <= 10C5H) OR (10D0H <= ch) & (ch <= 10F6H) OR
+        (ch = 1100H) OR (1102H <= ch) & (ch <= 1103H) OR
+        (1105H <= ch) & (ch <= 1107H) OR (ch = 1109H) OR
+        (110BH <= ch) & (ch <= 110CH) OR (110EH <= ch) & (ch <= 1112H) OR
+        (ch = 113CH) OR (ch = 113EH) OR (ch = 1140H) OR (ch = 114CH) OR
+        (ch = 114EH) OR (ch = 1150H) OR (1154H <= ch) & (ch <= 1155H) OR
+        (ch = 1159H) OR (115FH <= ch) & (ch <= 1161H) OR
+        (ch = 1163H) OR (ch = 1165H) OR (ch = 1167H) OR (ch = 1169H) OR
+        (116DH <= ch) & (ch <= 116EH) OR (1172H <= ch) & (ch <= 1173H) OR
+        (ch = 1175H) OR (ch = 119EH) OR (ch = 11A8H) OR (ch = 11ABH) OR
+        (11AEH <= ch) & (ch <= 11AFH) OR (11B7H <= ch) & (ch <= 11B8H) OR
+        (ch = 11BAH) OR (11BCH <= ch) & (ch <= 11C2H) OR
+        (ch = 11EBH) OR (ch = 11F0H) OR (ch = 11F9H)
     ELSE
-      CASE ch OF
-      | 1E00X .. 1E9BX, 1EA0X .. 1EF9X, 1F00X .. 1F15X, 1F18X .. 1F1DX, 
-        1F20X .. 1F45X, 1F48X .. 1F4DX, 1F50X .. 1F57X, 1F59X, 1F5BX, 1F5DX, 
-        1F5FX .. 1F7DX, 1F80X .. 1FB4X, 1FB6X .. 1FBCX, 1FBEX, 1FC2X .. 1FC4X, 
-        1FC6X .. 1FCCX, 1FD0X .. 1FD3X, 1FD6X .. 1FDBX, 1FE0X .. 1FECX, 
-        1FF2X .. 1FF4X, 1FF6X .. 1FFCX, 2126X, 212AX .. 212BX, 212EX, 
-        2180X .. 2182X, 3041X .. 3094X, 30A1X .. 30FAX, 3105X .. 312CX, 
-        0AC00X .. 0D7A3X:
-        RETURN TRUE
-      ELSE
-        RETURN FALSE
-      END
+      RETURN (1E00H <= ch) & (ch <= 1E9BH) OR (1EA0H <= ch) & (ch <= 1EF9H) OR
+        (1F00H <= ch) & (ch <= 1F15H) OR (1F18H <= ch) & (ch <= 1F1DH) OR
+        (1F20H <= ch) & (ch <= 1F45H) OR (1F48H <= ch) & (ch <= 1F4DH) OR
+        (1F50H <= ch) & (ch <= 1F57H) OR (ch = 1F59H) OR (ch = 1F5BH) OR
+        (ch = 1F5DH) OR (1F5FH <= ch) & (ch <= 1F7DH) OR
+        (1F80H <= ch) & (ch <= 1FB4H) OR (1FB6H <= ch) & (ch <= 1FBCH) OR
+        (ch = 1FBEH) OR (1FC2H <= ch) & (ch <= 1FC4H) OR
+        (1FC6H <= ch) & (ch <= 1FCCH) OR (1FD0H <= ch) & (ch <= 1FD3H) OR
+        (1FD6H <= ch) & (ch <= 1FDBH) OR (1FE0H <= ch) & (ch <= 1FECH) OR
+        (1FF2H <= ch) & (ch <= 1FF4H) OR (1FF6H <= ch) & (ch <= 1FFCH) OR
+        (ch = 2126H) OR (212AH <= ch) & (ch <= 212BH) OR (ch = 212EH) OR
+        (2180H <= ch) & (ch <= 2182H) OR (3041H <= ch) & (ch <= 3094H) OR
+        (30A1H <= ch) & (ch <= 30FAH) OR (3105H <= ch) & (ch <= 312CH) OR
+        (0AC00H <= ch) & (ch <= 0D7A3H)
     END
   END IsBaseChar;
 
 PROCEDURE IsIdeographic (ch: Buffer.Char): BOOLEAN;
   BEGIN
-    RETURN (4E00X <= ch) & (ch <= 9FA5X) OR
-           (ch = 3007X) OR
-           (3021X <= ch ) & (ch <= 3029X)
+    RETURN (4E00H <= ch) & (ch <= 9FA5H) OR
+           (ch = 3007H) OR
+           (3021H <= ch ) & (ch <= 3029H)
   END IsIdeographic;
 
 PROCEDURE IsCombiningChar (ch: Buffer.Char): BOOLEAN;
   BEGIN
-    IF (ch < 0300X) THEN
+    IF (ch < 0300H) THEN
       RETURN FALSE
-    ELSIF (ch < 0A00X) THEN
-      CASE ch OF
-      | 0300X .. 0345X, 0360X .. 0361X, 0483X .. 0486X, 0591X .. 05A1X, 
-        05A3X .. 05B9X, 05BBX .. 05BDX, 05BFX, 05C1X .. 05C2X, 05C4X, 
-        064BX .. 0652X, 0670X, 06D6X .. 06DCX, 06DDX .. 06DFX, 
-        06E0X .. 06E4X, 06E7X .. 06E8X, 06EAX .. 06EDX, 0901X .. 0903X, 093CX, 
-        093EX .. 094CX, 094DX, 0951X .. 0954X, 0962X .. 0963X, 0981X .. 0983X, 
-        09BCX, 09BEX, 09BFX, 09C0X .. 09C4X, 09C7X .. 09C8X, 09CBX .. 09CDX, 
-        09D7X, 09E2X .. 09E3X:
-        RETURN TRUE
-      ELSE
-        RETURN FALSE
-      END
-    ELSIF (ch < 0D00X) THEN
-      CASE ch OF
-      | 0A02X, 0A3CX, 0A3EX, 0A3FX, 0A40X .. 0A42X, 0A47X .. 0A48X, 
-        0A4BX .. 0A4DX, 0A70X .. 0A71X, 0A81X .. 0A83X, 0ABCX, 0ABEX .. 0AC5X, 
-        0AC7X .. 0AC9X, 0ACBX .. 0ACDX, 0B01X .. 0B03X, 0B3CX, 0B3EX .. 0B43X, 
-        0B47X .. 0B48X, 0B4BX .. 0B4DX, 0B56X .. 0B57X, 0B82X .. 0B83X, 
-        0BBEX .. 0BC2X, 0BC6X .. 0BC8X, 0BCAX .. 0BCDX, 0BD7X, 0C01X .. 0C03X, 
-        0C3EX .. 0C44X, 0C46X .. 0C48X, 0C4AX .. 0C4DX, 0C55X .. 0C56X, 
-        0C82X .. 0C83X, 0CBEX .. 0CC4X, 0CC6X .. 0CC8X, 0CCAX .. 0CCDX, 
-        0CD5X .. 0CD6X:
-        RETURN TRUE
-      ELSE
-        RETURN FALSE
-      END
-    ELSIF (ch < 1000X) THEN
-      CASE ch OF
-      | 0D02X .. 0D03X, 0D3EX .. 0D43X, 0D46X .. 0D48X, 0D4AX .. 0D4DX, 0D57X, 
-        0E31X, 0E34X .. 0E3AX, 0E47X .. 0E4EX, 0EB1X, 0EB4X .. 0EB9X, 
-        0EBBX .. 0EBCX, 0EC8X .. 0ECDX, 0F18X .. 0F19X, 0F35X, 0F37X, 0F39X, 
-        0F3EX, 0F3FX, 0F71X .. 0F84X, 0F86X .. 0F8BX, 0F90X .. 0F95X, 0F97X, 
-        0F99X .. 0FADX, 0FB1X .. 0FB7X, 0FB9X:
-        RETURN TRUE
-      ELSE
-        RETURN FALSE
-      END
-    ELSIF (ch < 2000X) THEN
+    ELSIF (ch < 0A00H) THEN
+      RETURN (0300H <= ch) & (ch <= 0345H) OR (0360H <= ch) & (ch <= 0361H) OR
+        (0483H <= ch) & (ch <= 0486H) OR (0591H <= ch) & (ch <= 05A1H) OR
+        (05A3H <= ch) & (ch <= 05B9H) OR (05BBH <= ch) & (ch <= 05BDH) OR
+        (ch = 05BFH) OR (05C1H <= ch) & (ch <= 05C2H) OR (ch = 05C4H) OR
+        (064BH <= ch) & (ch <= 0652H) OR (ch = 0670H) OR
+        (06D6H <= ch) & (ch <= 06DCH) OR (06DDH <= ch) & (ch <= 06DFH) OR
+        (06E0H <= ch) & (ch <= 06E4H) OR (06E7H <= ch) & (ch <= 06E8H) OR
+        (06EAH <= ch) & (ch <= 06EDH) OR (0901H <= ch) & (ch <= 0903H) OR
+        (ch = 093CH) OR (093EH <= ch) & (ch <= 094CH) OR (ch = 094DH) OR
+        (0951H <= ch) & (ch <= 0954H) OR (0962H <= ch) & (ch <= 0963H) OR
+        (0981H <= ch) & (ch <= 0983H) OR (ch = 09BCH) OR (ch = 09BEH) OR
+        (ch = 09BFH) OR (09C0H <= ch) & (ch <= 09C4H) OR
+        (09C7H <= ch) & (ch <= 09C8H) OR (09CBH <= ch) & (ch <= 09CDH) OR
+        (ch = 09D7H) OR (09E2H <= ch) & (ch <= 09E3H)
+    ELSIF (ch < 0D00H) THEN
+      RETURN (ch = 0A02H) OR (ch = 0A3CH) OR (ch = 0A3EH) OR (ch = 0A3FH) OR
+        (0A40H <= ch) & (ch <= 0A42H) OR (0A47H <= ch) & (ch <= 0A48H) OR
+        (0A4BH <= ch) & (ch <= 0A4DH) OR (0A70H <= ch) & (ch <= 0A71H) OR
+        (0A81H <= ch) & (ch <= 0A83H) OR (ch = 0ABCH) OR
+        (0ABEH <= ch) & (ch <= 0AC5H) OR (0AC7H <= ch) & (ch <= 0AC9H) OR
+        (0ACBH <= ch) & (ch <= 0ACDH) OR (0B01H <= ch) & (ch <= 0B03H) OR
+        (ch = 0B3CH) OR (0B3EH <= ch) & (ch <= 0B43H) OR
+        (0B47H <= ch) & (ch <= 0B48H) OR (0B4BH <= ch) & (ch <= 0B4DH) OR
+        (0B56H <= ch) & (ch <= 0B57H) OR (0B82H <= ch) & (ch <= 0B83H) OR
+        (0BBEH <= ch) & (ch <= 0BC2H) OR (0BC6H <= ch) & (ch <= 0BC8H) OR
+        (0BCAH <= ch) & (ch <= 0BCDH) OR (ch = 0BD7H) OR
+        (0C01H <= ch) & (ch <= 0C03H) OR (0C3EH <= ch) & (ch <= 0C44H) OR
+        (0C46H <= ch) & (ch <= 0C48H) OR (0C4AH <= ch) & (ch <= 0C4DH) OR
+        (0C55H <= ch) & (ch <= 0C56H) OR (0C82H <= ch) & (ch <= 0C83H) OR
+        (0CBEH <= ch) & (ch <= 0CC4H) OR (0CC6H <= ch) & (ch <= 0CC8H) OR
+        (0CCAH <= ch) & (ch <= 0CCDH) OR (0CD5H <= ch) & (ch <= 0CD6H)
+    ELSIF (ch < 1000H) THEN
+      RETURN (0D02H <= ch) & (ch <= 0D03H) OR (0D3EH <= ch) & (ch <= 0D43H) OR
+        (0D46H <= ch) & (ch <= 0D48H) OR (0D4AH <= ch) & (ch <= 0D4DH) OR
+        (ch = 0D57H) OR (ch = 0E31H) OR (0E34H <= ch) & (ch <= 0E3AH) OR
+        (0E47H <= ch) & (ch <= 0E4EH) OR (ch = 0EB1H) OR
+        (0EB4H <= ch) & (ch <= 0EB9H) OR (0EBBH <= ch) & (ch <= 0EBCH) OR
+        (0EC8H <= ch) & (ch <= 0ECDH) OR (0F18H <= ch) & (ch <= 0F19H) OR
+        (ch = 0F35H) OR (ch = 0F37H) OR (ch = 0F39H) OR
+        (ch = 0F3EH) OR (ch = 0F3FH) OR (0F71H <= ch) & (ch <= 0F84H) OR
+        (0F86H <= ch) & (ch <= 0F8BH) OR (0F90H <= ch) & (ch <= 0F95H) OR
+        (ch = 0F97H) OR (0F99H <= ch) & (ch <= 0FADH) OR
+        (0FB1H <= ch) & (ch <= 0FB7H) OR (ch = 0FB9H)
+    ELSIF (ch < 2000H) THEN
       RETURN FALSE
     ELSE
-      CASE ch OF
-      | 20D0X .. 20DCX, 20E1X, 302AX .. 302FX, 3099X, 309AX:
-        RETURN TRUE
-      ELSE
-        RETURN FALSE
-      END
+      RETURN (20D0H <= ch) & (ch <= 20DCH) OR (ch = 20E1H) OR
+        (302AH <= ch) & (ch <= 302FH) OR (ch = 3099H) OR (ch = 309AH)
     END
   END IsCombiningChar;
 
 PROCEDURE IsExtender (ch: Buffer.Char): BOOLEAN;
   BEGIN
-    IF (ch = 00B7X) THEN
+    IF (ch = 00B7H) THEN
       RETURN TRUE
-    ELSIF (ch >= 02D0X) THEN
-      CASE ch OF
-      | 02D0X, 02D1X, 0387X, 0640X, 0E46X, 0EC6X, 3005X, 3031X .. 3035X, 
-        309DX .. 309EX, 30FCX .. 30FEX:
-        RETURN TRUE
-      ELSE
-        RETURN FALSE
-      END
+    ELSIF (ch >= 02D0H) THEN
+      RETURN (ch = 02D0H) OR (ch = 02D1H) OR (ch = 0387H) OR (ch = 0640H) OR
+        (ch = 0E46H) OR (ch = 0EC6H) OR (ch = 3005H) OR
+        (3031H <= ch) & (ch <= 3035H) OR (309DH <= ch) & (ch <= 309EH) OR
+        (30FCH <= ch) & (ch <= 30FEH)
     ELSE
       RETURN FALSE
     END
@@ -462,46 +479,64 @@ PROCEDURE IsLetter (ch: Buffer.Char): BOOLEAN;
 PROCEDURE IsNameChar* (ch: Buffer.Char): BOOLEAN;
   BEGIN
     RETURN IsLetter (ch) OR IsDigit (ch) OR
-           (ch = ".") OR (ch = "-") OR (ch = "_") OR (ch = ":") OR
+           (ch = 46) OR (ch = 45) OR (ch = 95) OR (ch = 58) OR
            IsCombiningChar (ch) OR IsExtender (ch)
   END IsNameChar;
 
 PROCEDURE IsNameChar0* (ch: Buffer.Char): BOOLEAN;
   BEGIN
-    RETURN IsLetter (ch) OR (ch = "_") OR (ch = ":")
+    RETURN IsLetter (ch) OR (ch = 95) OR (ch = 58)
   END IsNameChar0;
+
+PROCEDURE UpperASCII (ch: Buffer.Char): Buffer.Char;
+  BEGIN
+    IF (ORD ("a") <= ch) & (ch <= ORD ("z")) THEN
+      RETURN ch-32
+    ELSE
+      RETURN ch
+    END
+  END UpperASCII;
+
+PROCEDURE DispatchChar (ch: Buffer.Char): LONGINT;
+(* Keeps end markers next to ASCII labels within VOC's CASE range limit. *)
+  BEGIN
+    IF ch = Buffer.markerEOB THEN RETURN caseEOB
+    ELSIF ch = Buffer.markerEOD THEN RETURN caseEOD
+    ELSE RETURN ch
+    END
+  END DispatchChar;
 
 PROCEDURE IsPubidChar (ch: Buffer.Char): BOOLEAN;
   VAR
     i: LONGINT;
   BEGIN
-    IF ("A" <= CAP (ch)) & (CAP (ch) <= "Z") OR
-       ("0" <= ch) & (ch <= "9") OR
-       (ch = " ") OR (ch = Ascii.cr) OR (ch = Ascii.lf) THEN
+    IF (65 <= UpperASCII (ch)) & (UpperASCII (ch) <= 90) OR
+       (48 <= ch) & (ch <= 57) OR
+       (ch = 32) OR (ch = ORD (Ascii.cr)) OR (ch = ORD (Ascii.lf)) THEN
       RETURN TRUE
     ELSE
       i := 0;
-      WHILE (suplPubidChar[i] # 0X) & (suplPubidChar[i] # ch) DO
+      WHILE (suplPubidChar[i] # 0) & (suplPubidChar[i] # ch) DO
         INC (i)
       END;
-      RETURN (suplPubidChar[i] # 0X)
+      RETURN (suplPubidChar[i] # 0)
     END
   END IsPubidChar;
 
 PROCEDURE IsVersionNumChar (ch: Buffer.Char): BOOLEAN;
   BEGIN
-    RETURN ("A" <= CAP (ch)) & (CAP (ch) <= "Z") OR
-           ("0" <= ch) & (ch <= "9") OR
-           (ch = "_") OR (ch = ".") OR (ch = ":") OR (ch = "-")
+    RETURN (65 <= UpperASCII (ch)) & (UpperASCII (ch) <= 90) OR
+           (48 <= ch) & (ch <= 57) OR
+           (ch = 95) OR (ch = 46) OR (ch = 58) OR (ch = 45)
   END IsVersionNumChar;
 
 PROCEDURE IsEncNameChar (ch: Buffer.Char; first: BOOLEAN): BOOLEAN;
   BEGIN
-    IF ("A" <= CAP (ch)) & (CAP (ch) <= "Z") THEN
+    IF (65 <= UpperASCII (ch)) & (UpperASCII (ch) <= 90) THEN
       RETURN TRUE
     ELSIF ~first THEN
-      RETURN ("0" <= ch) & (ch <= "9") OR
-             (ch = ".") OR (ch = "_") OR (ch = "-")
+      RETURN (48 <= ch) & (ch <= 57) OR
+             (ch = 46) OR (ch = 95) OR (ch = 45)
     ELSE
       RETURN FALSE
     END
@@ -671,10 +706,10 @@ PROCEDURE (p: Parser) ParseDocument*;
       Out.Ln; Out.String ("### buffer contents "); 
       Out.String (msg); Out.String (" ###"); Out.Ln;
       WHILE (chars[i] < Buffer.markerEOB) & (i <= end) DO
-        IF (chars[i] > 0FFX) THEN
+        IF (chars[i] > 0FFH) THEN
           Out.Char("?")
         ELSE
-          Out.Char(SHORT (chars[i]))
+          Out.Char(CHR (chars[i]))
         END;
         INC (i)
       END;
@@ -721,7 +756,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         string[i] := chars[start];
         INC (start); INC (i)
       END;
-      string[i] := 0X;
+      string[i] := 0;
       RETURN string
     END GetString;
   
@@ -756,7 +791,11 @@ PROCEDURE (p: Parser) ParseDocument*;
     BEGIN
       IF (p. in. codec. invalidChars # 0) THEN
         Err (invalidCharacterEncodings);
-        p. fileEntity. baseURI. GetString (str);
+        IF p. fileEntity. baseURI # NIL THEN
+          p. fileEntity. baseURI. GetString (str)
+        ELSE
+          str := "<input>"
+        END;
         p. lastError. SetStringAttrib ("uri", Msg.GetStringPtr (str));
         p. lastError. SetIntAttrib ("encodings", p. in. codec. invalidChars)
       END
@@ -777,9 +816,9 @@ PROCEDURE (p: Parser) ParseDocument*;
         i := 0; delta := 0;
         WHILE (i # len) DO
           CASE in. chars[i] OF
-          | Ascii.cr:
-            in. chars[i-delta] := Ascii.lf;
-            IF (in. chars[i+1] = Ascii.lf) THEN
+          | ORD (Ascii.cr):
+            in. chars[i-delta] := ORD (Ascii.lf);
+            IF (in. chars[i+1] = ORD (Ascii.lf)) THEN
               INC (i); INC (delta)
             END
           ELSE
@@ -869,7 +908,7 @@ PROCEDURE (p: Parser) ParseDocument*;
              a whitespace character, and at the same tim `LookingAt' will not
              fall out of an expanded entity reference *)
           IF (p. currEntityValue = NIL) THEN
-            chars[LEN (chars^)-2] := " ";
+            chars[LEN (chars^)-2] := 32;
             IF syncEntity THEN
               chars[LEN (chars^)-1] := Buffer.markerEOD
             ELSE
@@ -941,7 +980,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         (* fix up end of entity by removing the space that was added there
            by PushEntity *)
         IF (p. currEntityValue = NIL) THEN
-          ASSERT (chars[LEN (chars^)-2] = " ");
+          ASSERT (chars[LEN (chars^)-2] = 32);
           chars[LEN (chars^)-2] := Buffer.markerEOB;
         END;
         
@@ -992,10 +1031,10 @@ PROCEDURE (p: Parser) ParseDocument*;
   PROCEDURE LookingAtS(): BOOLEAN;
   (* pre: chars[cpos] is valid *)
     BEGIN
-      IF (chars[cpos] <= " ") THEN
+      IF (chars[cpos] <= 32) THEN
         RETURN TRUE
       ELSIF (p. inExternalSubset OR p. inExternalEntity) &
-            (chars[cpos] = "%") THEN
+            (chars[cpos] = 37) THEN
        IF (chars[cpos+1] = Buffer.markerEOB) THEN
          IF (chars = p. in. chars) THEN
            (* we aren't within an internal entity value *)
@@ -1017,7 +1056,7 @@ PROCEDURE (p: Parser) ParseDocument*;
   PROCEDURE LookingAtSnoPE(): BOOLEAN;
   (* pre: chars[cpos] is valid *)
     BEGIN
-      RETURN (chars[cpos] <= " ")
+      RETURN (chars[cpos] <= 32)
     END LookingAtSnoPE;
   
   (* ---------------------------------------------------------------------- *)
@@ -1055,7 +1094,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           | followedByAny:
             RETURN TRUE
           END
-        ELSIF (str[i] = chars[cpos]) THEN
+        ELSIF (ORD (str[i]) = chars[cpos]) THEN
           INC (i); INC (cpos)
         ELSE
           DEC (cpos, i);
@@ -1082,7 +1121,7 @@ PROCEDURE (p: Parser) ParseDocument*;
     BEGIN
       IF IsNameChar (chars[cpos]) THEN
         cstart := cpos;
-        IF (chars[cpos] = ":") THEN
+        IF (chars[cpos] = 58) THEN
           (* colon at beginning of name *)
           colon := cpos;
           IF checkForQName THEN
@@ -1105,7 +1144,7 @@ PROCEDURE (p: Parser) ParseDocument*;
             ELSE
               NextBlock
             END
-          ELSIF (chars[cpos] = ":") & checkForQName THEN
+          ELSIF (chars[cpos] = 58) & checkForQName THEN
             IF noColon THEN              (* no colon allowed in NCName *)
               Err (invalidNCName)
             ELSIF (colon >= 0) THEN      (* multiple colons *)
@@ -1120,7 +1159,7 @@ PROCEDURE (p: Parser) ParseDocument*;
             EXIT
           END
         END;
-        IF checkForQName & (string[LEN (string^)-2] = ":") THEN
+        IF checkForQName & (string[LEN (string^)-2] = 58) THEN
           (* colon is last character in name *)
           Err (invalidQName)
         END;
@@ -1144,7 +1183,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       END
     END Name;
   
-  PROCEDURE CheckChar (ch: CHAR);
+  PROCEDURE CheckChar (ch: DTD.Char);
   (* Compare the current character with @oparam{ch}, and report an error if
      they don't match.  *)
     VAR
@@ -1153,7 +1192,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       IF (chars[cpos] # ch) THEN
         Err (expectedChar);
         str := "X";
-        str[0] := ch;
+        str[0] := CHR (ch);
         p. lastError. SetStringAttrib ("symbol", Msg.GetStringPtr (str))
       END;
       IF (chars[cpos] # Buffer.markerEOD) THEN
@@ -1188,11 +1227,11 @@ PROCEDURE (p: Parser) ParseDocument*;
          (~p. inExternalSubset & ~p. inExternalEntity) THEN
         Err (nonMarkupDeclPERef)
       END;
-      CheckChar ("%");
+      CheckChar (37);
       oldCStart := cstart+p. in. offsetFromPos0;
       name := Name (TRUE);
       cstart := oldCStart-p. in. offsetFromPos0;
-      CheckChar (";");
+      CheckChar (59);
       decl := dtd. peNamespace. Get (name);
       IF (decl = NIL) THEN  (* FIXME... the WFC/VC rules are quite hairy *)
         IF p. validating OR
@@ -1256,25 +1295,25 @@ PROCEDURE (p: Parser) ParseDocument*;
      set to TRUE.  *)
     BEGIN
       LOOP
-        CASE chars[cpos] OF
-        | Buffer.markerEOB:
+        CASE DispatchChar (chars[cpos]) OF
+        | caseEOB:
           NextBlock
-        | " ":
+        | 32:
           INC (cpos)
-        | Ascii.lf:
+        | ORD (Ascii.lf):
           INC (cpos); EndOfLine
-        | Ascii.cr:
+        | ORD (Ascii.cr):
           INC (cpos);
           IF (chars[cpos] = Buffer.markerEOB) THEN
             NextBlock
           END;
-          IF (chars[cpos] = Ascii.lf) THEN
+          IF (chars[cpos] = ORD (Ascii.lf)) THEN
             INC (cpos)
           END;
           EndOfLine
-        | Ascii.ht:
+        | ORD (Ascii.ht):
           Tab; INC (cpos)
-        | "%":
+        | 37:
           IF ~noPE THEN
             PEReference (FALSE);
             OptS (noPE)
@@ -1282,7 +1321,7 @@ PROCEDURE (p: Parser) ParseDocument*;
             EXIT
           END
         ELSE
-          IF (chars[cpos] < " ") THEN
+          IF (chars[cpos] < 32) THEN
             Err (invalidChar);
             INC (cpos)
           ELSE
@@ -1328,14 +1367,14 @@ PROCEDURE (p: Parser) ParseDocument*;
     VAR
       cend: DTD.CharPos;
     BEGIN
-      ASSERT ((chars[cpos] < " ") OR (chars[cpos] = Buffer.markerEOB));
+      ASSERT ((chars[cpos] < 32) OR (chars[cpos] = Buffer.markerEOB));
       cend := cpos-cdelta;
-      CASE chars[cpos] OF
-      | Buffer.markerEOB:
+      CASE DispatchChar (chars[cpos]) OF
+      | caseEOB:
         NextBlock
-      | " ":
-        chars[cend] := " "; INC (cpos)
-      | Ascii.lf:
+      | 32:
+        chars[cend] := 32; INC (cpos)
+      | ORD (Ascii.lf):
         IF (chars = p. in. chars) THEN
           chars[cend] := eolReplacement; INC (cpos); EndOfLine
         ELSE
@@ -1343,14 +1382,14 @@ PROCEDURE (p: Parser) ParseDocument*;
              see E86 for more information *)
           chars[cend] := chars[cpos]; INC (cpos)
         END
-      | Ascii.cr:
+      | ORD (Ascii.cr):
         IF (chars = p. in. chars) THEN
           chars[cend] := eolReplacement;
           INC (cpos);
           IF (chars[cpos] = Buffer.markerEOB) THEN
             NextBlock
           END;
-          IF (chars[cpos] = Ascii.lf) THEN
+          IF (chars[cpos] = ORD (Ascii.lf)) THEN
             INC (cpos); INC (cdelta)
           END;
           EndOfLine
@@ -1359,11 +1398,11 @@ PROCEDURE (p: Parser) ParseDocument*;
              see E86 for more information *)
           chars[cend] := chars[cpos]; INC (cpos)
         END
-      | Ascii.ht:
-        IF (eolReplacement = " ") THEN
-          chars[cend] := " "
+      | ORD (Ascii.ht):
+        IF (eolReplacement = 32) THEN
+          chars[cend] := 32
         ELSE
-          chars[cend] := Ascii.ht
+          chars[cend] := ORD (Ascii.ht)
         END;
         Tab; INC (cpos)
       ELSE
@@ -1388,15 +1427,15 @@ PROCEDURE (p: Parser) ParseDocument*;
         i, delta: LONGINT;
       BEGIN
         (* strip leading whitespace *)
-        WHILE (cstart # cpos-cdelta) & (chars[cstart] <= " ") DO
+        WHILE (cstart # cpos-cdelta) & (chars[cstart] <= 32) DO
           INC (cstart)
         END;
         i := cstart; delta := 0;
         WHILE (i # cpos-cdelta) DO
-          IF (chars[i] <= " ") THEN
+          IF (chars[i] <= 32) THEN
             (* fold sequence of whitespace into single space *)
-            chars[i-delta] := " ";
-            WHILE (i+1 # cpos-cdelta) & (chars[i+1] <= " ") DO
+            chars[i-delta] := 32;
+            WHILE (i+1 # cpos-cdelta) & (chars[i+1] <= 32) DO
               INC (i); INC (delta)
             END
           ELSE
@@ -1406,25 +1445,25 @@ PROCEDURE (p: Parser) ParseDocument*;
         END;
         (* strip space character from end of string (can only be one) *)
         INC (cdelta, delta);
-        IF (cpos-cdelta # cstart) & (chars[cpos-cdelta-1] = " ") THEN
+        IF (cpos-cdelta # cstart) & (chars[cpos-cdelta-1] = 32) THEN
           INC (cdelta)
         END
       END NormalizeWhitespace;
     
     BEGIN
-      IF (chars[cpos] = "'") OR (chars[cpos] = '"') THEN
+      IF (chars[cpos] = 39) OR (chars[cpos] = 34) THEN
         StorePosition (pos);
         endChar := chars[cpos];
         INC (cpos);
         cstart := cpos; cdelta := 0;
         LOOP
-          CASE chars[cpos] OF
-          | 00X..1FX, Buffer.markerEOB:
-            IF (type = stringPubidLiteral) & (chars[cpos] = Ascii.ht) THEN
+          CASE DispatchChar (chars[cpos]) OF
+          | 00H..1FH, caseEOB:
+            IF (type = stringPubidLiteral) & (chars[cpos] = ORD (Ascii.ht)) THEN
               Err (invalidPubidChar)
             END;
-            ControlChar (Ascii.lf)
-          | Buffer.markerEOD:
+            ControlChar (ORD (Ascii.lf))
+          | caseEOD:
             ErrPos (stringNotClosed, pos);
             RETURN GetString (cstart, cpos-cdelta)
           ELSE
@@ -1433,15 +1472,15 @@ PROCEDURE (p: Parser) ParseDocument*;
                 NormalizeWhitespace
               END;
               string := GetString (cstart, cpos-cdelta);
-              CheckChar (SHORT (endChar));
+              CheckChar (endChar);
               
               CASE type OF
               | stringStandalone:
-                IF (string^ # "yes") & (string^ # "no") THEN
+                IF (~LongStrings.Equal8 (string^, "yes")) & (~LongStrings.Equal8 (string^, "no")) THEN
                   ErrPos (expectedYesNo, pos)
                 END
               | stringEncoding, stringVersion:
-                IF (string^ = "") THEN
+                IF (string[0] = 0) THEN
                   ErrPos (expectedNonEmptyString, pos)
                 END
               ELSE (* ignore *)
@@ -1477,7 +1516,7 @@ PROCEDURE (p: Parser) ParseDocument*;
   PROCEDURE Eq;
   (* post: chars[cpos] # Buffer.markerEOB *)
     BEGIN
-      OptS (TRUE); CheckChar ("="); OptS (TRUE)
+      OptS (TRUE); CheckChar (61); OptS (TRUE)
     END Eq;
   
   PROCEDURE XMLDecl (entity: DTD.ExternalEntity);
@@ -1491,12 +1530,12 @@ PROCEDURE (p: Parser) ParseDocument*;
       ASSERT (cpos = 0);
       ASSERT (entity # NIL);
       INC (cpos, 5);                   (* skip over "<?xml" *)
-      IF (chars[cpos] # "?") THEN S END;
+      IF (chars[cpos] # 63) THEN S END;
       IF LookingAt ("version", followedByNonName) THEN
         INC (cpos, 7);                 (* skip over "version" *)
         Eq;
         entity. SetVersion (String (stringVersion));
-        IF (chars[cpos] # "?") THEN S END
+        IF (chars[cpos] # 63) THEN S END
       ELSIF (entity. type = DTD.entityDocument) THEN
         Err (expectedVersion)
       END;
@@ -1510,10 +1549,10 @@ PROCEDURE (p: Parser) ParseDocument*;
              detection, then install a new codec and parse XMLDecl again *)
           NEW (encoding, LongStrings.Length (string^)+1);
           FOR i := 0 TO LEN (encoding^)-1 DO
-            IF (string[i] > MAX (CHAR)) THEN
+            IF (string[i] > ORD (MAX (CHAR))) THEN
               encoding[i] := "?"
             ELSE
-              encoding[i] := SHORT (string[i])
+              encoding[i] := CHR (string[i])
             END
           END;
           codecFactory := Codec.GetFactory (encoding^);
@@ -1528,7 +1567,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         END;
         
         entity. SetEncoding (string);
-        IF (chars[cpos] # "?") THEN S END
+        IF (chars[cpos] # 63) THEN S END
       ELSIF (entity. type # DTD.entityDocument) THEN
         Err (expectedEncodingDecl)
       END;
@@ -1537,7 +1576,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         INC (cpos, 10);              (* skip over "standalone" *)
         Eq;
         string := String (stringStandalone);
-        IF (string^ = "yes") THEN
+        IF LongStrings.Equal8 (string^, "yes") THEN
           entity. SetStandalone (DTD.standaloneYes)
         ELSE
           entity. SetStandalone (DTD.standaloneNo)
@@ -1579,9 +1618,9 @@ PROCEDURE (p: Parser) ParseDocument*;
     
     PROCEDURE IsReserved (name: ARRAY OF DTD.Char): BOOLEAN;
       BEGIN
-        RETURN (CAP (name[0]) = "X") &
-               (CAP (name[1]) = "M") &
-               (CAP (name[2]) = "L")
+        RETURN (UpperASCII (name[0]) = 88) &
+               (UpperASCII (name[1]) = 77) &
+               (UpperASCII (name[2]) = 76)
       END IsReserved;
     
     BEGIN
@@ -1589,7 +1628,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       currentEntity := CurrentEntity();
       INC (cpos, 2);                     (* skip over "<?" *)
       target := Name (TRUE);
-      IF (target^ = "xml") THEN
+      IF LongStrings.Equal8 (target^, "xml") THEN
         ErrPos (xmlDeclNotAtBeginning, p. l^)
       ELSIF IsReserved (target^) THEN
         ErrPos (reservedPITarget, p. l^)
@@ -1603,13 +1642,13 @@ PROCEDURE (p: Parser) ParseDocument*;
         S;
         cstart := cpos; cdelta := 0;
         LOOP
-          CASE chars[cpos] OF
-          | 00X..1FX, Buffer.markerEOB:
-            ControlChar (Ascii.lf)
-          | Buffer.markerEOD:
+          CASE DispatchChar (chars[cpos]) OF
+          | 00H..1FH, caseEOB:
+            ControlChar (ORD (Ascii.lf))
+          | caseEOD:
             ErrPos (piNotClosed, p. l^);
             EXIT
-          | "?":
+          | 63:
             IF LookingAt ("?>", followedByAny) THEN
               CheckCurrentEntity (currentEntity);
               p. builder. ProcessingInstruction (target, chars^, (* callback *)
@@ -1637,13 +1676,13 @@ PROCEDURE (p: Parser) ParseDocument*;
       INC (cpos, 4);                     (* skip over "<!--" *)
       cstart := cpos; cdelta := 0;
       LOOP
-        CASE chars[cpos] OF
-        | 00X..1FX, Buffer.markerEOB:
-          ControlChar (Ascii.lf)
-        | Buffer.markerEOD:
+        CASE DispatchChar (chars[cpos]) OF
+        | 00H..1FH, caseEOB:
+          ControlChar (ORD (Ascii.lf))
+        | caseEOD:
           ErrPos (commentNotClosed, p. l^);
           EXIT
-        | "-":
+        | 45:
           IF LookingAt ("-->", followedByAny) THEN
             CheckCurrentEntity (currentEntity);
             p. builder. Comment (chars^, cstart, cpos-cdelta); (* callback *)
@@ -1668,13 +1707,13 @@ PROCEDURE (p: Parser) ParseDocument*;
       INC (cpos, 9);                     (* skip over "<![CDATA[" *)
       cstart := cpos; cdelta := 0;
       LOOP
-        CASE chars[cpos] OF
-        | 00X..1FX, Buffer.markerEOB:
-          ControlChar (Ascii.lf)
-        | Buffer.markerEOD:
+        CASE DispatchChar (chars[cpos]) OF
+        | 00H..1FH, caseEOB:
+          ControlChar (ORD (Ascii.lf))
+        | caseEOD:
           ErrPos (cdataNotClosed, p. l^);
           EXIT
-        | "]":
+        | 93:
           IF LookingAt ("]]>", followedByAny) THEN
             DecLength (p. l^, -9);
             p. builder. Characters (chars^, cstart, cpos-cdelta, (* callback *)
@@ -1709,12 +1748,12 @@ PROCEDURE (p: Parser) ParseDocument*;
     PROCEDURE ToUnicode (cval: LONGINT): DTD.CharPos;
       BEGIN
         IF (cval <= 0FFFFH) THEN
-          chars[cpos-cdelta] := LONGCHR (cval);
+          chars[cpos-cdelta] := cval;
           RETURN 1
         ELSE
           DEC (cval, 10000H);
-          chars[cpos-cdelta] := LONGCHR (0D800H + cval DIV 1024);
-          chars[cpos-cdelta+1] := LONGCHR (0DC00H + cval MOD 1024);
+          chars[cpos-cdelta] := 0D800H + cval DIV 1024;
+          chars[cpos-cdelta+1] := 0DC00H + cval MOD 1024;
           RETURN 2
         END
       END ToUnicode;
@@ -1725,19 +1764,19 @@ PROCEDURE (p: Parser) ParseDocument*;
       IF LookingAt ("&#x", followedByAny) THEN
         INC (cpos, 3); INC (cdelta, 3);
         LOOP
-          CASE chars[cpos] OF
-          | Buffer.markerEOB:
+          CASE DispatchChar (chars[cpos]) OF
+          | caseEOB:
             NextBlock
-          | ";", Buffer.markerEOD:
+          | 59, caseEOD:
             EXIT
-          | "0".."9":
+          | 48..57:
             IF (cval <= overflow) THEN
-              cval := cval*16 + ORD (chars[cpos]) - ORD ("0")
+              cval := cval*16 + chars[cpos] - 48
             END;
             INC (cpos); INC (cdelta)
-          | "a".."f", "A".."F":
+          | 97..102, 65..70:
             IF (cval <= overflow) THEN
-              cval := cval*16 + (ORD (CAP (chars[cpos])) + 10) - ORD ("A")
+              cval := cval*16 + (UpperASCII (chars[cpos]) + 10) - 65
             END;
             INC (cpos); INC (cdelta)
           ELSE
@@ -1747,14 +1786,14 @@ PROCEDURE (p: Parser) ParseDocument*;
       ELSE
         INC (cpos, 2); INC (cdelta, 2);
         LOOP
-          CASE chars[cpos] OF
-          | Buffer.markerEOB:
+          CASE DispatchChar (chars[cpos]) OF
+          | caseEOB:
             NextBlock
-          | ";", Buffer.markerEOD:
+          | 59, caseEOD:
             EXIT
-          | "0".."9":
+          | 48..57:
             IF (cval <= overflow) THEN
-              cval := cval*10 + ORD (chars[cpos]) - ORD ("0")
+              cval := cval*10 + chars[cpos] - 48
             END;
             INC (cpos); INC (cdelta)
           ELSE
@@ -1762,8 +1801,8 @@ PROCEDURE (p: Parser) ParseDocument*;
           END
         END
       END;
-      IF (chars[cpos] = ";") THEN INC (cdelta) END;
-      CheckChar (";");
+      IF (chars[cpos] = 59) THEN INC (cdelta) END;
+      CheckChar (59);
       IF ~IsCharUCS4 (cval) THEN
         ErrPos (invalidCharRef, pos); cval := errorReplacement
       END;
@@ -1782,11 +1821,11 @@ PROCEDURE (p: Parser) ParseDocument*;
       pos: Locator.Position;
     BEGIN
       StorePosition (pos);
-      CheckChar ("&");
+      CheckChar (38);
       localCStart := p. in. offsetFromPos0+cstart;
       name := Name (TRUE);
       cstart := localCStart-p. in. offsetFromPos0;
-      CheckChar (";");
+      CheckChar (59);
       
       decl := dtd. geNamespace. Get (name);
       IF (decl = NIL) THEN
@@ -1829,23 +1868,23 @@ PROCEDURE (p: Parser) ParseDocument*;
     
     BEGIN
       attValue := dtd. NewAttValue();
-      IF (chars[cpos] = "'") OR (chars[cpos] = '"') THEN
+      IF (chars[cpos] = 39) OR (chars[cpos] = 34) THEN
         StorePosition (pos);
         endChar := chars[cpos];
         INC (cpos);
         cstart := cpos; cdelta:= 0;
         LOOP
-          CASE chars[cpos] OF
-          | 00X..1FX, Buffer.markerEOB:
-            ControlChar (" ")
-          | Buffer.markerEOD:
+          CASE DispatchChar (chars[cpos]) OF
+          | 00H..1FH, caseEOB:
+            ControlChar (32)
+          | caseEOD:
             ErrPos (stringNotClosed, pos);
             Flush;
             EXIT
-          | "<":
+          | 60:
             Err (lAngleInAttValue);
-            chars[cpos-cdelta] := " "; INC (cpos)
-          | "&":
+            chars[cpos-cdelta] := 32; INC (cpos)
+          | 38:
             IF LookingAt ("&#", followedByAny) THEN
               (* looking at character reference: replace on the spot *)
               CharRef()
@@ -1860,7 +1899,7 @@ PROCEDURE (p: Parser) ParseDocument*;
                  space; the normalization for such attributes ensures that
                  there is at most one space at the end of the value *)
               Flush;
-              CheckChar (SHORT (endChar));
+              CheckChar (endChar);
               EXIT
             ELSE
               chars[cpos-cdelta] := chars[cpos]; INC (cpos)
@@ -1929,21 +1968,20 @@ PROCEDURE (p: Parser) ParseDocument*;
         attValue := dtd. NewAttValue();
         cstart := cpos;
         LOOP
-          CASE chars[cpos] OF
-          | Buffer.markerEOD:
+          CASE DispatchChar (chars[cpos]) OF
+          | caseEOD:
             Flush;
             EXIT
-          | 00X .. 1FX:
+          | 00H .. 1FH:
             (* the entity value has been cleaned of end of line artifacts or
                 invalid characters; any remaining whitespace must be replaced
                 with " " *)
-            IF (chars[cpos] # Ascii.ht) THEN
-              chars[cpos] := " "
-            END
-          | "<":
+            chars[cpos] := 32;
+            INC (cpos)
+          | 60:
             Err (lAngleInAttValue);
             INC (cpos)
-          | "&":
+          | 38:
             Flush;
             IF LookingAt ("&#", followedByAny) THEN
               (* looking at character reference: replace on the spot *)
@@ -2011,21 +2049,21 @@ PROCEDURE (p: Parser) ParseDocument*;
           (* this is a very specialized version of the loop down below; it
              covers the case where `cdelta' stays zero, which means that
              no characters must be copied *)
-          CASE chars[cpos] OF
-          | 00X..1FX, Buffer.markerEOB:
+          CASE DispatchChar (chars[cpos]) OF
+          | 00H..1FH, caseEOB:
             IF (chars # p. in. chars) THEN
               INC (cpos)
             ELSE
-              ControlChar (Ascii.lf);
+              ControlChar (ORD (Ascii.lf));
               IF (cdelta # 0) THEN
                 EXIT
               END
             END
-          | " ":
+          | 32:
             INC (cpos)
-          | "<", "&", Buffer.markerEOD:
+          | 60, 38, caseEOD:
             EXIT
-          | "]":
+          | 93:
             IF LookingAt ("]]>", followedByAny) THEN
               EXIT
             ELSE
@@ -2039,8 +2077,8 @@ PROCEDURE (p: Parser) ParseDocument*;
         END;
 
         LOOP
-          CASE chars[cpos] OF
-          | 00X..1FX, Buffer.markerEOB:
+          CASE DispatchChar (chars[cpos]) OF
+          | 00H..1FH, caseEOB:
             IF (chars # p. in. chars) THEN
               (* when expanding an entity reference, no translation of
                  end of line characters is done; the reason for this is that
@@ -2049,20 +2087,20 @@ PROCEDURE (p: Parser) ParseDocument*;
                  explicitly introduced through character references *)
               chars[cpos-cdelta] := chars[cpos]; INC (cpos)
             ELSE
-              ControlChar (Ascii.lf)
+              ControlChar (ORD (Ascii.lf))
             END
-          | " ":
+          | 32:
             chars[cpos-cdelta] := chars[cpos]; INC (cpos)
-          | "<", Buffer.markerEOD:
+          | 60, caseEOD:
             EXIT
-          | "&":
+          | 38:
             IF LookingAt ("&#", followedByAny) THEN (* character reference *)
               elementWhitespace := DTD.elementWhitespaceNo;
               CharRef()
             ELSE
               EXIT
             END
-          | "]":
+          | 93:
             IF LookingAt ("]]>", followedByAny) THEN
               Err (invalidCloseCDATA)
             END;
@@ -2130,22 +2168,22 @@ PROCEDURE (p: Parser) ParseDocument*;
 
     BEGIN
       LOOP
-        CASE chars[cpos] OF
-        | Buffer.markerEOD:
+        CASE DispatchChar (chars[cpos]) OF
+        | caseEOD:
           EXIT
-        | "<":
+        | 60:
           IF LookingAt ("<!--", followedByAny) THEN
             Comment
           ELSIF LookingAt ("<![CDATA[", followedByAny) THEN
             CDSect
           ELSIF LookingAt ("<?", followedByAny) THEN
             PI
-          ELSIF (chars[cpos+1] # "/") THEN
+          ELSIF (chars[cpos+1] # 47) THEN
             element
           ELSE
             EXIT
           END;
-        | "&":
+        | 38:
           IF LookingAt ("&#", followedByAny) THEN (* character reference *)
             CharData
           ELSE
@@ -2188,7 +2226,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         i: LONGINT;
       BEGIN
         FOR i := 0 TO p. lenNameList-1 DO
-          IF (name^ = p. nameList[i]^) THEN
+          IF LongStrings.Equal (name^, p. nameList[i]^) THEN
             RETURN TRUE
           END
         END;
@@ -2206,7 +2244,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         BEGIN
           i := 0;
           WHILE (i # p. lenNameList) DO
-            IF (p. nameList[i]^ = name^) THEN
+            IF LongStrings.Equal (p. nameList[i]^, name^) THEN
               RETURN TRUE
             END;
             INC (i)
@@ -2242,8 +2280,8 @@ PROCEDURE (p: Parser) ParseDocument*;
       END ErrEndTag;
     
     BEGIN
-      IF (chars[cpos] = "<") THEN
-        CheckChar ("<");
+      IF (chars[cpos] = 60) THEN
+        CheckChar (60);
         p. lenNameList := 0;
         emptyElementTag := FALSE;
         StorePosition (p. l^);
@@ -2253,14 +2291,14 @@ PROCEDURE (p: Parser) ParseDocument*;
         LOOP
           IF (chars[cpos] = Buffer.markerEOD) THEN
             EXIT
-          ELSIF (chars[cpos] # ">") & (chars[cpos] # "/") THEN
+          ELSIF (chars[cpos] # 62) & (chars[cpos] # 47) THEN
             S
           END;
-          IF (chars[cpos] = "/") THEN
-            CheckChar ("/");
+          IF (chars[cpos] = 47) THEN
+            CheckChar (47);
             emptyElementTag := TRUE;
             EXIT
-          ELSIF (chars[cpos] = ">") THEN
+          ELSIF (chars[cpos] = 62) THEN
             EXIT
           END;
           
@@ -2288,7 +2326,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         IF (decl # NIL) THEN
           AddDefaultAttributes (decl(DTD.ElementDecl))
         END;
-        CheckChar (">");
+        CheckChar (62);
         p. builder. AttributesDone();    (* callback *)
         
         DiscardPreviousInput;
@@ -2298,16 +2336,16 @@ PROCEDURE (p: Parser) ParseDocument*;
         ELSE
           content;
           StorePosition (pos);
-          IF (chars[cpos] # "<") THEN ErrEndTag END;
-          CheckChar ("<");
-          IF (chars[cpos] # "/") THEN ErrEndTag END;
-          CheckChar ("/");
+          IF (chars[cpos] # 60) THEN ErrEndTag END;
+          CheckChar (60);
+          IF (chars[cpos] # 47) THEN ErrEndTag END;
+          CheckChar (47);
           StorePosition (p. l^);
           endName := Name (FALSE);
-          IF (endName^ # startName^) THEN ErrEndTag END;
+          IF ~LongStrings.Equal (endName^, startName^) THEN ErrEndTag END;
           p. builder. EndElement (NIL, startName); (* callback *)
           OptS (TRUE);
-          CheckChar (">")
+          CheckChar (62)
         END
       ELSE
         Err (expectedElement)
@@ -2318,10 +2356,10 @@ PROCEDURE (p: Parser) ParseDocument*;
   (* post: chars[cpos] # Buffer.markerEOB *)
     BEGIN
       LOOP
-        CASE chars[cpos] OF
-        | Buffer.markerEOB:
+        CASE DispatchChar (chars[cpos]) OF
+        | caseEOB:
           NextBlock
-        | "<":
+        | 60:
           IF LookingAt ("<!--", followedByAny) THEN
             Comment
           ELSIF LookingAt ("<?", followedByAny) THEN
@@ -2329,7 +2367,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           ELSE
             EXIT
           END
-        | 00X.." ":
+        | 00H..32:
           S
         ELSE
           EXIT
@@ -2362,7 +2400,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         IF ~optionJustPubid OR LookingAtS() THEN
           S;
           IF ~optionJustPubid OR
-             (chars[cpos] = "'") OR (chars[cpos] = '"') THEN
+             (chars[cpos] = 39) OR (chars[cpos] = 34) THEN
             system := String (stringPubidLiteral)
           END
         END;
@@ -2400,18 +2438,18 @@ PROCEDURE (p: Parser) ParseDocument*;
             last := first;
             OptS (FALSE);
             hasAlternative := FALSE;
-            WHILE (chars[cpos] = "|") DO
+            WHILE (chars[cpos] = 124) DO
               hasAlternative := TRUE;
-              CheckChar ("|");
+              CheckChar (124);
               OptS (FALSE);
               last. SetNext (dtd. NewNameCP (DTD.cpOnce, Name (FALSE)));
               last := last. next;
               OptS (FALSE)
             END;
             CheckCurrentEntity (currentEntity);
-            CheckChar (")");
-            IF hasAlternative OR (chars[cpos] = "*") THEN
-              CheckChar ("*");
+            CheckChar (41);
+            IF hasAlternative OR (chars[cpos] = 42) THEN
+              CheckChar (42);
               RETURN dtd. NewChoiceCP (DTD.cpRepeat0, first)
             ELSE
               RETURN dtd. NewChoiceCP (DTD.cpOnce, first)
@@ -2427,9 +2465,9 @@ PROCEDURE (p: Parser) ParseDocument*;
           (* pre: chars[cpos] # markerEOB *)
             BEGIN
               CASE chars[cpos] OF
-              | "*": CheckChar ("*"); RETURN DTD.cpRepeat0
-              | "+": CheckChar ("+"); RETURN DTD.cpRepeat1
-              | "?": CheckChar ("?"); RETURN DTD.cpOptional
+              | 42: CheckChar (42); RETURN DTD.cpRepeat0
+              | 43: CheckChar (43); RETURN DTD.cpRepeat1
+              | 63: CheckChar (63); RETURN DTD.cpOptional
               ELSE
                 RETURN DTD.cpOnce
               END
@@ -2447,9 +2485,9 @@ PROCEDURE (p: Parser) ParseDocument*;
                 cp: DTD.CP;
                 currentEntity: DTD.Entity;
               BEGIN
-                IF (chars[cpos] = "(") THEN
+                IF (chars[cpos] = 40) THEN
                   currentEntity := CurrentEntity();
-                  CheckChar ("(");
+                  CheckChar (40);
                   OptS (FALSE);
                   cp := choiceseq (currentEntity)
                 ELSIF IsNameChar0 (chars[cpos]) THEN
@@ -2463,19 +2501,19 @@ PROCEDURE (p: Parser) ParseDocument*;
               END cp;
 
             BEGIN
-              class := 0X;
+              class := 0;
               first := cp();
               OptS (FALSE);
               last := first;
               LOOP
-                CASE chars[cpos] OF
-                | Buffer.markerEOB:
+                CASE DispatchChar (chars[cpos]) OF
+                | caseEOB:
                   NextBlock
-                | ",", "|":
-                  IF (class = 0X) THEN
+                | 44, 124:
+                  IF (class = 0) THEN
                     class := chars[cpos]
                   END;
-                  CheckChar (SHORT (class));
+                  CheckChar (class);
                   OptS (FALSE);
                   last. SetNext (cp());
                   last := last. next;
@@ -2484,10 +2522,10 @@ PROCEDURE (p: Parser) ParseDocument*;
                   EXIT
                 END
               END;
-              CheckChar (")");
+              CheckChar (41);
               CheckCurrentEntity (currentEntity);
               
-              IF (class = ",") THEN
+              IF (class = 44) THEN
                 RETURN dtd. NewSeqCP (DTD.cpOnce, first)
               ELSE
                 RETURN dtd. NewChoiceCP (DTD.cpOnce, first)
@@ -2505,9 +2543,9 @@ PROCEDURE (p: Parser) ParseDocument*;
             RETURN dtd. NewNameCP (DTD.cpOnce, Name (FALSE))
           ELSIF LookingAt ("ANY", followedByNonName) THEN
             RETURN dtd. NewNameCP (DTD.cpOnce, Name (FALSE))
-          ELSIF (chars[cpos] = "(") THEN
+          ELSIF (chars[cpos] = 40) THEN
             currentEntity := CurrentEntity();
-            CheckChar ("(");
+            CheckChar (40);
             OptS (FALSE);
             IF LookingAt ("#PCDATA", followedByNonName) THEN
               RETURN Mixed (currentEntity)
@@ -2535,7 +2573,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         END;
 
         CheckCurrentEntity (currentEntity);
-        CheckChar (">")
+        CheckChar (62)
       END elementdecl;
 
     PROCEDURE AttListDecl (currentEntity: DTD.Entity);
@@ -2555,7 +2593,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         PROCEDURE Enumeration (attrType: DTD.AttributeType): DTD.Enumeration;
           BEGIN
             enum := dtd. NewEnumeration();
-            CheckChar ("(");
+            CheckChar (40);
             LOOP
               OptS (FALSE);
               CASE attrType OF
@@ -2565,13 +2603,13 @@ PROCEDURE (p: Parser) ParseDocument*;
                 enum. Append (Nmtoken (FALSE, FALSE))
               END;
               OptS (FALSE);
-              IF (chars[cpos] = "|") THEN
-                CheckChar ("|")
+              IF (chars[cpos] = 124) THEN
+                CheckChar (124)
               ELSE
                 EXIT
               END
             END;
-            CheckChar (")");
+            CheckChar (41);
             RETURN enum
           END Enumeration;
 
@@ -2602,8 +2640,8 @@ PROCEDURE (p: Parser) ParseDocument*;
             INC (cpos, 8);
             attrType := DTD.attrNMTOKENS
           ELSIF LookingAt ("NOTATION", followedByNonName) OR
-                (chars[cpos] = "(") THEN
-            IF (chars[cpos] = "(") THEN
+                (chars[cpos] = 40) THEN
+            IF (chars[cpos] = 40) THEN
               attrType := DTD.attrENUMERATED
             ELSE
               attrType := DTD.attrNOTATION;
@@ -2646,10 +2684,10 @@ PROCEDURE (p: Parser) ParseDocument*;
         S;
         elementName := Name (FALSE);
         LOOP
-          IF (chars[cpos] # ">") THEN
+          IF (chars[cpos] # 62) THEN
             S
           END;
-          IF (chars[cpos] = ">") OR (chars[cpos] = Buffer.markerEOD) THEN
+          IF (chars[cpos] = 62) OR (chars[cpos] = Buffer.markerEOD) THEN
             EXIT
           END;
 
@@ -2666,7 +2704,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           END
         END;
         CheckCurrentEntity (currentEntity);
-        CheckChar (">")
+        CheckChar (62)
       END AttListDecl;
 
     PROCEDURE EntityDecl (currentEntity: DTD.Entity);
@@ -2700,7 +2738,7 @@ PROCEDURE (p: Parser) ParseDocument*;
 
         BEGIN
           string := noName;
-          IF (chars[cpos] = "'") OR (chars[cpos] = '"') THEN
+          IF (chars[cpos] = 39) OR (chars[cpos] = 34) THEN
             (* if the entity value contains parameter entity references, all
                the pieces are collected first into `p. currEntityValue', and are only
                at the very end rewritten into one large string *)
@@ -2712,14 +2750,14 @@ PROCEDURE (p: Parser) ParseDocument*;
             INC (cpos);
             cstart := cpos; cdelta := 0;
             LOOP
-              CASE chars[cpos] OF
-              | 00X..1FX, Buffer.markerEOB:
-                ControlChar (Ascii.lf)
-              | Buffer.markerEOD:
+              CASE DispatchChar (chars[cpos]) OF
+              | 00H..1FH, caseEOB:
+                ControlChar (ORD (Ascii.lf))
+              | caseEOD:
                 ErrPos (stringNotClosed, pos);
                 p. currEntityValue. Append (dtd. NewCharacters (chars, cstart, cpos-cdelta, TRUE));
                 EXIT
-              | "%":
+              | 37:
                 IF (cstart # cpos-cdelta) THEN
                   (* append character sequence before the PE reference to
                      the fragment list *)
@@ -2729,7 +2767,7 @@ PROCEDURE (p: Parser) ParseDocument*;
                 (* note: PopEntity will attach the characters from within the
                    reference to `currEntityValue'; it will also reset
                    `cstart' and `cdelta' *)
-              | "&":
+              | 38:
                 IF LookingAt ("&#", followedByAny) THEN
                   (* looking at character reference: replace on the spot *)
                   CharRef()
@@ -2743,7 +2781,7 @@ PROCEDURE (p: Parser) ParseDocument*;
                   (* only recognize the string end delimiter if we are not
                      expanding any entity references *)
                   p. currEntityValue. Append (dtd. NewCharacters (chars, cstart, cpos-cdelta, TRUE));
-                  CheckChar (SHORT (endChar));
+                  CheckChar (endChar);
                   EXIT
                 ELSE
                   chars[cpos-cdelta] := chars[cpos]; INC (cpos)
@@ -2761,15 +2799,15 @@ PROCEDURE (p: Parser) ParseDocument*;
       BEGIN
         INC (cpos, 8);                 (* skip over entity *)
         SnoPE;
-        isPEntity := (chars[cpos] = "%");
+        isPEntity := (chars[cpos] = 37);
         IF isPEntity THEN
-          CheckChar ("%");
+          CheckChar (37);
           S
         END;
         StorePosition (p. l^);
         name := Name (TRUE);
         S;
-        IF (chars[cpos] = "'") OR (chars[cpos] = '"') THEN
+        IF (chars[cpos] = 39) OR (chars[cpos] = 34) THEN
           public := NIL; system := NIL; ndata := NIL;
           entityValue := EntityValue (isPEntity);
 
@@ -2807,7 +2845,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         END;
         OptS (FALSE);
         CheckCurrentEntity (currentEntity);
-        CheckChar (">");
+        CheckChar (62);
 
         IF p. processDeclarations THEN
           IF isPEntity THEN
@@ -2836,7 +2874,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         OptS (FALSE);
         p. builder. Notation (dtd. NewNotation (name, public, system, baseURI)); (* callback *)
         CheckCurrentEntity (currentEntity);
-        CheckChar (">")
+        CheckChar (62)
       END NotationDecl;
 
     BEGIN
@@ -2870,13 +2908,13 @@ PROCEDURE (p: Parser) ParseDocument*;
         level := 1;
         cstart := cpos; cdelta := 0;
         LOOP
-          CASE chars[cpos] OF
-          | 00X..1FX, Buffer.markerEOB:
-            ControlChar (Ascii.lf)
-          | Buffer.markerEOD:
+          CASE DispatchChar (chars[cpos]) OF
+          | 00H..1FH, caseEOB:
+            ControlChar (ORD (Ascii.lf))
+          | caseEOD:
             ErrPos (ignoreNotClosed, pos);
             EXIT
-          | "]":
+          | 93:
             IF LookingAt ("]]>", followedByAny) THEN
               IF (level = 1) THEN
                 CheckCurrentEntity (currentEntity)
@@ -2889,7 +2927,7 @@ PROCEDURE (p: Parser) ParseDocument*;
             ELSE
               chars[cpos-cdelta] := chars[cpos]; INC (cpos)
             END
-          | "<":
+          | 60:
             IF LookingAt ("<![", followedByAny) THEN
               INC (cpos, 3);             (* skip over "]]>" *)
               INC (level)
@@ -2904,7 +2942,7 @@ PROCEDURE (p: Parser) ParseDocument*;
     
     BEGIN
       LOOP
-        IF (chars[cpos] = "<") THEN
+        IF (chars[cpos] = 60) THEN
           currentEntity := CurrentEntity();
           StorePosition (pos);
           IF LookingAt ("<![", followedByAny) THEN
@@ -2914,7 +2952,7 @@ PROCEDURE (p: Parser) ParseDocument*;
               INC (cpos, 7);         (* skip over "INCLUDE" *)
               OptS (FALSE);
               CheckCurrentEntity (currentEntity);
-              CheckChar ("[");
+              CheckChar (91);
               extSubsetDecl;
               CheckCurrentEntity (currentEntity);
               IF LookingAt ("]]>", followedByAny) THEN
@@ -2926,7 +2964,7 @@ PROCEDURE (p: Parser) ParseDocument*;
               INC (cpos, 6);         (* skip over "IGNORE" *)
               OptS (FALSE);
               CheckCurrentEntity (currentEntity);
-              CheckChar ("[");
+              CheckChar (91);
               ignoreSectContents
             ELSE
               Err (expectedConditional)
@@ -2934,7 +2972,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           ELSE
             markupdecl
           END
-        ELSIF (chars[cpos] = "%") THEN
+        ELSIF (chars[cpos] = 37) THEN
           PEReference (TRUE)
         ELSIF LookingAtSnoPE() THEN
           SnoPE
@@ -3017,12 +3055,12 @@ PROCEDURE (p: Parser) ParseDocument*;
         ELSE
           system := NIL; public := NIL; baseURI := NIL
         END;
-        IF (chars[cpos] = "[") THEN
-          CheckChar ("[");
+        IF (chars[cpos] = 91) THEN
+          CheckChar (91);
           LOOP
-            IF (chars[cpos] = "<") THEN
+            IF (chars[cpos] = 60) THEN
               markupdecl
-            ELSIF (chars[cpos] = "%") THEN
+            ELSIF (chars[cpos] = 37) THEN
               PEReference (TRUE)
             ELSIF LookingAtSnoPE() THEN
               SnoPE
@@ -3033,10 +3071,10 @@ PROCEDURE (p: Parser) ParseDocument*;
           IF (p. lenPEStack # 0) THEN
             Err (unbalancedPERef)
           END;
-          CheckChar ("]");
+          CheckChar (93);
           OptS (FALSE)
         END;
-        CheckChar (">");
+        CheckChar (62);
         
         IF (public # NIL) OR (system # NIL) THEN
           IF p. followExternalRef THEN
@@ -3131,7 +3169,7 @@ PROCEDURE Init (p: Parser; new: BOOLEAN;
       NEW (p. peStack, initPEStack);
       p. in := Buffer.NewInput (reader, codecFactory, p. errList);
     ELSE
-      ASSERT (FALSE);
+      HALT (127);
       (*p. in. Reset (reader, codecFactory, p. errList)*)
     END;
     
@@ -3269,11 +3307,11 @@ PROCEDURE NewExternalID* (public, system: ARRAY OF DTD.Char;
     VAR
       str: DTD.String;
     BEGIN
-      IF (s = "") THEN
+      IF (s[0] = 0) THEN
         RETURN NIL
       ELSE
         NEW (str, LongStrings.Length (s)+1);
-        COPY (s, str^);
+        LongStrings.Assign (s, str^);
         RETURN str
       END
     END ToString;
@@ -3427,10 +3465,10 @@ PROCEDURE SetErrorMessages;
   END SetErrorMessages;
 
 BEGIN
-  suplPubidChar := "-'()+,./:=?;!*#@$_%";
+  LongStrings.Long ("-'()+,./:=?;!*#@$_%", suplPubidChar);
   NEW (noName, 8);
-  COPY ("#no_name", noName^);
+  LongStrings.Long ("#no_name", noName^);
 
   parserContext := Error.NewContext ("XML:Parser");
   SetErrorMessages
-END XML:Parser.
+END XMLParser.

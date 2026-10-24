@@ -1,5 +1,5 @@
 (*      $Id: Locator.Mod,v 1.5 2000/07/31 18:37:07 mva Exp $   *)
-MODULE XML:Locator [OOC_EXTENSIONS];
+MODULE XMLLocator;
 (*  Provides access to position information for XML parser callbacks.
     Copyright (C) 2000, 2001  Michael van Acken
 
@@ -19,20 +19,20 @@ MODULE XML:Locator [OOC_EXTENSIONS];
 *)
 
 IMPORT
-  Buffer := XML:UnicodeBuffer, XML:Error, XML:DTD;
+  Buffer := XMLUnicodeBuffer, Error := XMLError, DTD := XMLDTD;
 
 TYPE
   Locator* = POINTER TO Position;
   Position* = RECORD
     charIndex*: Buffer.CharPos;
     (**The character index of the starting position associated with a callback
-       event, based on the UCS-2 character encoding.  This position is relative
+       event, counting UTF-16 code units.  This position is relative
        to the beginning of the current file (document entity, external DTD
        subset, or external entity), and begins with character index 0.
 
        Please note that this number may differ from the number of Unicode
        characters before the given index, if the file contains characters with
-       code values over 0xFFFF, which are encoded as two Unicode characters.
+       code values over 0xFFFF, which are encoded as two UTF-16 code units.
 
        For a character position reported in an error message, the actual value
        is incremented by @ovar{Error.errMsgCharPosBase}.  *)
@@ -58,12 +58,12 @@ TYPE
 
 TYPE
   ErrorListener* = POINTER TO ErrorListenerDesc;
-  ErrorListenerDesc* = RECORD [ABSTRACT]
+  ErrorListenerDesc* = RECORD
   (**Using the @otype{ErrorListener} instance provided by the parser, builders
      and applications can add their own error messages to a document.  *)
   END;
 
-PROCEDURE (el: ErrorListener) [ABSTRACT] Error* (context: Error.Context;
+PROCEDURE (el: ErrorListener) Error* (context: Error.Context;
                                                  code: Error.Code;
                                                  fatalError: BOOLEAN;
                                                  pos: Position): Error.Msg;
@@ -72,6 +72,7 @@ PROCEDURE (el: ErrorListener) [ABSTRACT] Error* (context: Error.Context;
    @code{TRUE}, then the parser should stop reporting any events to the
    application.  @oparam{pos} indicates the position of the error.  It should
    be taken from a locator.  *)
+  BEGIN HALT (127); RETURN NIL
   END Error;
   
-END XML:Locator.
+END XMLLocator.
