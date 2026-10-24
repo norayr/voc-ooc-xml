@@ -35,3 +35,19 @@ The transferred versions were recorded in this repository at commit
 `src/XML/Unicode.Mod` is named `oocUnicode` in VOC so shared support can be
 built independently of XML. The original `IOMemory` implementation is also
 preserved as `src/IO/Memory.Mod` in the CVS branches and release tags.
+
+## URI support
+
+The reusable URI modules were transferred to VOC's `src/ports/ooc/` from
+this repository's commit `910ea3fa1604e200dff7ba9b70a1bea123f93303`.
+VOC commit `b4c3ad8c` preserves all sixteen source files byte for byte;
+`5a360603` adapts their module names, types and local resource channels.
+The original paths are listed in VOC's
+[URI provenance record](https://github.com/vishapoberon/compiler/blob/master/src/ports/ooc/URI-provenance.md).
+
+XML also requires the shared `LongStrings.Equal8` and URI byte-classification
+fixes in
+[VOC commit 8e8edff2896e139e57b0f1e38ec57f2fa7d38765](https://github.com/vishapoberon/compiler/commit/8e8edff2896e139e57b0f1e38ec57f2fa7d38765).
+URI implementation sources and their unit tests are maintained in VOC.
+Their original CVS versions remain available here
+on `upstream-cvs`, `upstream-cvs-MAIN` and the release tags.

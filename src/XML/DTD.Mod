@@ -1,5 +1,5 @@
 (* 	$Id: DTD.Mod,v 1.18 2001/03/24 12:22:10 mva Exp $	 *)
-MODULE XML:DTD [OOC_EXTENSIONS];
+MODULE XMLDTD;
 (*  Implements the internal representation of a document DTD.
     Copyright (C) 2000, 2001  Michael van Acken
 
@@ -25,7 +25,7 @@ MODULE XML:DTD [OOC_EXTENSIONS];
    information.  *)
 
 IMPORT
-  LongStrings, URI, XML:UnicodeCodec, XML:UnicodeBuffer;
+  LongStrings, URI, UnicodeCodec := XMLUnicodeCodec, UnicodeBuffer := XMLUnicodeBuffer;
 
 
 TYPE
@@ -79,7 +79,7 @@ TYPE
    ------------------------------------------------------------------------ *)
 
 TYPE
-  DeclarationDesc* = RECORD [ABSTRACT]
+  DeclarationDesc* = RECORD
     next-: Declaration;
     (**Next declaration in namespace.  *)
     name-: String;
@@ -237,7 +237,7 @@ CONST
   (**Entity representing the external DTD subset.  *)
 
 TYPE
-  EntityDesc = RECORD [ABSTRACT]
+  EntityDesc = RECORD
   (**Abstract base type for both internal and external entities.  *)
     (DeclarationDesc)
     type-: EntityType;
@@ -475,7 +475,7 @@ PROCEDURE (ns: Namespace) Add* (decl: Declaration): BOOLEAN;
       IF (list = NIL) THEN
         list := decl;
         RETURN TRUE
-      ELSIF (list. name^ # decl. name^) THEN
+      ELSIF ~LongStrings.Equal (list. name^, decl. name^) THEN
         RETURN RecAdd (list. next)
       ELSE
         RETURN FALSE
@@ -492,7 +492,7 @@ PROCEDURE (ns: Namespace) Get* (name: String): Declaration;
     ptr: Declaration;
   BEGIN
     ptr := ns. declList;
-    WHILE (ptr # NIL) & (ptr. name^ # name^) DO
+    WHILE (ptr # NIL) & ~LongStrings.Equal (ptr. name^, name^) DO
       ptr := ptr. next
     END;
     RETURN ptr
@@ -631,15 +631,15 @@ PROCEDURE (attValue: AttValue) FlattenValue* (normalizeWhitespace: BOOLEAN;
     VAR
       f: Fragment;
     
-    PROCEDURE Copy (source[NO_COPY]: StringVar; start, end: CharPos);
+    PROCEDURE Copy (VAR source: StringVar; start, end: CharPos);
       VAR
         i: LONGINT;
       BEGIN
         i := start;
         WHILE (i # end) DO
-          IF (source[i] = " ") THEN
+          IF (source[i] = 32) THEN
             IF ~skipSpace THEN
-              str[pos] := " ";
+              str[pos] := 32;
               INC (pos);
               skipSpace := normalizeWhitespace
             ELSE
@@ -661,9 +661,9 @@ PROCEDURE (attValue: AttValue) FlattenValue* (normalizeWhitespace: BOOLEAN;
           IF (f. entity # NIL) THEN
             Append (f. entity. attValue)
           ELSE
-            Copy ("&", 0, 1);
+            str[pos] := ORD ("&"); INC (pos); skipSpace := FALSE;
             Copy (f. name^, 0, LongStrings.Length (f. name^));
-            Copy (";", 0, 1)
+            str[pos] := ORD (";"); INC (pos); skipSpace := FALSE
           END
         | f: Characters DO
           Copy (f. source^, f. sourceStart, f. sourceEnd)
@@ -681,10 +681,10 @@ PROCEDURE (attValue: AttValue) FlattenValue* (normalizeWhitespace: BOOLEAN;
     skipSpace := normalizeWhitespace;
     didNormalization := FALSE;
     Append (attValue);
-    IF normalizeWhitespace & (pos # 0) & (str[pos-1] = " ") THEN
+    IF normalizeWhitespace & (pos # 0) & (str[pos-1] = 32) THEN
       DEC (pos); didNormalization := TRUE
     END;
-    str[pos] := 0X;
+    str[pos] := 0;
     RETURN str
   END FlattenValue;
 
@@ -726,7 +726,7 @@ PROCEDURE (b: Builder) NewEnumeration*(): Enumeration;
     RETURN enum
   END NewEnumeration;
 
-PROCEDURE (enum: Enumeration) Append* (name: String);
+PROCEDURE (enumeration: Enumeration) Append* (name: String);
   VAR
     node: NameNode;
   BEGIN
@@ -734,22 +734,22 @@ PROCEDURE (enum: Enumeration) Append* (name: String);
     node. next := NIL;
     node. name := name;
     
-    IF (enum. nameList = NIL) THEN
-      enum. nameList := node
+    IF (enumeration. nameList = NIL) THEN
+      enumeration. nameList := node
     ELSE
-      enum. nameTail. next := node
+      enumeration. nameTail. next := node
     END;
-    enum. nameTail := node
+    enumeration. nameTail := node
   END Append;
 
-PROCEDURE (enum: Enumeration) Matches* (VAR name: StringVar): BOOLEAN;
+PROCEDURE (enumeration: Enumeration) Matches* (VAR name: StringVar): BOOLEAN;
 (**Returns @code{TRUE}, if one of the names listed in the enumeration matches
    the string @oparam{name}.  *)
   VAR
     ptr: NameNode;
   BEGIN
-    ptr := enum. nameList;
-    WHILE (ptr # NIL) & (ptr. name^ # name) DO
+    ptr := enumeration. nameList;
+    WHILE (ptr # NIL) & ~LongStrings.Equal (ptr. name^, name) DO
       ptr := ptr. next
     END;
     RETURN (ptr # NIL)
@@ -891,16 +891,16 @@ PROCEDURE (b: Builder) IsValidEntityDecl* (name, entityValue: String): BOOLEAN;
    legal replacement text for the entity, then this function returns
    @code{FALSE}.  Otherwise, it returns @code{TRUE}.  *)
   BEGIN
-    IF (name^ = "lt") THEN
-      RETURN (entityValue^ = "&#60;")
-    ELSIF (name^ = "amp") THEN
-      RETURN (entityValue^ = "&#38;")
-    ELSIF (name^ = "gt") THEN
-      RETURN (entityValue^ = ">") OR (entityValue^ = "&#62;")
-    ELSIF (name^ = "apos") THEN
-      RETURN (entityValue^ = "'") OR (entityValue^ = "&#39;")
-    ELSIF (name^ = "quot") THEN
-      RETURN (entityValue^ = '"') OR (entityValue^ = "&#34;")
+    IF LongStrings.Equal8 (name^, "lt") THEN
+      RETURN LongStrings.Equal8 (entityValue^, "&#60;")
+    ELSIF LongStrings.Equal8 (name^, "amp") THEN
+      RETURN LongStrings.Equal8 (entityValue^, "&#38;")
+    ELSIF LongStrings.Equal8 (name^, "gt") THEN
+      RETURN LongStrings.Equal8 (entityValue^, ">") OR LongStrings.Equal8 (entityValue^, "&#62;")
+    ELSIF LongStrings.Equal8 (name^, "apos") THEN
+      RETURN LongStrings.Equal8 (entityValue^, "'") OR LongStrings.Equal8 (entityValue^, "&#39;")
+    ELSIF LongStrings.Equal8 (name^, "quot") THEN
+      RETURN LongStrings.Equal8 (entityValue^, '"') OR LongStrings.Equal8 (entityValue^, "&#34;")
     ELSE
       RETURN TRUE
     END
@@ -1078,9 +1078,9 @@ PROCEDURE InitElementDecl* (elemDecl: ElementDecl; name: String; contentModel: C
     
     IF (elemDecl. contentModel # NIL) THEN
       WITH contentModel: NameCP DO
-        IF (contentModel. name^ = "EMPTY") THEN
+        IF LongStrings.Equal8 (contentModel. name^, "EMPTY") THEN
           elemDecl. contentType := contentEMPTY
-        ELSIF (contentModel. name^ = "ANY") THEN
+        ELSIF LongStrings.Equal8 (contentModel. name^, "ANY") THEN
           elemDecl. contentType := contentANY
         ELSE
           elemDecl. contentType := contentANY
@@ -1088,7 +1088,7 @@ PROCEDURE InitElementDecl* (elemDecl: ElementDecl; name: String; contentModel: C
         END
       | contentModel: ChoiceCP DO
         IF (contentModel. list IS NameCP) &
-           (contentModel. list(NameCP). name^ = "#PCDATA") THEN
+           LongStrings.Equal8 (contentModel. list(NameCP). name^, "#PCDATA") THEN
           elemDecl. contentType := contentMixed
         ELSE
           elemDecl. contentType := contentChildren
@@ -1175,7 +1175,7 @@ PROCEDURE GetString* (VAR string: ARRAY OF Char; start, end: LONGINT): String;
     FOR i := 0 TO end-start-1 DO
       s[i] := string[start+i]
     END;
-    s[end-start] := 0X;
+    s[end-start] := 0;
     RETURN s
   END GetString;
 
@@ -1200,16 +1200,16 @@ PROCEDURE GetStringURI* (VAR string: ARRAY OF CHAR; start, end: LONGINT): String
 PROCEDURE Init* (b: Builder);
 (**Initializes the DTD builder.  Also registers the predefined general entities
    @samp{lt}, @samp{gt}, @samp{amp}, @samp{apos}, and @samp{quot}.  *)
-  PROCEDURE PredefEntity (name, replacement: ARRAY OF LONGCHAR);
+  PROCEDURE PredefEntity (name, replacement: ARRAY OF CHAR);
     VAR
       nameString, replString: String;
       entity: Entity;
       dummy: BOOLEAN;
     BEGIN
-      NEW (nameString, LongStrings.Length (name)+1);
-      COPY (name, nameString^);
-      NEW (replString, LongStrings.Length (replacement)+2);
-      COPY (replacement, replString^);
+      NEW (nameString, LongStrings.Length8 (name)+1);
+      LongStrings.Long (name, nameString^);
+      NEW (replString, LongStrings.Length8 (replacement)+2);
+      LongStrings.Long (replacement, replString^);
       replString[LEN (replString^)-2] := UnicodeBuffer.markerEOD;
       
       entity := b. NewInternalEntity (nameString, entityInternalGeneral, 
@@ -1245,4 +1245,4 @@ PROCEDURE New*(): Builder;
 BEGIN
   NEW (undefAttr);
   InitAttrDecl (undefAttr, NIL, NIL, -1, NIL, -1, NIL, FALSE);
-END XML:DTD.
+END XMLDTD.

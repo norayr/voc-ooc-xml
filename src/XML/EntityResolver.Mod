@@ -1,5 +1,5 @@
 (*      $Id: EntityResolver.Mod,v 1.3 2000/07/23 17:43:43 mva Exp $   *)
-MODULE XML:EntityResolver;
+MODULE XMLEntityResolver;
 (*  Locates and opens external entities for the XML parser.
     Copyright (C) 2000  Michael van Acken
 
@@ -19,8 +19,8 @@ MODULE XML:EntityResolver;
 *)
 
 IMPORT
-  LongStrings, Msg, Strings, URI, URI:Parser, URI:CharClass,
-  XML:DTD, Codec := XML:UnicodeCodec, XML:UnicodeCodec:UTF8;
+  LongStrings, Msg, URI, Parser := URIParser, CharClass := URICharClass,
+  URIError, DTD := XMLDTD, Codec := XMLUnicodeCodec, UTF8 := XMLUnicodeCodecUTF8;
 
 
 TYPE
@@ -28,21 +28,23 @@ TYPE
   ResolverDesc* = RECORD
   END;
 
+CONST invalidSystemIdentifier = 1;
+VAR resolverContext: URIError.Context;
+
 
 PROCEDURE NormalizeURI* (uri: DTD.String): DTD.StringURI;
-(**Normalizes an Unicode string representing a URI to a legal URI.  First, t
+(**Normalizes a Unicode string representing a URI to a legal URI.  First,
    the Unicode string is encoded into a UTF-8 byte sequence.  Then, any
    resulting bytes that are not reserved, unreserved, @samp{#}, or @samp{%}
    are replaced with URI escape sequences.  In particular, all non-ASCII
-   bytes are escaped.  *)
+   bytes are escaped. Returns NIL for malformed UTF-16 or excessive length. *)
   VAR
-    len16, i: INTEGER;
+    len16, i, j, previous: LONGINT;
     codec: Codec.Codec;
-    str8: ARRAY 8*1024 OF CHAR;
-    repl: ARRAY 4 OF CHAR;
+    str8, result: DTD.StringURI;
     srcDone, destDone: LONGINT;
 
-  PROCEDURE ToHex (i: INTEGER): CHAR;
+  PROCEDURE ToHex (i: LONGINT): CHAR;
     BEGIN
       IF (i < 10) THEN
         RETURN CHR (i+ORD ("0"))
@@ -52,43 +54,40 @@ PROCEDURE NormalizeURI* (uri: DTD.String): DTD.StringURI;
     END ToHex;
 
   BEGIN
+    IF uri = NIL THEN RETURN NIL END;
     len16 := LongStrings.Length (uri^);
+    IF len16 > (MAX (LONGINT)-19) DIV 18 THEN RETURN NIL END;
+    NEW (str8, Codec.maxUTF8EncodingLength*(len16+1));
     codec := UTF8.factory. NewCodec();
-
-    (* encode UCS-2 character sequence as UTF-8 character sequence *)
-    IF (len16 # 0) THEN
-      codec. Encode (uri^, 0, len16, str8, 0, LEN (str8), srcDone, destDone);
-      IF (srcDone # len16) THEN
-        codec. Encode (uri^, srcDone, len16, str8, destDone, LEN (str8),
-                       srcDone, destDone);
-        ASSERT (srcDone = len16)
-      END;
-      str8[destDone] := 0X
-    ELSE
-      COPY ("", str8)
+    srcDone := 0; destDone := 0;
+    WHILE srcDone < len16 DO
+      previous := srcDone;
+      codec. Encode (uri^, srcDone, len16, str8^, destDone, LEN (str8^),
+                     srcDone, destDone);
+      IF (codec. invalidChars # 0) OR (srcDone = previous) THEN RETURN NIL END
     END;
 
     (* encode every non-ASCII character and some other characters in the
        UTF-8 string to %HH *)
-    i := 0;
-    WHILE (str8[i] # 0X) DO
+    NEW (result, 3*destDone+1);
+    i := 0; j := 0;
+    WHILE i < destDone DO
       IF (str8[i] >= 80X) OR
          ~(CharClass.IsReserved (str8[i]) OR
            CharClass.IsUnreserved (str8[i]) OR
            (str8[i] = "#") OR
            (str8[i] = "%")) THEN
-        repl := "%HH";
-        repl[1] := ToHex (ORD (str8[i]) DIV 16);
-        repl[2] := ToHex (ORD (str8[i]) MOD 16);
-        Strings.Delete (str8, i, 1);
-        Strings.Insert (repl, i, str8);
-        INC (i, 3)
+        result[j] := "%";
+        result[j+1] := ToHex (ORD (str8[i]) DIV 16);
+        result[j+2] := ToHex (ORD (str8[i]) MOD 16);
+        INC (j, 3)
       ELSE
-        INC (i)
-      END
+        result[j] := str8[i]; INC (j)
+      END;
+      INC (i)
     END;
-
-    RETURN DTD.GetStringURI (str8, 0, i)
+    result[j] := 0X;
+    RETURN result
   END NormalizeURI;
 
 
@@ -113,6 +112,10 @@ PROCEDURE (r: Resolver) GetURI* (public, system: DTD.String; baseURI: URI.URI;
     END;
     
     str8 := NormalizeURI (system);
+    IF str8 = NIL THEN
+      uri := NIL; res := Msg.New (resolverContext, invalidSystemIdentifier);
+      RETURN
+    END;
     IF (baseURI # NIL) & (baseURI IS URI.HierarchicalURI) THEN
       uri := Parser.NewURI (str8^, baseURI(URI.HierarchicalURI), res)
     ELSE
@@ -128,4 +131,8 @@ PROCEDURE New* (): Resolver;
     RETURN er
   END New;
 
-END XML:EntityResolver.
+BEGIN
+  resolverContext := URIError.NewContext ("XMLEntityResolver");
+  resolverContext. SetString (invalidSystemIdentifier,
+    "Malformed or oversized UTF-16 system identifier")
+END XMLEntityResolver.

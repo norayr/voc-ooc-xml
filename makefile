@@ -3,11 +3,11 @@ BUILD ?= build/voc
 ROOT := $(CURDIR)
 MODULES := XMLUnicodeCodec XMLUnicodeCodecUTF8 XMLUnicodeCodecUTF16 \
 	XMLUnicodeCodecASCII XMLUnicodeCodecLatin1 XMLUnicodeCodecImportAll \
-	XMLInputBuffer XMLUnicodeBuffer \
-	TestUnicodeCodecs TestUnicodeMessages TestMemoryBuffers
+	XMLInputBuffer XMLUnicodeBuffer XMLDTD XMLEntityResolver \
+	TestUnicodeCodecs TestUnicodeMessages TestMemoryBuffers TestDTDResolver
 
-.PHONY: all codecs buffers test clean
-all: buffers
+.PHONY: all codecs buffers resolver test clean
+all: resolver
 
 $(BUILD):
 	mkdir -p "$(BUILD)"
@@ -27,15 +27,22 @@ buffers: codecs
 		"$(ROOT)/src/XML/InputBuffer.Mod" \
 		"$(ROOT)/src/XML/UnicodeBuffer.Mod"
 
-test: buffers
+resolver: buffers
+	cd "$(BUILD)" && $(VOC) -O2 -s \
+		"$(ROOT)/src/XML/DTD.Mod" \
+		"$(ROOT)/src/XML/EntityResolver.Mod"
+
+test: resolver
 	cd "$(BUILD)" && $(VOC) -O2 -s -m "$(ROOT)/tests/voc/TestUnicodeCodecs.Mod"
 	"$(BUILD)/TestUnicodeCodecs"
 	cd "$(BUILD)" && $(VOC) -O2 -s -m "$(ROOT)/tests/voc/TestUnicodeMessages.Mod"
 	"$(BUILD)/TestUnicodeMessages"
 	cd "$(BUILD)" && $(VOC) -O2 -s -m "$(ROOT)/tests/voc/TestMemoryBuffers.Mod"
 	"$(BUILD)/TestMemoryBuffers"
+	cd "$(BUILD)" && $(VOC) -O2 -s -m "$(ROOT)/tests/voc/TestDTDResolver.Mod"
+	"$(BUILD)/TestDTDResolver"
 
 clean:
 	rm -f $(foreach module,$(MODULES),$(foreach ext,c h o sym,"$(BUILD)/$(module).$(ext)")) \
 		"$(BUILD)/TestUnicodeCodecs" "$(BUILD)/TestUnicodeMessages" \
-		"$(BUILD)/TestMemoryBuffers"
+		"$(BUILD)/TestMemoryBuffers" "$(BUILD)/TestDTDResolver"

@@ -20,22 +20,24 @@ must not be stored in `LONGINT`.
 
 ### Working so far
 
-The Unicode codecs and XML buffers build with VOC:
+The Unicode codecs, XML buffers, DTD data model and entity resolver build
+with VOC:
 
 ```sh
 make test
 ```
 
 This requires VOC with the
-[shared ooc update](https://github.com/vishapoberon/compiler/commit/9ec25546ab07cd37df96088d1dc5f7e64bf93d73)
-installed, including
-`oocUnicode`, `LongStrings`, Unicode-safe `Msg`, `Channel` and `IOMemory`.
+[shared ooc and URI support](https://github.com/vishapoberon/compiler/commit/8e8edff2896e139e57b0f1e38ec57f2fa7d38765)
+installed, including `LongStrings.Equal8`.
+These provide `oocUnicode`, `LongStrings`, Unicode-safe `Msg`, `Channel`,
+`IOMemory`, `URIParser` and the file/memory URI schemes.
 Their sources and unit tests live in VOC's `src/ports/ooc/` and confidence
 tests. Rebuild VOC and its dependent modules together when updating this
 package.
 
-This builds and tests the support and buffering layers. The XML parser remains under
-development. `XMLUnicodeCodecImportAll` registers the bundled ASCII, Latin-1,
+The XML parser is still being adapted from oo2c to VOC.
+`XMLUnicodeCodecImportAll` registers the bundled ASCII, Latin-1,
 UTF-8 and UTF-16 encodings at startup. The codec source paths are unchanged so
 the changes remain easy to compare with CVS.
 
@@ -60,14 +62,19 @@ The XML tests cover ASCII, Latin-1, Armenian, supplementary characters,
 both UTF-16 byte orders, malformed/truncated input, buffer boundaries,
 Unicode diagnostics, streaming boundaries, flush/retry behavior and lengths
 above 32767. String-edit and message-framework unit tests run in VOC.
+DTD tests cover declaration lookup, predefined entities, attribute values
+and content-model classification. Resolver tests cover relative system
+identifiers, UTF-8 percent escapes, surrogate pairs, malformed UTF-16 and
+40,000-code-unit identifiers.
 They pass with GCC and Clang in C23 mode, and TCC. XML conformance testing
 will follow the parser port.
 
-The work starts with Unicode strings and codecs, followed by in-memory XML
-parsing, builders, namespaces, validation and writing. File/URI adapters and
-the original regression suites follow. Optional network facilities need a
-separate native-ABI review; they are not a prerequisite for an in-memory
-parser.
+VOC's ooc package supplies URI parsing, relative resolution and file/memory
+channels. XML's `XMLEntityResolver` converts Unicode system identifiers to
+these URI objects. The parser, event builders, namespaces, validation and
+writer are the next adaptation stages, followed by the original regression
+suites. External-entity controls and resource limits still need review
+before the parser can accept untrusted documents.
 
 ### Testing with a VOC source build
 
