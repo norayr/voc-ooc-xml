@@ -1,7 +1,7 @@
 MODULE XMLUnicodeCodec;
 
 IMPORT
-  Strings;
+  Strings, Unicode := XMLUnicode;
 
 
 CONST
@@ -63,10 +63,7 @@ CONST
      used.  *)
   
 TYPE
-  (* VOC -O2 CHAR is an octet. Preserve the original UCS-2/UTF-16 code
-     units as non-negative LONGINT values, never as signed INTEGERs or
-     truncated CHARs. Supplementary characters still use surrogate pairs. *)
-  Char* = LONGINT;
+  Char* = Unicode.LONGCHAR;
 
   Factory* = POINTER TO FactoryDesc;
   FactoryDesc* = RECORD

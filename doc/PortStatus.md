@@ -33,7 +33,8 @@ recorded provenance and an unmodified baseline before adaptation.
 - Build explicitly with `-O2`: 8-bit `SHORTINT`, 16-bit `INTEGER`, 32-bit
   `LONGINT`. Do not change the whole library to the C or V type model.
 - Preserve Unicode values. The ported codec interface uses `LONGINT` storage
-  for UTF-16 code units, rather than narrowing `LONGCHAR` to 8-bit `CHAR`.
+  through the shared `XMLUnicode.LONGCHAR` alias for UTF-16 code units.
+  Its definition documents the representation and valid 0..65535 range.
 - Replace implicit wide-string operations with explicit string helpers.
   Record memory moves must use the actual element size after porting.
 - Audit indices and lengths separately from character values. VOC's ordinary

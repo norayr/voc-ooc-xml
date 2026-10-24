@@ -1,12 +1,12 @@
 MODULE TestUnicodeCodecs;
 
-IMPORT Out, UC := XMLUnicodeCodec, XMLUnicodeCodecImportAll;
+IMPORT Out, Unicode := XMLUnicode, UC := XMLUnicodeCodec, XMLUnicodeCodecImportAll;
 
 VAR
 	bytes, encoded: ARRAY 64 OF CHAR;
-	units: ARRAY 32 OF UC.Char;
+	units: ARRAY 32 OF Unicode.LONGCHAR;
 	oneByte: ARRAY 1 OF CHAR;
-	oneUnit: ARRAY 1 OF UC.Char;
+	oneUnit: ARRAY 1 OF Unicode.LONGCHAR;
 	encodings: ARRAY 4 OF ARRAY 16 OF CHAR;
 	c: UC.Codec; f: UC.Factory;
 	i, n, count, bad: LONGINT;

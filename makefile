@@ -1,7 +1,7 @@
 VOC ?= voc
 BUILD ?= build/voc
 ROOT := $(CURDIR)
-MODULES := XMLUnicodeCodec XMLUnicodeCodecUTF8 XMLUnicodeCodecUTF16 \
+MODULES := XMLUnicode XMLUnicodeCodec XMLUnicodeCodecUTF8 XMLUnicodeCodecUTF16 \
 	XMLUnicodeCodecASCII XMLUnicodeCodecLatin1 XMLUnicodeCodecImportAll TestUnicodeCodecs
 
 .PHONY: all codecs test clean
@@ -11,6 +11,7 @@ all: codecs
 codecs:
 	mkdir -p "$(BUILD)"
 	cd "$(BUILD)" && $(VOC) -O2 -s \
+		"$(ROOT)/src/XML/Unicode.Mod" \
 		"$(ROOT)/src/XML/UnicodeCodec.Mod" \
 		"$(ROOT)/src/XML/UnicodeCodec/ASCII.Mod" \
 		"$(ROOT)/src/XML/UnicodeCodec/Latin1.Mod" \

@@ -32,10 +32,11 @@ This builds **only the codecs**, not the XML parser. The adapted modules are
 Their source paths are unchanged so the changes remain easy to compare with
 CVS. `XMLUnicodeCodecImportAll` registers the bundled encodings at startup.
 
-`XMLUnicodeCodec.Char` stores a UTF-16 code unit in an Oberon-2 `LONGINT`.
-Values retain the original 0..65535 range, including surrogate pairs; the
-storage is wider, not the character repertoire. Encoders reject out-of-range
-values rather than truncating them to octets.
+`XMLUnicode.LONGCHAR` is the shared type for UTF-16 code units. VOC and
+standard Oberon-2 have no built-in `LONGCHAR`, so this alias uses `LONGINT`
+storage for values in the original 0..65535 range. Supplementary characters
+use surrogate pairs. `XMLUnicodeCodec.Char` uses this same type, and encoders
+reject out-of-range values.
 
 The new Oberon tests cover ASCII, Latin-1, Armenian, supplementary characters,
 both UTF-16 byte orders, malformed/truncated input, exact-sized buffers and
