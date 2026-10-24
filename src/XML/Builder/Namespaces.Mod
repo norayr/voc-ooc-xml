@@ -1,5 +1,5 @@
 (*      $Id: Namespaces.Mod,v 1.6 2001/03/16 21:39:40 mva Exp $   *)
-MODULE XML:Builder:Namespaces;
+MODULE XMLBuilderNamespaces;
 (*  Provides namespace support for XML:Parser.
     Copyright (C) 2000, 2001  Michael van Acken
 
@@ -20,9 +20,10 @@ MODULE XML:Builder:Namespaces;
 
 
 IMPORT
-  Msg, LongStrings, URI, URIParser := URI:Parser, URI:String, 
-  URI:Fragment:Unparsed,
-  XML:Error, XML:DTD, XML:Locator, B := XML:Builder, XML:EntityResolver;
+  Msg, LongStrings, URI, URIParser, String := URIString,
+  Unparsed := URIFragmentUnparsed,
+  Error := XMLError, DTD := XMLDTD, Locator := XMLLocator,
+  B := XMLBuilder, EntityResolver := XMLEntityResolver;
 
 
 TYPE
@@ -71,6 +72,7 @@ TYPE
     lenNamespaceList: LONGINT;
     
     attrList: B.AttributeList;
+    failed: BOOLEAN;
   END;
 
 
@@ -79,9 +81,20 @@ CONST  (* error codes *)
   malformedURIRef = 2;
   undeclaredPrefix = 3;
   nameClash = 4;
+  reservedBinding = 5;
+
+CONST
+  xmlURI = "http://www.w3.org/XML/1998/namespace";
+  xmlnsURI = "http://www.w3.org/2000/xmlns/";
   
 VAR
   namespacesContext: Error.Context;
+
+PROCEDURE ReportError (b: Builder; code: Error.Code; pos: Locator.Position): Error.Msg;
+  BEGIN
+    b. failed := TRUE;
+    RETURN b. errorListener. Error (namespacesContext, code, TRUE, pos)
+  END ReportError;
 
 
 PROCEDURE (b: Builder) SetLocator* (locator: Locator.Locator);
@@ -169,9 +182,9 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
     
   PROCEDURE IsNamespaceDecl (VAR str: ARRAY OF DTD.Char): BOOLEAN;
     BEGIN
-      RETURN (str[0] = "x") & (str[1] = "m") & (str[2] = "l") &
-             (str[3] = "n") & (str[4] = "s") &
-             ((str[5] = 0X) OR (str[5] = ":"))
+      RETURN (str[0] = ORD ("x")) & (str[1] = ORD ("m")) & (str[2] = ORD ("l")) &
+             (str[3] = ORD ("n")) & (str[4] = ORD ("s")) &
+             ((str[5] = 0) OR (str[5] = ORD (":")))
     END IsNamespaceDecl;
   
   PROCEDURE GetURI (str: DTD.String): DTD.StringURI;
@@ -184,6 +197,10 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
       fragm: Unparsed.Fragment;
     BEGIN
       str8 := EntityResolver.NormalizeURI (str);
+      IF str8 = NIL THEN
+        err := ReportError (b, malformedURIRef, b. parserLocator^);
+        RETURN NIL
+      END;
       baseURI := b. parserLocator. entity. baseURI;
       fragm := Unparsed.New (String.Copy (""));
       IF (baseURI # NIL) & (baseURI IS URI.HierarchicalURI) THEN
@@ -192,8 +209,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
         uriRef := URIParser.NewReference (str8^, NIL, fragm, res)
       END;
       IF (res # NIL) THEN
-        err := b. errorListener. Error (namespacesContext, malformedURIRef,
-                                        TRUE, b. parserLocator^);
+        err := ReportError (b, malformedURIRef, b. parserLocator^);
         err. SetMsgAttrib ("uri_error", res);
         RETURN NIL
       ELSE
@@ -227,20 +243,27 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
       (* create a record for the namespace declarations local to the current
          element, unless this record already exists *)
       str := value. Flatten (attrDecl);
-      IF (localName[5] = 0X) THEN        (* default declaration *)
-        IF (str^ = "") THEN
+      IF (localName[5] = 0) THEN        (* default declaration *)
+        IF (str[0] = 0) THEN
           AddDecl (DTD.NewNamespaceDeclaration (NIL, NIL));
           b. stack[b. currLevel]. default := NIL
         ELSE
-          nspDecl := DTD.NewNamespaceDeclaration (NIL, GetURI (str));
-          AddDecl (nspDecl);
-          b. stack[b. currLevel]. default := nspDecl
+          IF LongStrings.Equal8 (str^, xmlURI) OR LongStrings.Equal8 (str^, xmlnsURI) THEN
+            err := ReportError (b, reservedBinding, b. parserLocator^)
+          ELSE
+            nspDecl := DTD.NewNamespaceDeclaration (NIL, GetURI (str));
+            AddDecl (nspDecl);
+            b. stack[b. currLevel]. default := nspDecl
+          END
         END
       ELSE
         prefix := DTD.GetString (localName^, 6, LongStrings.Length (localName^));
-        IF (str^ = "") THEN
-          err := b. errorListener. Error (namespacesContext, emptyURI,
-                                          TRUE, b. parserLocator^)
+        IF (str[0] = 0) THEN
+          err := ReportError (b, emptyURI, b. parserLocator^)
+        ELSIF LongStrings.Equal8 (prefix^, "xmlns") OR
+              LongStrings.Equal8 (str^, xmlnsURI) OR
+              (LongStrings.Equal8 (prefix^, "xml") # LongStrings.Equal8 (str^, xmlURI)) THEN
+          err := ReportError (b, reservedBinding, b. parserLocator^)
         ELSE
           AddDecl (DTD.NewNamespaceDeclaration (prefix, GetURI (str)))
         END
@@ -253,7 +276,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
   
 PROCEDURE (b: Builder) NamespaceDeclaration* (namespaceDecl: DTD.NamespaceDeclaration);
   BEGIN
-    ASSERT (FALSE)
+    HALT (127)
   END NamespaceDeclaration;
 
 PROCEDURE (b: Builder) AttributesDone*;
@@ -269,10 +292,10 @@ PROCEDURE (b: Builder) AttributesDone*;
       i: LONGINT;
     BEGIN
       i := 0;
-      WHILE (str[i] # 0X) & (str[i] # ":") DO
+      WHILE (str[i] # 0) & (str[i] # ORD (":")) DO
         INC (i)
       END;
-      IF (str[i] = ":") THEN
+      IF (str[i] = ORD (":")) THEN
         RETURN i
       ELSE
         RETURN -1
@@ -284,21 +307,27 @@ PROCEDURE (b: Builder) AttributesDone*;
       i: LONGINT;
       err: Error.Msg;
     BEGIN
-      str[colon] := 0X;
+      str[colon] := 0;
       i := b. lenNamespaceList-1;
       WHILE (i >= 0) DO
-        IF (b. namespaceList[i]. prefix^ = str) THEN
-          str[colon] := ":";
+        IF (b. namespaceList[i]. prefix # NIL) &
+           LongStrings.Equal (b. namespaceList[i]. prefix^, str) THEN
+          str[colon] := ORD (":");
           RETURN b. namespaceList[i]
         END;
         DEC (i)
       END;
-      err := b. errorListener. Error (namespacesContext, undeclaredPrefix,
-                                      TRUE, b. namespaceLocator^);
+      err := ReportError (b, undeclaredPrefix, b. namespaceLocator^);
       err. SetLStringAttrib ("prefix", Msg.GetLStringPtr (str));
-      str[colon] := ":";
+      str[colon] := ORD (":");
       RETURN NIL
     END GetNamespace;
+
+  PROCEDURE RestoreLocator;
+    BEGIN
+      b. attrList. Clear;
+      b. delegateBuilder. SetLocator (b. parserLocator)
+    END RestoreLocator;
   
   BEGIN
     b. delegateBuilder. SetLocator (b. namespaceLocator);
@@ -313,6 +342,7 @@ PROCEDURE (b: Builder) AttributesDone*;
     ELSE
       namespaceDecl := b. stack[b. currLevel]. default
     END;
+    IF b. failed THEN RestoreLocator; RETURN END;
     b. stack[b. currLevel]. namespaceDecl := namespaceDecl;
     b. stack[b. currLevel]. localName := localName;
     b. delegateBuilder. StartElement (namespaceDecl, localName);
@@ -340,11 +370,12 @@ PROCEDURE (b: Builder) AttributesDone*;
            and namespace URI *)
         j := 0;
         WHILE (j # i) DO
-          IF (b. attrList. attr[j]. localName^ = localName^) &
+          IF (namespaceDecl # NIL) & (namespaceDecl. uri # NIL) &
+             LongStrings.Equal (b. attrList. attr[j]. localName^, localName^) &
              (b. attrList. attr[j]. namespaceDecl # NIL) &
+             (b. attrList. attr[j]. namespaceDecl. uri # NIL) &
              (b. attrList. attr[j]. namespaceDecl. uri^ = namespaceDecl. uri^) THEN
-            err := b. errorListener. Error (namespacesContext, nameClash,
-                                            TRUE, b. namespaceLocator^);
+            err := ReportError (b, nameClash, b. namespaceLocator^);
             err. SetLStringAttrib ("prefix", Msg.GetLStringPtr (b. attrList. attr[j]. namespaceDecl. prefix^));
             err. SetLStringAttrib ("localName", Msg.GetLStringPtr (localName^));
           END;
@@ -355,6 +386,7 @@ PROCEDURE (b: Builder) AttributesDone*;
       END;
       attr. namespaceDecl := namespaceDecl;
       attr. localName := localName;
+      IF b. failed THEN RestoreLocator; RETURN END;
       
       b. delegateBuilder. Attribute (namespaceDecl,
                                      localName,
@@ -363,8 +395,7 @@ PROCEDURE (b: Builder) AttributesDone*;
                                      attr. specified);
       INC (i)
     END;
-    
-    b. delegateBuilder. SetLocator (b. parserLocator);
+    RestoreLocator;
     b. delegateBuilder. AttributesDone
   END AttributesDone;
 
@@ -433,17 +464,22 @@ PROCEDURE (b: Builder) Comment* (VAR chars: DTD.StringVar;
 
 
 PROCEDURE Init* (b: Builder; delegateBuilder: B.Builder);
+  VAR prefix: DTD.String; builtinURI: DTD.StringURI;
   BEGIN
     b. delegateBuilder := delegateBuilder;
     NEW (b. namespaceLocator);
     b. parserLocator := NIL;
     b. errorListener := NIL;
+    b. failed := FALSE;
     
     b. currLevel := -1;
     NEW (b. stack, 16);
     
-    b. lenNamespaceList := 0;
     NEW (b. namespaceList, 16);
+    NEW (prefix, 4); LongStrings.Long ("xml", prefix^);
+    NEW (builtinURI, LongStrings.Length8 (xmlURI)+1); COPY (xmlURI, builtinURI^);
+    b. namespaceList[0] := DTD.NewNamespaceDeclaration (prefix, builtinURI);
+    b. lenNamespaceList := 1;
     
     b. attrList := B.NewAttributeList();
   END Init;
@@ -477,6 +513,8 @@ PROCEDURE SetErrorMessages;
         t := "Prefix `${prefix}' is not declared"
       | nameClash:
         t := "Attribute name conflicts with `${prefix}:${localName}'"
+      | reservedBinding:
+        t := "Reserved namespace prefix or URI binding"
       ELSE
         t := ""
       END;
@@ -489,4 +527,4 @@ PROCEDURE SetErrorMessages;
 BEGIN
   namespacesContext := Error.NewContext ("XML:Builder:Namespaces");
   SetErrorMessages
-END XML:Builder:Namespaces.
+END XMLBuilderNamespaces.

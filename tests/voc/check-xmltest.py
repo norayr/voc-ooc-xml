@@ -1,4 +1,4 @@
-"""Check XML 1.0 well-formedness using the bundled James Clark fixtures."""
+"""Check XML and namespace well-formedness using the bundled fixtures."""
 
 import argparse
 from pathlib import Path
@@ -47,6 +47,32 @@ def main():
     print(f"Details: {report}")
     for reason in skipped:
         print(f"Skipped: {reason}")
+    if failures:
+        print("\n".join(failures))
+        raise SystemExit(1)
+    namespace_root = Path(__file__).resolve().parents[1] / "namespaces"
+    failures = []
+    total = 0
+    for category in ("valid", "not-wf"):
+        for path in sorted((namespace_root / category).glob("*.xml")):
+            total += 1
+            try:
+                result = subprocess.run(
+                    [str(executable), "--namespaces", str(path)],
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=5,
+                )
+                expected = 0 if category == "valid" else 1
+                if result.returncode != expected:
+                    failures.append(f"{path.relative_to(namespace_root)}: exit {result.returncode}\n"
+                                    + result.stdout.decode("utf-8", errors="replace"))
+            except subprocess.TimeoutExpired:
+                failures.append(f"{path.relative_to(namespace_root)}: timeout")
+    if total != 24:
+        failures.append(f"Incomplete namespace corpus: expected 24 fixtures, found {total}")
+    report = args.work / "namespace-results.txt"
+    report.write_text("\n".join(failures), encoding="utf-8")
+    print(f"namespace well-formedness: {total - len(failures)}/{total} passed")
+    print(f"Details: {report}")
     if failures:
         print("\n".join(failures))
         raise SystemExit(1)

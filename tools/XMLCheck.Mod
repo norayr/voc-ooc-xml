@@ -1,24 +1,30 @@
 MODULE XMLCheck;
 
 IMPORT Args, Out, M := Msg, Mem := IOMemory, B := XMLBuilder,
-  P := XMLParser, XMLUnicodeCodecImportAll;
+  N := XMLBuilderNamespaces, P := XMLParser, XMLUnicodeCodecImportAll;
 
 VAR path, text: ARRAY 4096 OF CHAR; p: P.Parser; res: M.Msg;
-  output: Mem.Channel; i: LONGINT; external: BOOLEAN;
+  output: Mem.Channel; i: LONGINT; arg: INTEGER;
+  external, namespaces: BOOLEAN; builder: B.Builder;
 
 BEGIN
-  IF (Args.argc < 2) OR (Args.argc > 3) THEN
-    Out.String("usage: XMLCheck [--external] file.xml"); Out.Ln; HALT(2)
+  IF (Args.argc < 2) OR (Args.argc > 4) THEN
+    Out.String("usage: XMLCheck [--external] [--namespaces] file.xml"); Out.Ln; HALT(2)
   END;
-  Args.Get(1, path); external := path = "--external";
-  IF external THEN
-    IF Args.argc # 3 THEN HALT(2) END;
-    Args.Get(2, path)
-  ELSIF Args.argc # 2 THEN HALT(2)
+  arg := 1; external := FALSE; namespaces := FALSE;
+  WHILE arg < Args.argc-1 DO
+    Args.Get(arg, path);
+    IF (path = "--external") & ~external THEN external := TRUE
+    ELSIF (path = "--namespaces") & ~namespaces THEN namespaces := TRUE
+    ELSE HALT(2)
+    END;
+    INC(arg)
   END;
-  p := P.NewFile(path, NIL, NIL, NIL, B.New(), res);
+  Args.Get(arg, path); builder := B.New();
+  IF namespaces THEN builder := N.New(builder) END;
+  p := P.NewFile(path, NIL, NIL, NIL, builder, res);
   IF p = NIL THEN res.GetText(text); Out.String(text); Out.Ln; HALT(2) END;
-  p.followExternalRef := external; p.ParseDocument;
+  p.followExternalRef := external; p.enforceQNames := namespaces; p.ParseDocument;
   IF p.errList.msgCount # 0 THEN
     output := Mem.Tmp("", {Mem.read, Mem.write}, res);
     p.errList.Write(output);

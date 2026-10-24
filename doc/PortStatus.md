@@ -2,8 +2,8 @@
 
 `make test` builds and tests the Unicode codecs, XML byte/Unicode buffers,
 DTD data model, entity resolver, diagnostics, locator, builder interface and
-parser against VOC's shared ooc support under the Oberon-2 model. Namespace
-and validation builders and the XML writer are the next adaptation stages.
+parser and namespace builder against VOC's shared ooc support under the
+Oberon-2 model. The validation builder and XML writer are the next adaptation stages.
 
 ## Dependencies
 
@@ -13,7 +13,8 @@ integer widths, record extensions and method signatures must agree.
 | Dependency | Status |
 | --- | --- |
 | `XMLParser`, `XMLBuilder`, `XMLLocator`, `XMLError` | Ported and tested with in-memory and file inputs, UTF-16 callbacks and UTF-8 diagnostics. |
-| Namespace/validation builders and writer | Included in the CVS import; still need adapting to VOC. |
+| `XMLBuilderNamespaces` | Ported with scoped declarations, implicit `xml` bindings, duplicate expanded-name checks and Unicode coverage. |
+| Validation builder and writer | Included in the CVS import; still need adapting to VOC. |
 | `XMLDTD` | Ported data model; parser tests cover internal subsets, parameter entities and default attributes. Full validation awaits its builder. |
 | `XMLEntityResolver` | Ported Unicode system-identifier normalization and relative URI resolution; tested with supplementary characters, malformed UTF-16 and long identifiers. |
 | `XMLInputBuffer`, `XMLUnicodeBuffer` | Ported and tested with short reads, BOMs, growth, compaction, repeated flushes and partial-write retries. |
@@ -124,6 +125,7 @@ will not be part of the VOC port's implementation.
 - `make conformance` extracts the bundled James Clark archive into ignored
   build storage and checks all 360 included well-formedness cases. The
   upstream exclusion of `valid/sa/065.xml` is recorded in the result file.
+  All 24 original namespace fixtures also pass with `XMLCheck --namespaces`.
   Timeouts, traps and opening errors are failures, even for negative fixtures.
   Canonical-output and validity comparisons remain pending.
 - `XMLCheck` disables external references by default. The library retains its
@@ -131,9 +133,25 @@ will not be part of the VOC port's implementation.
   explicitly. Expansion, recursion and input-size limits remain pending, so
   use trusted documents while that security review is incomplete.
 
+## Namespace checks
+
+- The builder resolves prefixes after collecting all declarations in a start
+  tag, and restores scope after an end tag. Default declarations apply to
+  elements; unprefixed attributes retain no namespace.
+- The implicit `xml` binding is available without a declaration. Reserved
+  prefix/URI bindings, undeclared prefixes, empty prefixed declarations and
+  duplicate expanded attribute names produce diagnostics.
+- Buffered attributes are cleared between elements. Default namespace entries
+  are skipped during prefix lookup, and fatal errors suppress further events
+  to the application apart from `EndDocument`.
+- Tests cover attributes declared in a DTD without an accompanying element
+  declaration, Unicode names/URIs, more than 16 nested scopes and attribute
+  list growth. DTD default values and explicit-value normalization also work
+  for elements without `<!ELEMENT>` declarations.
+
 ## Verification
 
-The five XML test programs and seven ooc regression programs pass with
+The six XML test programs and seven ooc regression programs pass with
 GCC/C23, Clang/C23 and TCC under `-O2`. The shared ooc package is rebuilt
 before each XML test run. An additional Clang build instruments the shared
 package, ported XML modules and tests with AddressSanitizer and
@@ -175,7 +193,7 @@ source-build example in the README.
 
 ## Next stages
 
-1. Adapt and test namespace support, DTD validation and the writer.
+1. Adapt and test DTD validation and the writer.
 2. Adapt the remaining upstream test drivers. Review entity expansion,
    recursion and external-entity controls before accepting untrusted input.
 3. Run the remaining XML/namespace/encoding suites. Separate external fixture

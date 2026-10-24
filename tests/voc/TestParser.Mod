@@ -178,7 +178,11 @@ BEGIN
   p := Document('<!DOCTYPE r [<!ENTITY % decl "<!ELEMENT r EMPTY>">%decl;]><r/>', b); Good(p);
   ASSERT((b.dtd.elementNamespace.Get(b.dtd.rootName) # NIL) & b.complete, 15);
   b := NewCapture(); p := Document('<!DOCTYPE r SYSTEM "missing.dtd"><r/>', b); Good(p);
-  ASSERT(~b.complete, 16)
+  ASSERT(~b.complete, 16);
+  b := NewCapture(); p := Document('<!DOCTYPE r [<!ATTLIST r a NMTOKENS " a  b ">]><r/>', b); Good(p);
+  ASSERT((b.defaults = 1) & S.Equal8(b.lastValue^, "a b"), 29);
+  b := NewCapture(); p := Document('<!DOCTYPE r [<!ATTLIST r a NMTOKENS #IMPLIED>]><r a=" a  b "/>', b); Good(p);
+  ASSERT((b.attributes = 1) & S.Equal8(b.lastValue^, "a b"), 30)
 END DTDChecks;
 
 PROCEDURE UnicodeChecks;

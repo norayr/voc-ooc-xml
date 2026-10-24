@@ -2253,14 +2253,20 @@ PROCEDURE (p: Parser) ParseDocument*;
         END AttributeDefined;
       
       BEGIN
-        decl := elemDecl. attrNamespace. declList;
+        IF elemDecl # NIL THEN
+          decl := elemDecl. attrNamespace. declList
+        ELSE
+          decl := dtd. attributeList
+        END;
         WHILE (decl # NIL) DO
           attrDecl := decl(DTD.AttrDecl);
-          IF ~AttributeDefined (attrDecl. name) THEN
+          IF ((elemDecl # NIL) OR LongStrings.Equal (attrDecl. elementName^, startName^)) &
+             ~AttributeDefined (attrDecl. name) THEN
             IF (attrDecl. default >= DTD.attrDefault) THEN
               Expand (attrDecl. defaultValue);
               p. builder. Attribute (NIL, decl. name, attrDecl,
-                                     attrDecl. defaultValue, FALSE)
+                                     attrDecl. defaultValue, FALSE);
+              NoteName (decl. name)
             ELSIF p. validating &
                   (attrDecl. default = DTD.attrRequired) THEN
               ErrPosNF (requiredAttrMissing, p. l^);
@@ -2316,6 +2322,15 @@ PROCEDURE (p: Parser) ParseDocument*;
             IF (decl0 # NIL) THEN
               attrDecl := decl0(DTD.AttrDecl)
             END
+          ELSE
+            decl0 := dtd. attributeList;
+            WHILE (decl0 # NIL) & (attrDecl = NIL) DO
+              IF LongStrings.Equal (decl0(DTD.AttrDecl). elementName^, startName^) &
+                 LongStrings.Equal (decl0. name^, attrName^) THEN
+                attrDecl := decl0(DTD.AttrDecl)
+              END;
+              decl0 := decl0. next
+            END
           END;
           attrValue := AttValue (TRUE);
           Expand (attrValue);
@@ -2325,6 +2340,8 @@ PROCEDURE (p: Parser) ParseDocument*;
         StorePosition (p. l^);
         IF (decl # NIL) THEN
           AddDefaultAttributes (decl(DTD.ElementDecl))
+        ELSE
+          AddDefaultAttributes (NIL)
         END;
         CheckChar (62);
         p. builder. AttributesDone();    (* callback *)
