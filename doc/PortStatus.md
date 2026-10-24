@@ -1,8 +1,8 @@
 # VOC port status
 
-The full XML library does not yet build with VOC. `make test` currently tests
-the six adapted Unicode codec modules only. The parser, DTD handling,
-builders and writer remain upstream source, not tested VOC implementations.
+`make test` currently builds and tests the Unicode codecs, `LongStrings` and
+the Unicode-safe `Msg` implementation under VOC's Oberon-2 model. The parser,
+DTD handling, builders and writer are the next porting stages.
 
 ## Dependencies
 
@@ -13,9 +13,9 @@ integer widths, record extensions and method signatures must agree.
 | --- | --- |
 | XML parser, DTDs, builders, resolver, buffers and writer | Included in the CVS import; still need porting. |
 | Unicode codec registry, ASCII, Latin-1, UTF-8, UTF-16 | Adapted to `-O2`; new Oberon tests pass with GCC/C23, Clang/C23 and TCC. |
-| `LongStrings` | Not in VOC's current oo2c port set. Original source is available; needs an interface using preserved Unicode code units, not `CHAR`. |
-| `Msg` | VOC has it, but its `LChar` is `CHAR`. The Unicode XML message/attribute interfaces cannot use that representation unchanged. |
-| `Channel`, `TextRider`, `Time` | VOC has oo2c ports. Their interfaces need checking against the XML channel implementations. |
+| `LongStrings` | Adapted in `src/oo2c/`, using `XMLUnicode.LONGCHAR` for code units and `LONGINT` for positions and lengths. |
+| `Msg` | Adapted in `src/oo2c/`; wide attributes, template replacement and message-list transfers are tested. `GetLText` preserves UTF-16; `GetText` retains the original Latin-1 conversion. |
+| `Channel`, `TextRider`, `Time` | VOC has oo2c ports. Channel and rider modules must be rebuilt against this Unicode-safe `Msg` interface before use together. |
 | `Ascii`, `CharClass`, `IntStr`, `RealStr` | VOC has ports; retain only the required interfaces and test their use. |
 | `Strings` | XML expects oo2c semantics. VOC also has Oakwood `Strings` and `oocStrings`; choose explicitly, not just by module name. |
 | `Files` | XML expects oo2c channels, whereas VOC's ordinary `Files` is an Oberon file/rider API. An explicit channel adapter is needed. |
@@ -24,9 +24,41 @@ integer widths, record extensions and method signatures must agree.
 | `OS:*`, `IO:PFD`, sockets and select | Included here, with original C bindings. Require a separate native-width/opaque-structure review; not part of the tested codec build. |
 | `ADT:ArrayList`, `ADT:Dictionary`, `ADT:Object`, `ADT:String` | Used by optional `URI:Query:WWWForm`, not directly by the XML parser. Do not import newer generic replacements unnecessarily. |
 
-The original support sources are available locally, so there is no known
-source-availability blocker. Any imported support module needs its own
-recorded provenance and an unmodified baseline before adaptation.
+Support-module provenance is recorded in
+[history/oo2c-support.md](../history/oo2c-support.md). Additional imported
+support modules need the same recorded provenance and unmodified baseline.
+
+## String and diagnostic checks
+
+- Copies, edits and searches preserve UTF-16 code units, including Armenian
+  characters and surrogate pairs. Positions count code units; bounded edits
+  may split a pair, as in the original interface.
+- `Long` and `Append8` widen Latin-1 octets. UTF-8 decoding uses the codecs.
+- `Capitalize` preserves oo2c's ASCII and Latin-1 mapping; other code units
+  remain unchanged.
+- Small-buffer edit combinations are checked against independently constructed
+  expected results. Capacity tests use subtraction to avoid length overflow.
+- Regression tests cover insertion beyond the end, message-list transfers into
+  empty and extended lists, repeated built-in placeholders, bounded narrow
+  output and wide/narrow strings longer than 32767 units or octets.
+- A UTF-8 round trip through the string and diagnostic interfaces checks that
+  Armenian and supplementary characters survive the complete support path.
+
+The three test programs pass with GCC/C23, Clang/C23 and TCC. An additional
+Clang build instruments the ported modules and tests with AddressSanitizer
+and UndefinedBehaviorSanitizer:
+
+```sh
+env CC=clang \
+  CFLAGS='-std=c23 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer' \
+  ASAN_OPTIONS=detect_leaks=0:detect_stack_use_after_return=0 \
+  UBSAN_OPTIONS=halt_on_error=1 \
+  make BUILD=build/sanitize test
+```
+
+ASan's alternate stack frames must be disabled so VOC's conservative garbage
+collector can find live pointers on the native stack. The installed VOC
+runtime and support dependencies are used as provided by the compiler.
 
 ## Representation rules
 
@@ -42,20 +74,15 @@ recorded provenance and an unmodified baseline before adaptation.
   length operation.
 - Keep native addresses in `SYSTEM.ADDRESS`, preserve native field widths,
   and check narrowing conversions at OS boundaries.
-- Retain the Oberon parser and writer. No C libxml dependency is being added.
 
 ## Next stages
 
-1. Unicode string operations and Unicode-safe diagnostic attributes.
-2. Port memory channels, URI types and XML buffers with bounded operations.
-3. Build and test the in-memory parser and basic builders, then namespaces,
+1. Port memory channels, URI types and XML buffers with bounded operations.
+2. Build and test the in-memory parser and basic builders, then namespaces,
    DTD validation and the writer.
-4. Adapt file resolution and upstream test drivers. Review entity expansion,
+3. Adapt file resolution and upstream test drivers. Review entity expansion,
    recursion and external-entity controls before accepting untrusted input.
-5. Run the original XML/namespace/encoding suites. Separate external fixture
+4. Run the original XML/namespace/encoding suites. Separate external fixture
    availability from genuine parser failures.
-6. Only then add a VOC port manifest and integrate the tested sources into
+5. Only then add a VOC port manifest and integrate the tested sources into
    VOC's ports tree. Optional HTTP/socket support can be handled independently.
-
-The W3c port is a separate follow-up; its sources have not been mixed into
-this repository.
