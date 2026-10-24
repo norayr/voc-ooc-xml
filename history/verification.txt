@@ -1,0 +1,16 @@
+OK: 42 initial vendor no-op revisions equal their imported 1.1
+OK: 3291 live CVS revisions, 3276 revision-to-commit mappings
+OK: all 23 dead CVS revisions have corresponding file deletions
+OK: CVS symbol HEAD: 1916 files match refs/heads/master
+OK: CVS symbol MAIN: 845 files match refs/heads/import-1.1.1
+OK: CVS symbol libxml-3_1_1: 1916 files match refs/tags/libxml-3_1_1
+OK: CVS symbol libxml-3_2_0: 1916 files match refs/tags/libxml-3_2_0
+OK: CVS symbol libxml_3_0: 1913 files match refs/tags/libxml_3_0
+OK: CVS symbol v0: 686 files match refs/tags/v0
+OK: CVS symbol v1: 845 files match refs/tags/v1
+OK: CVS symbol v2_0: 869 files match refs/tags/v2_0
+OK: CVS symbol v2_1: 923 files match refs/tags/v2_1
+OK: CVS symbol v2_2: 929 files match refs/tags/v2_2
+OK: CVS symbol v2_3: 942 files match refs/tags/v2_3
+OK: CVS symbol v2_4: 942 files match refs/tags/v2_4
+OK: CVS symbol v2_5: 951 files match refs/tags/v2_5
