@@ -22,14 +22,19 @@ diagnostics (exit 1); opening errors, traps and sanitizer errors fail the test.
 | James Clark canonical output | 163 |
 | IBM canonical output | 148 |
 | Sun canonical output | 28 |
-| Original parser-protocol output | 5 |
+| Original parser/namespace protocol checks | 30 |
+| Original local XML regressions | 124 |
+| Original bulk canonical outputs | 2 |
 
-All included checks pass, also under Clang ASan/UBSan. The DTD total is 1,808;
-339 cases additionally compare canonical output byte-for-byte. James Clark
+All 2,687 included checks pass, also under Clang ASan/UBSan. The archived DTD
+total is 1,808; 339 archive cases compare canonical output byte-for-byte. James Clark
 uses the first canonical form; IBM and Sun use the second form, which includes
 sorted notation declarations.
-Parser-protocol checks compare callback traces and locator positions with the
-five original successful snapshots. Integration tests also reparse diagnostic
+The local XML suite adds 70 well-formedness checks and 54 validation checks;
+98 local/bulk runs compare canonical output bytes. Protocol checks compare
+callback traces and locator positions with 14 original successful snapshots,
+including nine namespace snapshots. The other 16 protocol checks require an
+XML diagnostic for malformed input. Integration tests also reparse diagnostic
 traces produced for malformed input.
 
 ## Upstream exclusions
@@ -70,6 +75,26 @@ directory globs, which would also run copies of the catalogs as XML documents.
 - Sun `not-wf/lang01.xml` through `lang06.xml` declare `xml:lang` as CDATA.
   Their language metadata does not impose additional XML well-formedness or
   DTD-validity constraints.
+- Local `miscxml/valid/sa/046.xml` declares `((a?,b)|(a?,c))`, and its own
+  comment identifies this as non-deterministic. It remains well-formed and its
+  canonical output matches; validation must report the XML section 3.2.1
+  compatibility error.
+
+## Original driver coverage
+
+The upstream `tests/Makefile` groups codec, URI, archived conformance, local
+XML, bulk, protocol and namespace tests. VOC's runners use the preserved
+fixtures directly. Negative local fixtures check diagnostic exit status;
+their historical error-text snapshots are retained as references. Positive
+XML/protocol output is compared byte-for-byte.
+
+| Original driver or suite | VOC coverage and follow-up |
+| --- | --- |
+| `src/TestParser.Mod` | `tools/XMLCheck.Mod` supplies well-formedness, DTD validation, namespaces, first/second canonical forms and protocol modes. All archived and local XML fixture groups now run in `make conformance`. |
+| `src/TestCodecs.Mod`, `tests/codecs` | `TestUnicodeCodecs` and `TestMemoryBuffers` cover codecs and streaming; replaying every original hex-vector case remains a follow-up. |
+| `src/TestURI.Mod`, `tests/uri` | URI support and its confidence tests live in VOC's ooc package. Review the original URI fixture groups there, including their optional HTTP-specific coverage. |
+| `src/TestGet.Mod`, `src/TestServer.Mod` | Optional HTTP/socket examples depend on the preserved network support modules. Review these with that dependency package. |
+| `src/libxml.Mod` | Upstream oo2c library manifest. The VOC `makefile` lists and builds the XML modules against the shared ooc package. |
 
 Specification references: [XML 1.0 Second Edition](https://www.w3.org/TR/2000/REC-xml-20001006/)
 and its [errata](https://www.w3.org/XML/xml-V10-2e-errata).

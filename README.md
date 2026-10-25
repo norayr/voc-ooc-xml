@@ -108,7 +108,10 @@ IBM, Sun and OASIS archives. Historical fixture exclusions and corrected
 expectations are recorded explicitly; see [conformance coverage](doc/Conformance.md).
 The target also compares 339 canonical outputs byte-for-byte with the
 reference files, including two explicitly recorded Sun output corrections.
-Five original parser-protocol snapshots also match byte-for-byte.
+The original local XML and bulk suites add 126 checks, including 98 canonical
+output comparisons. Fourteen original parser/namespace protocol snapshots
+match byte-for-byte; 16 negative protocol cases return XML diagnostics.
+The conformance target now runs 2,687 checks.
 
 `make xmlcheck` builds `XMLCheck`, a file well-formedness checker. Use
 `XMLCheck --namespaces file.xml` to enable namespace checks. Its default

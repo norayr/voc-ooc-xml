@@ -214,8 +214,14 @@ will not be part of the VOC port's implementation.
 - `XMLBuilderParserProtocol` writes callbacks as XML through `XMLWriter`.
   Tests reparse traces for declarations, attributes, namespaces, CDATA,
   comments, instructions, entities, missing base URIs and fatal parse errors.
-  All five original successful snapshots match byte-for-byte, including their
-  locator positions. Long-text tests exercise buffered trace output.
+  All 14 original successful protocol/namespace snapshots match byte-for-byte,
+  including their locator positions; 16 negative protocol cases return XML
+  diagnostics. Long-text tests exercise buffered trace output.
+- The original local XML and bulk suites now run 126 checks in the conformance
+  target, with 98 byte-for-byte canonical comparisons. Their sole historical
+  validation correction is a declared non-deterministic content model;
+  [Conformance coverage](Conformance.md) records it and reviews the original
+  drivers. The full conformance/output total is 2,687.
 
 ## Input policy review
 

@@ -1,4 +1,4 @@
-"""Compare the five original parser-callback protocol snapshots."""
+"""Compare original parser and namespace callback protocol snapshots."""
 
 import argparse
 from pathlib import Path
@@ -11,31 +11,38 @@ def main():
     parser.add_argument("--work", type=Path, default=Path("build/conformance"))
     args = parser.parse_args()
     executable = args.executable.resolve()
-    root = Path(__file__).resolve().parents[1] / "protocol"
+    tests = Path(__file__).resolve().parents[1]
     args.work.mkdir(parents=True, exist_ok=True)
-    paths = sorted((root / "valid").glob("???.xml"))
-    if len(paths) != 5:
-        raise SystemExit(f"Incomplete protocol corpus: expected 5 cases, found {len(paths)}")
+    cases = []
+    for suite, valid_count, invalid_count, extra in (("protocol", 5, 1, ()),
+                                                   ("namespaces", 9, 15, ("--namespaces",))):
+        root = tests / suite
+        for category, count, code in (("valid", valid_count, 0), ("not-wf", invalid_count, 1)):
+            paths = sorted((root / category).glob("???.xml"))
+            if len(paths) != count:
+                raise SystemExit(f"Incomplete {suite}/{category} corpus: expected {count} cases, found {len(paths)}")
+            cases.extend((root, path, extra, code) for path in paths)
     failures = []
-    for path in paths:
+    for root, path, extra, code in cases:
         name = path.relative_to(root).as_posix()
-        expected = (path.parent / "out" / path.name).read_bytes()
+        label = root.name + '/' + name
+        expected = (path.parent / "out" / path.name).read_bytes() if code == 0 else None
         try:
-            result = subprocess.run([str(executable), "--external", "--protocol", name],
+            result = subprocess.run([str(executable), "--external", "--protocol", *extra, name],
                                     cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=5)
-            if result.returncode:
-                failures.append(f"{name}: exit {result.returncode}\n"
+            if result.returncode != code:
+                failures.append(f"{label}: exit {result.returncode}\n"
                                 + result.stdout.decode("utf-8", errors="replace"))
-            elif result.stdout != expected:
+            elif expected is not None and result.stdout != expected:
                 offset = next((i for i, (a, b) in enumerate(zip(result.stdout, expected)) if a != b),
                               min(len(result.stdout), len(expected)))
-                failures.append(f"{name}: byte mismatch at {offset}\n"
+                failures.append(f"{label}: byte mismatch at {offset}\n"
                                 f"actual: {result.stdout[offset:offset+100]!r}\n"
                                 f"expected: {expected[offset:offset+100]!r}")
         except subprocess.TimeoutExpired:
-            failures.append(f"{name}: timeout")
+            failures.append(f"{label}: timeout")
     (args.work / "parser-protocol.txt").write_text("\n".join(failures) + "\n", encoding="utf-8")
-    print(f"Parser protocol output: {len(paths) - len(failures)}/{len(paths)} passed")
+    print(f"Parser protocol checks: {len(cases) - len(failures)}/{len(cases)} passed")
     if failures:
         raise SystemExit("\n".join(failures))
 

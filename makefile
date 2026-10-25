@@ -99,6 +99,7 @@ conformance: xmlcheck
 	python3 tests/voc/check-validation.py "$(BUILD)/XMLCheck" --work "$(BUILD)/conformance"
 	python3 tests/voc/check-canonical.py "$(BUILD)/XMLCheck" --work "$(BUILD)/conformance"
 	python3 tests/voc/check-protocol.py "$(BUILD)/XMLCheck" --work "$(BUILD)/conformance"
+	python3 tests/voc/check-misc.py "$(BUILD)/XMLCheck" --work "$(BUILD)/conformance"
 
 limits: xmlcheck
 	python3 tests/voc/check-limits.py "$(BUILD)/XMLCheck" --work "$(BUILD)/limits"
