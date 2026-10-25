@@ -20,7 +20,7 @@ MODULE XMLRegexp;
 
 
 IMPORT
-  Out, LongStrings, DTD := XMLDTD;
+  Out, LongStrings, Limits := XMLLimits, DTD := XMLDTD;
 
 
 TYPE
@@ -32,6 +32,7 @@ TYPE
   END;
   RegexpDesc = RECORD
     (DTD.RegexpInfoDesc)
+    limits: Limits.Budget;
     states: States;
     initialState: State;
     size: State;
@@ -41,6 +42,7 @@ TYPE
   Set = POINTER TO SetDesc;
   Members = POINTER TO ARRAY OF State;
   SetDesc = RECORD
+    limits: Limits.Budget;
     members: Members;
     size: LONGINT;
   END;
@@ -48,6 +50,7 @@ TYPE
 TYPE
   Matcher* = POINTER TO MatcherDesc;
   MatcherDesc = RECORD
+    limits: Limits.Budget;
     states: States;
     current: Set;
   END;
@@ -82,7 +85,10 @@ PROCEDURE DumpRegexp (regexp: Regexp);
   END DumpRegexp;
 
 
-PROCEDURE New* (contentModel: DTD.CP): Regexp;
+PROCEDURE Step (limits: Limits.Budget; n: LONGINT): BOOLEAN;
+  BEGIN RETURN (limits = NIL) OR limits. Charge (Limits.work, n) END Step;
+
+PROCEDURE NewLimited* (contentModel: DTD.CP; limits: Limits.Budget): Regexp;
 (**@precond
    The @oparam{contentModel} is neither @code{EMPTY}, @code{ANY}, nor
    @samp{Mixed}.
@@ -97,6 +103,7 @@ PROCEDURE New* (contentModel: DTD.CP): Regexp;
       new: States;
       i: LONGINT;
     BEGIN
+      IF ~Step (limits, 1) THEN RETURN 0 END;
       IF (regexp. size = LEN (regexp. states^)) THEN
         NEW (new, LEN (regexp. states^)*2);
         FOR i := 0 TO LEN (regexp. states^)-1 DO
@@ -128,15 +135,16 @@ PROCEDURE New* (contentModel: DTD.CP): Regexp;
         VAR
           first1, first2: State;
         BEGIN
-          IF (ptr. next = NIL) THEN
-            Convert (ptr, start, end)
-          ELSE
+          WHILE ptr # NIL DO
+            IF ~Step (limits, 1) THEN RETURN END;
+            IF ptr. next = NIL THEN Convert (ptr, start, end); RETURN END;
             first1 := NewState();
             Convert (ptr, first1, end);
             first2 := NewState();
-            ConvertChoiceList (ptr. next, first2, end);
+            IF ~Step (limits, 0) THEN RETURN END;
             regexp. states[start]. next1 := first1;
-            regexp. states[start]. next2 := first2
+            regexp. states[start]. next2 := first2;
+            start := first2; ptr := ptr. next
           END
         END ConvertChoiceList;
 
@@ -144,16 +152,17 @@ PROCEDURE New* (contentModel: DTD.CP): Regexp;
         VAR
           first1: State;
         BEGIN
-          IF (ptr. next = NIL) THEN
-            Convert (ptr, start, end)
-          ELSE
+          WHILE ptr # NIL DO
+            IF ~Step (limits, 1) THEN RETURN END;
+            IF ptr. next = NIL THEN Convert (ptr, start, end); RETURN END;
             first1 := NewState();
             Convert (ptr, start, first1);
-            ConvertSeqList (ptr. next, first1, end)
+            start := first1; ptr := ptr. next
           END
         END ConvertSeqList;
 
       BEGIN
+        IF ~Step (limits, 1) THEN RETURN END;
         WITH cp: DTD.NameCP DO
           regexp. states[start]. elem := cp. name;
           regexp. states[start]. next1 := end;
@@ -168,6 +177,8 @@ PROCEDURE New* (contentModel: DTD.CP): Regexp;
       END ConvertCP;
       
     BEGIN
+      IF ~Step (limits, 1) THEN RETURN END;
+      IF (limits # NIL) & ~limits. Enter() THEN RETURN END;
       CASE cp. cpMode OF
       | DTD.cpOnce:
         ConvertCP (cp, start, end)
@@ -186,25 +197,32 @@ PROCEDURE New* (contentModel: DTD.CP): Regexp;
         ConvertCP (cp, start, subStart);
         regexp. states[subStart]. next1 := end;
         regexp. states[subStart]. next2 := start
-      END
+      END;
+      IF limits # NIL THEN limits. Leave END
     END Convert;
   
   BEGIN
     NEW (regexp);
+    regexp. limits := limits;
     NEW (regexp. states, 16);
     regexp. size := 0;
     regexp. initialState := NewState();
     Convert (contentModel, regexp. initialState, endOfRegexp);
+    IF ~Step (limits, 0) THEN RETURN NIL END;
     (*DumpRegexp (regexp);*)
     RETURN regexp
-  END New;
+  END NewLimited;
+
+PROCEDURE New* (contentModel: DTD.CP): Regexp;
+  BEGIN RETURN NewLimited (contentModel, NIL) END New;
 
 
-PROCEDURE NewSet(): Set;
+PROCEDURE NewSet(limits: Limits.Budget): Set;
   VAR
     set: Set;
   BEGIN
     NEW (set);
+    set. limits := limits;
     NEW (set. members, 8);
     set. size := 0;
     RETURN set
@@ -215,8 +233,10 @@ PROCEDURE Include (set: Set; element: State);
     i, j: LONGINT;
     new: Members;
   BEGIN
+    IF ~Step (set. limits, 1) THEN RETURN END;
     i := 0;
     WHILE (i # set. size) & (set. members[i] # element) DO
+      IF ~Step (set. limits, 1) THEN RETURN END;
       INC (i)
     END;
     
@@ -250,6 +270,7 @@ PROCEDURE Expand (states: States; set: Set);
   BEGIN
     i := 0;
     WHILE i < set. size DO
+      IF ~Step (set. limits, 1) THEN RETURN END;
       s := set. members[i];
       IF (s # endOfRegexp) & (states[s]. elem = NIL) THEN
         Include (set, states[s]. next1);
@@ -265,16 +286,19 @@ PROCEDURE (regexp: Regexp) IsDeterministic* (): BOOLEAN;
   VAR closure: Set; i, j, k: LONGINT; s, t: State;
   BEGIN
     FOR i := -1 TO regexp. size-1 DO
+      IF ~Step (regexp. limits, 1) THEN RETURN FALSE END;
       IF (i = -1) OR (regexp. states[i]. elem # NIL) THEN
-        closure := NewSet();
+        closure := NewSet(regexp. limits);
         IF i = -1 THEN Include (closure, regexp. initialState)
         ELSE Include (closure, regexp. states[i]. next1)
         END;
         Expand (regexp. states, closure);
         FOR j := 0 TO closure. size-1 DO
+          IF ~Step (regexp. limits, 1) THEN RETURN FALSE END;
           s := closure. members[j];
           IF (s # endOfRegexp) & (regexp. states[s]. elem # NIL) THEN
             FOR k := j+1 TO closure. size-1 DO
+              IF ~Step (regexp. limits, 1) THEN RETURN FALSE END;
               t := closure. members[k];
               IF (t # endOfRegexp) & (regexp. states[t]. elem # NIL) &
                  LongStrings.Equal (regexp. states[s]. elem^, regexp. states[t]. elem^) THEN
@@ -285,7 +309,7 @@ PROCEDURE (regexp: Regexp) IsDeterministic* (): BOOLEAN;
         END
       END
     END;
-    RETURN TRUE
+    RETURN Step (regexp. limits, 0)
   END IsDeterministic;
 
 
@@ -295,8 +319,9 @@ PROCEDURE NewMatcher* (regexp: Regexp): Matcher;
     m: Matcher;
   BEGIN
     NEW (m);
+    m. limits := regexp. limits;
     m. states := regexp. states;
-    m. current := NewSet();
+    m. current := NewSet(m. limits);
     Include (m. current, regexp. initialState);
     RETURN m
   END NewMatcher;
@@ -307,14 +332,16 @@ PROCEDURE (m: Matcher) Matches* (name: DTD.String): BOOLEAN;
     s: State;
     newSet: Set;
   BEGIN
+    IF ~Step (m. limits, 1) THEN RETURN FALSE END;
     IF (m. current. size = 0) THEN
       (* a previous mismatch reduced the current set of states to the empty 
          set; no need to report further mismatches *)
       RETURN TRUE
     ELSE
-      newSet := NewSet();
+      newSet := NewSet(m. limits);
       i := 0;
       WHILE (i # m. current. size) DO
+        IF ~Step (m. limits, 1) THEN RETURN FALSE END;
         s := m. current. members[i];
         IF (s = endOfRegexp) THEN
           (* this pseudo state does not match any element *)
@@ -331,7 +358,7 @@ PROCEDURE (m: Matcher) Matches* (name: DTD.String): BOOLEAN;
 
       IF (newSet. size # 0) THEN
         m. current := newSet;
-        RETURN TRUE
+        RETURN Step (m. limits, 0)
       ELSE
         RETURN FALSE
       END
@@ -345,6 +372,7 @@ PROCEDURE (m: Matcher) EndOfRegexp* (): BOOLEAN;
   BEGIN
     i := 0;
     WHILE (i # m. current. size) DO
+      IF ~Step (m. limits, 1) THEN RETURN FALSE END;
       s := m. current. members[i];
       IF (s = endOfRegexp) THEN
         RETURN TRUE
@@ -373,6 +401,7 @@ PROCEDURE (m: Matcher) ExpectedTags* (currentElement: DTD.String): DTD.String;
       len := 0;
       i := 0;
       WHILE (i # m. current. size) DO
+        IF ~Step (m. limits, 1) THEN RETURN NIL END;
         IF (m. current. members[i] = endOfRegexp) THEN
           INC (len, LongStrings.Length (currentElement^)+2)
         ELSIF (m. states[m. current. members[i]]. elem # NIL) THEN
@@ -385,6 +414,7 @@ PROCEDURE (m: Matcher) ExpectedTags* (currentElement: DTD.String): DTD.String;
       str[0] := 0;
       i := 0;
       WHILE (i # m. current. size) DO
+        IF ~Step (m. limits, 1) THEN RETURN NIL END;
         IF (m. current. members[i] = endOfRegexp) THEN
           LongStrings.Append8 (" /", str^);
           LongStrings.Append (currentElement^, str^)

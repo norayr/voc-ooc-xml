@@ -1,6 +1,7 @@
 MODULE XMLUnicodeBuffer;
 
 IMPORT
+  Limits := XMLLimits,
   SYSTEM, Channel, Msg, LongStrings, Unicode := oocUnicode,
   InputBuffer := XMLInputBuffer, Codec := XMLUnicodeCodec;
 
@@ -498,6 +499,10 @@ PROCEDURE (out: Output) Write8* (str: ARRAY OF CHAR);
   BEGIN
     out. Write8I (str, 0, LongStrings.Length8 (str))
   END Write8;
+
+PROCEDURE (out: Output) SetLimits* (limits: Limits.Budget);
+(**Applies an optional output-byte budget to buffered and subsequent output. *)
+  BEGIN out. writer := Limits.WrapWriter (out. writer, limits) END SetLimits;
 
 PROCEDURE (out: Output) Flush*;
 (**Flushes the contents of the output buffer to the channel.  Then, flush is

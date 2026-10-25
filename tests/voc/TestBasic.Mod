@@ -3,7 +3,7 @@ MODULE TestBasic;
 IMPORT Out, S := LongStrings, M := Msg, Mem := IOMemory, Ch := Channel,
   URI, URIParser, D := XMLDTD, E := XMLBasicElement, T := XMLBasicDataType,
   P := XMLBasicParser, L := XMLLocator, Err := XMLError, W := XMLWriter,
-  C := XMLUnicodeCodec, XMLUnicodeCodecImportAll;
+  C := XMLUnicodeCodec, Limits := XMLLimits, XMLUnicodeCodecImportAll;
 
 TYPE
   Node = POINTER TO NodeDesc;
@@ -208,13 +208,30 @@ BEGIN
   ASSERT((pcdata.chars.length = 2) & (pcdata.chars.array[0] = 0D83DH), 37)
 END BufferChecks;
 
+PROCEDURE LimitedChecks;
+  VAR budget: Limits.Budget; ch: Mem.Channel; writer: Ch.Writer;
+    node: E.Element; list: Err.List; i: LONGINT; text: ARRAY 64 OF CHAR;
+BEGIN
+  options := {}; text := '<r><r/>text</r>';
+  FOR i := 0 TO 200 DO
+    ch := Memory(); writer := ch.NewWriter(); writer.WriteBytes(text, 0, S.Length8(text));
+    budget := Limits.New(); budget.maxWork := i;
+    created := 0; located := 0; completed := 0;
+    node := P.ParseLimited(ch.NewReader(), base, NIL, factory, -1, {}, budget, list);
+    IF budget.error # NIL THEN ASSERT((node = NIL) & (list # NIL), 40)
+    ELSE ASSERT((node # NIL) & (list = NIL), 41)
+    END;
+    ASSERT(budget.depth = 0, 42); ch.Close
+  END
+END LimitedChecks;
+
 BEGIN
   base := URIParser.NewURI("file:/xml-tests/document.xml", NIL, result); ASSERT(result = NIL, 38);
   initValue := Value("r"); rootName := initValue.Flatten(NIL);
   initValue := Value("n"); required := initValue.Flatten(NIL);
   initValue := Value("element consistency failure"); semantic := initValue.Flatten(NIL);
   factory := E.NewRootFactory(); factory.AddFactory(rootName^, Root);
-  ParserChecks; DataChecks; BufferChecks;
+  ParserChecks; DataChecks; BufferChecks; LimitedChecks;
   rootName[0] := 531H; factory.AddFactory(rootName^, Root);
   options := {};
   unicodeXML[0] := "<"; unicodeXML[1] := 0D4X; unicodeXML[2] := 0B1X;

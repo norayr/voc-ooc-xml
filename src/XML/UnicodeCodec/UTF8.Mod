@@ -47,11 +47,12 @@ PROCEDURE New (bom: SHORTINT): Codec;
     RETURN c
   END New;
 
-PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
+PROCEDURE DecodeBytes (codec: Codec; VAR source: ARRAY OF CHAR;
                                   sourceStart, sourceEnd: LONGINT;
                                   VAR dest: ARRAY OF UC.Char;
                                   destStart, destEnd: LONGINT;
-                                  VAR sourceDone, destDone: LONGINT);
+                                  VAR sourceDone, destDone: LONGINT;
+                                  logicalEnd: LONGINT);
   VAR
     i, j, cval, low, bytes, testSourceEnd, testDestEnd: LONGINT;
   
@@ -78,10 +79,9 @@ PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
       INC (codec. invalidChars);
       dest[j] := UC.decodeError;
       INC (j); INC (i, offset);
-      (* Do not scan forward here: the short-buffer fallback temporarily
-         pads sourceEnd for the main loop. Scanning continuation bytes to
-         that artificial end can consume bytes outside the caller's range.
-         A following unexpected continuation is a separate decoding error. *)
+      (* Keep upstream's replacement grouping inside the caller's interval,
+         independently of the short-buffer fallback's padded loop bound. *)
+      WHILE (i < logicalEnd) & (80X <= source[i]) & (source[i] < 0C0X) DO INC (i) END
     END Invalid;
   
   BEGIN
@@ -184,9 +184,9 @@ PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
       END;
       IF (i # sourceStart) THEN
         (* try to decode all the complete characters left in source *)
-        codec. Decode (source, sourceStart, i+offsetSource,
-                       dest, j, destEnd+offsetDest,
-                       sourceDone, destDone)
+        DecodeBytes (codec, source, sourceStart, i+offsetSource,
+                        dest, j, destEnd+offsetDest,
+                        sourceDone, destDone, logicalEnd)
       ELSE
         sourceDone := i; destDone := destStart
       END;
@@ -202,6 +202,16 @@ PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
     ELSE
       sourceDone := i; destDone := j
     END
+  END DecodeBytes;
+
+PROCEDURE (codec: Codec) Decode* (VAR source: ARRAY OF CHAR;
+                                  sourceStart, sourceEnd: LONGINT;
+                                  VAR dest: ARRAY OF UC.Char;
+                                  destStart, destEnd: LONGINT;
+                                  VAR sourceDone, destDone: LONGINT);
+  BEGIN
+    DecodeBytes (codec, source, sourceStart, sourceEnd, dest, destStart, destEnd,
+                 sourceDone, destDone, sourceEnd)
   END Decode;
 
 PROCEDURE (codec: Codec) Encode* (VAR source: ARRAY OF UC.Char;

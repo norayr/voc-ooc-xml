@@ -139,7 +139,8 @@ TYPE
   (**An attribute value is stored as a list of character data and general
      entity references.  That is, the internal structure of the value string is
      not resolved at first.  Character data is stored as
-     @otype{Characters}, and entity references as @otype{EntityRef}.  *)
+      @otype{Characters}, and entity references as @otype{EntityRef}.  *)
+    limits-: Limits.Budget;
     fragmentList-, fragmentTail: Fragment;
     (**The head of the list of attribute value fragments.  For an empty
        attribute, this is @code{NIL}.  *)
@@ -161,6 +162,7 @@ TYPE
   Enumeration* = POINTER TO EnumerationDesc;
   EnumerationDesc = RECORD
   (**Used to store an attribute value enumeration.  *)
+    limits: Limits.Budget;
     nameList-, nameTail: NameNode;
     (**A list of names.  Used for both @oconst{attrENUMERATED} and
        @oconst{attrNOTATION}.  @ofield{NameNode.next} refers to the next
@@ -467,6 +469,9 @@ PROCEDURE NewNamespace*(): Namespace;
     RETURN ns
   END NewNamespace;
 
+PROCEDURE (ns: Namespace) SetLimits* (limits: Limits.Budget);
+  BEGIN ns. limits := limits END SetLimits;
+
 PROCEDURE (ns: Namespace) Add* (decl: Declaration): BOOLEAN;
 (**Adds the declaration @oparam{decl} to the namespace @oparam{ns}.  Nothing is
    done if the namespace already contains a declaration of the same name.  In
@@ -563,6 +568,7 @@ PROCEDURE (b: Builder) NewEntityRef* (name: String;
 
 PROCEDURE InitAttValue* (attValue: AttValue);
   BEGIN
+    attValue. limits := NIL;
     attValue. fragmentList := NIL;
     attValue. fragmentTail := NIL;
   END InitAttValue;
@@ -573,8 +579,41 @@ PROCEDURE (b: Builder) NewAttValue* (): AttValue;
   BEGIN
     NEW (attValue);
     InitAttValue (attValue);
+    attValue. limits := b. limits;
     RETURN attValue
   END NewAttValue;
+
+PROCEDURE (attValue: AttValue) SetLimits* (limits: Limits.Budget);
+(**Applies a budget to length calculation and flattening of this value,
+   including nested entity values created by an application. *)
+  BEGIN attValue. limits := limits END SetLimits;
+
+PROCEDURE ValueLength (value: AttValue; limits: Limits.Budget; VAR len: LONGINT): BOOLEAN;
+  VAR fragment: Fragment; n, maximum: LONGINT; ok: BOOLEAN;
+  BEGIN
+    IF ~limits. Enter() THEN RETURN FALSE END;
+    fragment := value. fragmentList; ok := TRUE;
+    WHILE (fragment # NIL) & ok DO
+      ok := limits. Charge (Limits.work, 1); n := 0;
+      IF ok THEN
+        WITH fragment: Characters DO n := fragment. sourceEnd-fragment. sourceStart
+        | fragment: EntityRef DO
+          IF (fragment. entity # NIL) & (fragment. entity. attValue # NIL) THEN
+            ok := ValueLength (fragment. entity. attValue, limits, len)
+          ELSE n := LongStrings.Length (fragment. name^)+2
+          END
+        END;
+        maximum := limits. maxAttributeUnits;
+        IF (maximum < 0) OR (maximum > MAX (LONGINT)-2) THEN maximum := MAX (LONGINT)-2 END;
+        IF (len > maximum) OR (n > maximum-len) THEN
+          limits. Fail (Limits.attributeUnits); ok := FALSE
+        ELSIF ok THEN INC (len, n); ok := limits. Charge (Limits.expandedUnits, n)
+        END
+      END;
+      fragment := fragment. next
+    END;
+    limits. Leave; RETURN ok
+  END ValueLength;
 
 PROCEDURE (attValue: AttValue) Clear*;
   BEGIN
@@ -601,6 +640,10 @@ PROCEDURE (attValue: AttValue) Length* (): LONGINT;
     len: LONGINT;
   BEGIN
     len := 0;
+    IF attValue. limits # NIL THEN
+      IF ~ValueLength (attValue, attValue. limits, len) THEN RETURN 0 END;
+      RETURN len
+    END;
     fragment := attValue. fragmentList;
     WHILE (fragment # NIL) DO
       WITH fragment: EntityRef DO
@@ -631,7 +674,7 @@ PROCEDURE (attValue: AttValue) FlattenValue* (normalizeWhitespace: BOOLEAN;
     len, pos: LONGINT;
     skipSpace: BOOLEAN;
   
-  PROCEDURE Append (attValue: AttValue);
+  PROCEDURE Append (value: AttValue);
     VAR
       f: Fragment;
     
@@ -659,10 +702,14 @@ PROCEDURE (attValue: AttValue) FlattenValue* (normalizeWhitespace: BOOLEAN;
       END Copy;
     
     BEGIN
-      f := attValue. fragmentList;
+      IF (attValue. limits # NIL) & ~attValue. limits. Enter() THEN RETURN END;
+      f := value. fragmentList;
       WHILE (f # NIL) DO
+        IF (attValue. limits # NIL) & ~attValue. limits. Charge (Limits.work, 1) THEN
+          attValue. limits. Leave; RETURN
+        END;
         WITH f: EntityRef DO
-          IF (f. entity # NIL) THEN
+          IF (f. entity # NIL) & (f. entity. attValue # NIL) THEN
             Append (f. entity. attValue)
           ELSE
             str[pos] := ORD ("&"); INC (pos); skipSpace := FALSE;
@@ -673,7 +720,8 @@ PROCEDURE (attValue: AttValue) FlattenValue* (normalizeWhitespace: BOOLEAN;
           Copy (f. source^, f. sourceStart, f. sourceEnd)
         END;
         f := f. next
-      END
+      END;
+      IF attValue. limits # NIL THEN attValue. limits. Leave END
     END Append;
   
   BEGIN
@@ -684,6 +732,9 @@ PROCEDURE (attValue: AttValue) FlattenValue* (normalizeWhitespace: BOOLEAN;
     pos := 0;
     skipSpace := normalizeWhitespace;
     didNormalization := FALSE;
+    IF (attValue. limits # NIL) & (attValue. limits. error # NIL) THEN
+      str[0] := 0; RETURN str
+    END;
     Append (attValue);
     IF normalizeWhitespace & (pos # 0) & (str[pos-1] = 32) THEN
       DEC (pos); didNormalization := TRUE
@@ -725,6 +776,7 @@ PROCEDURE (b: Builder) NewEnumeration*(): Enumeration;
     enum: Enumeration;
   BEGIN
     NEW (enum);
+    enum. limits := b. limits;
     enum. nameList := NIL;
     enum. nameTail := NIL;
     RETURN enum
@@ -754,6 +806,7 @@ PROCEDURE (enumeration: Enumeration) Matches* (VAR name: StringVar): BOOLEAN;
   BEGIN
     ptr := enumeration. nameList;
     WHILE (ptr # NIL) & ~LongStrings.Equal (ptr. name^, name) DO
+      IF (enumeration. limits # NIL) & ~enumeration. limits. Charge (Limits.work, 1) THEN RETURN FALSE END;
       ptr := ptr. next
     END;
     RETURN (ptr # NIL)

@@ -8,7 +8,7 @@ MODULE XMLBasicParser;
    The element factories consume the document's qualified names. *)
 
 IMPORT
-  Ch := Channel, Msg, URI,
+  Ch := Channel, Msg, URI, Limits := XMLLimits,
    XMLError := XMLError, DTD := XMLDTD, Builder := XMLBuilder,
    UnicodeCodec := XMLUnicodeCodec, Locator := XMLLocator, Parser := XMLParser,
    Validation := XMLBuilderValidation, Error := XMLError, Element := XMLBasicElement;
@@ -132,7 +132,7 @@ PROCEDURE (b: Build) StartElement* (namespaceDecl: DTD.NamespaceDeclaration; loc
     newStack: ElementStack;
     i: LONGINT;
   BEGIN
-    IF ~b. noerr THEN RETURN END;
+    IF ~b. noerr OR ~b. Charge (1) THEN RETURN END;
     IF (namespaceDecl # NIL) THEN
       b. Error (namespacesNotSupported); RETURN
     END;
@@ -175,13 +175,13 @@ PROCEDURE (b: Build) StartElement* (namespaceDecl: DTD.NamespaceDeclaration; loc
     END
   END StartElement;
 
-PROCEDURE (b: Build) Attribute* (namespaceDecl: DTD.NamespaceDeclaration; 
+PROCEDURE (b: Build) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
                                  localName: DTD.String;
                                  attrDecl: DTD.AttrDecl;
                                  value: DTD.AttValue;
                                  specified: BOOLEAN);
   BEGIN
-    IF ~b. noerr THEN RETURN END;
+    IF ~b. noerr OR ~b. Charge (1) THEN RETURN END;
     IF (namespaceDecl # NIL) THEN
       b. Error (namespacesNotSupported)
     ELSIF ~b. stack[b. nestingLevel]. IsAttributeName (localName) THEN
@@ -217,7 +217,7 @@ PROCEDURE (b: Build) Characters* (VAR chars: DTD.StringVar;
     END IsWhitespace;
   
   BEGIN
-    IF ~b. noerr THEN RETURN END;
+    IF ~b. noerr OR ~b. Charge (1) THEN RETURN END;
     IF b. stack[b. nestingLevel]. HasMixedContent() THEN
       b. stack[b. nestingLevel]. AddCharacters (chars, charsStart, charsEnd)
     ELSIF ~IsWhitespace() THEN
@@ -271,13 +271,14 @@ PROCEDURE (b: Build) EndElement* (namespaceDecl: DTD.NamespaceDeclaration; local
     byteReader. SetPos (textReader. Pos())
   END ParseMIMEHeader;*)
 
-PROCEDURE Parse* (byteReader: Ch.Reader;
-                  baseURI: URI.URI;
-                  unicodeFactory: UnicodeCodec.Factory;
-                  rootFactory: Element.RootFactory;
-                  maxNestingDepth: LONGINT;
-                  flags: SET;
-                  VAR errList: XMLError.List): Element.Element;
+PROCEDURE ParseLimited* (byteReader: Ch.Reader;
+                         baseURI: URI.URI;
+                         unicodeFactory: UnicodeCodec.Factory;
+                         rootFactory: Element.RootFactory;
+                         maxNestingDepth: LONGINT;
+                         flags: SET;
+                         limits: Limits.Budget;
+                         VAR errList: XMLError.List): Element.Element;
 (**Parses an XML document from reader @samp{byteReader} request.  If
    @oparam{baseURI} is not @code{NIL}, or if @oconst{validate} is in
    @oparam{flags}, external references in the XML document are followed.  In
@@ -309,7 +310,7 @@ PROCEDURE Parse* (byteReader: Ch.Reader;
       builder := b
     END;
     
-    parser := Parser.NewReader (byteReader, baseURI, unicodeFactory, NIL, builder);
+    parser := Parser.NewReaderLimited (byteReader, baseURI, unicodeFactory, NIL, builder, limits);
     (* ... should disable XMLDecl and DoctypeDecl if flags are set *)
     parser. followExternalRef := (validate IN flags) OR (baseURI # NIL);
     parser. validating := (validate IN flags);
@@ -323,6 +324,17 @@ PROCEDURE Parse* (byteReader: Ch.Reader;
       errList := parser. errList;
       RETURN NIL
     END
+  END ParseLimited;
+
+PROCEDURE Parse* (byteReader: Ch.Reader; baseURI: URI.URI;
+                  unicodeFactory: UnicodeCodec.Factory; rootFactory: Element.RootFactory;
+                  maxNestingDepth: LONGINT; flags: SET;
+                   VAR errList: XMLError.List): Element.Element;
+(**Parses with the same callbacks and external-reference policy as ParseLimited,
+   using an unlimited resource budget. *)
+  BEGIN
+    RETURN ParseLimited (byteReader, baseURI, unicodeFactory, rootFactory,
+                         maxNestingDepth, flags, NIL, errList)
   END Parse;
 
 BEGIN

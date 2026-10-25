@@ -1,8 +1,9 @@
 # XML input policy and resource review
 
 The port currently requires **trusted XML**. External access controls and
-parser resource budgets have regression coverage. Broader adversarial testing
-and accounting in validation and application builders remain unfinished.
+parser and built-in builder resource budgets have regression coverage.
+Application callbacks and underlying allocation/I/O failures still require
+their own policies and broader adversarial testing.
 
 ## External resources
 
@@ -75,24 +76,26 @@ parser.ParseDocument;
 
 The original constructors retain their unlimited behavior. `XMLCheck` uses a
 fresh default budget for every invocation, including namespace, validation,
-canonical and protocol modes. The Basic parser's convenience `Parse` interface
-continues to use the original constructors.
+canonical and protocol modes. `XMLBasicParser.ParseLimited` accepts a budget
+after `flags` and before `errList`; the original `Parse` remains unlimited.
+Both Basic entry points retain the external-reference policy described above.
 
 | Budget maximum | Default | Accounted resources |
 | --- | ---: | --- |
 | `maxInputBytes` | 16 MiB | Accepted bytes across the document and all opened external entities. |
-| `maxNesting` | 128 | Combined active element, entity, content-model, conditional-section and attribute-graph traversal levels. |
+| `maxNesting` | 128 | Combined active element, entity, content-model, conditional-section, regular-expression construction and attribute-graph traversal levels. |
 | `maxEntityExpansions` | 10,000 | Entity entries, including the external DTD and eager checking of internal declarations. |
 | `maxExpandedUnits` | 16,777,216 | UTF-16 code units copied for entity insertion/internalization and visited while checking attribute/entity values. |
-| `maxWork` | 100,000 | Name/string construction, character fragments, graph visits, parser diagnostics and declaration/attribute comparisons. |
+| `maxWork` | 100,000 | Name/string construction, character fragments, graph visits, parser diagnostics, declaration/attribute comparisons, validation/ID/enumeration scans, regular-expression states/sets, namespace searches and canonical sorting. |
 | `maxAttributeUnits` | 1,048,576 | Code units in one flattened attribute or entity value. |
 | `maxModelParticles` | 256 | Groups and named particles in one DTD content model. |
+| `maxOutputBytes` | 16 MiB | Encoded bytes delivered by built-in canonical and protocol builders. |
 
 Zero is a real limit; a negative maximum disables that particular limit.
 Counters are cumulative and a failed budget remains failed. Keep the budget
 exclusive to its parse and leave the maxima unchanged during parsing.
 Expansion accounting is conservative: checking a reused value can charge its
-units again. `maxWork` bounds allocation-producing parser operations, rather
+units again. `maxWork` bounds construction and comparison operations, rather
 than measuring allocated bytes or elapsed time.
 
 The byte budget wraps the reader before constructor prefetch and is shared
@@ -115,43 +118,70 @@ and unused entity declarations. DTD namespace insertion is iterative and both
 lookup and insertion charge comparisons. Retained-token byte and Unicode
 buffers grow geometrically, keeping long-token copying linear in total size.
 
+The parser calls `XMLBuilder.SetLimits` before document callbacks. The namespace
+and validation builders forward the same budget to their delegates. Validation
+charges aggregate costs across content models, ID/IDREF and enumeration checks;
+`XMLRegexp.NewLimited` also supplies this accounting to direct callers. The
+original `XMLRegexp.New` remains unlimited. Canonical and protocol builders wrap
+their output writers before flushing any document bytes. The output cap counts
+bytes successfully written, including buffered output and escaping expansion;
+an incomplete output must be discarded on exhaustion.
+
+DTD values created by a limited parser retain its budget for subsequent length
+and flattening operations. Directly created values can opt in with
+`XMLDTD.AttValue.SetLimits`, covering nested entity values and cycles. Direct
+namespace lookups can use `XMLDTD.Namespace.SetLimits`. Other direct DTD
+construction operations retain their caller-managed resource policy.
+
 ## Adversarial checks
 
 `TestLimits` tests exact boundaries and independently exhausts every limit.
 It varies byte, work, expansion, value-length, nesting and content-model
 cutoffs throughout a document containing declarations, attributes, entities,
 comments, instructions and CDATA. It checks diagnostics, stack unwinding,
-content callback suppression and final notification.
+content callback suppression and final notification in plain, namespace,
+validation and combined modes. It also sweeps canonical/protocol output cutoffs
+and checks directly constructed entity cycles. `TestBasic` exercises work
+cutoffs through `ParseLimited`.
 
 `TestEntityPolicy` also cuts the shared byte allowance at every position across
 external DTDs, repeated streamed entities and external-parameter internalization.
 It checks that expansion exhaustion prevents a further external open.
 
 ```sh
-make BUILD=../compiler/build/ports/ooc/2 test conformance limits
+make BUILD=../compiler/build/ports/ooc/2 test conformance limits fuzz
 ```
 
-The `limits` target runs 45 hostile-input checks: deep elements, content models
+The `limits` target runs 53 hostile-input checks: deep elements, content models
 and conditional sections, wide models, unused entity amplification, long entity
 chains, parameter expansion, large attributes/input/names, many attributes and
 siblings, malformed-control/reference floods and external internalization.
-Each runs in plain, namespace and validation modes and must return a resource
-diagnostic with exit code 1. The runner applies a 10-second CPU allowance,
+The general cases run in plain, namespace and validation modes. Additional
+cases exercise validation closure/aggregate costs, IDREF/enumeration floods,
+namespace searches, canonical notation sorting and escaped output growth.
+Every case must return a resource diagnostic with exit code 1.
+The runner applies a 10-second CPU allowance,
 a wall-clock timeout and a 512 MiB address-space ceiling on Linux. Under ASan
 the address-space ceiling is disabled to accommodate shadow memory; CPU and
 wall-clock limits remain active. Logs and results go under `BUILD/limits`.
+
+The `fuzz` target runs 2,655 deterministic truncation and byte-mutation checks
+with seed 20261025 across plain, namespace, validation, canonical and protocol
+modes. Every invocation must finish with success or XML diagnostics, rather
+than a trap, timeout, opening/usage failure or sanitizer error. Its CPU,
+wall-clock and output-file limits bound each process; the same address-space
+policy applies as above. Reports and reproducing inputs are in `BUILD/fuzz`.
 
 ## Remaining resource work
 
 Continue using trusted documents while completing:
 
-- work/allocation accounting inside validation, regular-expression processing
-  and namespace/output/application builders, including aggregate costs across
-  many content models;
-- broader malformed-input and randomized testing, resolver/channel stalls and
+- broader malformed-input and randomized testing, including larger graphs and
+  different mutation seeds, resolver/channel stalls and
   recovery from underlying allocation failures;
-- budget support in the Basic parser convenience interface and direct DTD APIs.
+- application-builder accounting and caller-managed direct DTD construction.
 
 Applications must bound their own resolver, channel and builder behavior.
-Directly constructed DTD value graphs bypass the parser's graph checks. Retain
+Custom delegating builders should forward `SetLimits` and charge their own
+work; callbacks are application code. Retain
 process-level time and memory limits when exercising hostile inputs.

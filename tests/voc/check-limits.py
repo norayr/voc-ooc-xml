@@ -60,6 +60,24 @@ def main():
              for name, text, flags, diagnostic in cases
              for suffix, extra in (("", ()), ("-namespaces", ("--namespaces",)),
                                    ("-validation", ("--validate",)))]
+    cases.extend([
+        ("validation-idrefs", '<!DOCTYPE r [<!ELEMENT r EMPTY><!ATTLIST r a IDREFS #IMPLIED>]><r a="'
+         + ' '.join(f'id{i}' for i in range(10000)) + '"/>', ("--validate",), "processing work"),
+        ("validation-enumeration", '<!DOCTYPE r [<!ELEMENT r EMPTY><!ATTLIST r a ('
+         + '|'.join(f't{i}' for i in range(10000)) + ') #IMPLIED>]><r/>', ("--validate",), "processing work"),
+        ("validation-closure", '<!DOCTYPE r [<!ELEMENT r ('
+         + '|'.join(f'a{i}?' for i in range(200)) + ')>]><r/>', ("--validate",), "processing work"),
+        ("validation-aggregate", '<!DOCTYPE r [' + ''.join(
+            f'<!ELEMENT e{i} (' + '|'.join(f'a{j}?' for j in range(40)) + ')>' for i in range(100))
+         + '<!ELEMENT r EMPTY>]><r/>', ("--validate",), "processing work"),
+        ("namespace-search", ''.join(f'<r xmlns:p{i}="urn:p{i}">' for i in range(100))
+         + '<r ' + ' '.join(f'p0:a{i}=""' for i in range(300)) + '/>' + '</r>' * 100,
+         ("--namespaces",), "processing work"),
+        ("canonical-notations", '<!DOCTYPE r [' + ''.join(
+            f'<!NOTATION n{i} SYSTEM "n{i}">' for i in range(3000)) + ']><r/>', ("--second",), "processing work"),
+        ("canonical-output", '<r>' + '>' * (4 * 1024 * 1024) + '</r>', ("--canonical",), "output byte"),
+        ("protocol-output", '<r>' + '>' * (4 * 1024 * 1024) + '</r>', ("--protocol",), "output byte"),
+    ])
     failures = []
     for name, text, flags, diagnostic in cases:
         path = args.work / f"{name}.xml"

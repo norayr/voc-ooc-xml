@@ -90,7 +90,8 @@ UTF-8/UTF-16 round trips, escaping, long names/URIs, indentation and partial
 channel writes. Basic-element tests cover factory lookup, typed values,
 application checks, locators, stack growth and long Unicode buffers. Protocol
 tests reparse callback traces, including malformed input and namespace events.
-The twelve integration programs pass with GCC and Clang in
+The thirteen integration programs, including all 114 original codec vectors,
+pass with GCC and Clang in
 C23 mode, TCC and Clang ASan/UBSan.
 
 The bundled James Clark XML test archive supplies the first well-formedness
@@ -129,13 +130,16 @@ locators, DTD declarations and text. It supports `--namespaces` and `--validate`
 
 VOC's ooc package supplies URI parsing, relative resolution and file/memory
 channels. XML's `XMLEntityResolver` converts Unicode system identifiers to
-these URI objects. The ported library modules have integration coverage;
-remaining original regression drivers are still being reviewed.
+these URI objects. The shared ooc tests replay all 77 original URI fixtures;
+the XML tests cover every original XML regression-driver group.
 `XMLCheck` applies default input, nesting, entity-expansion, value-length and
 work budgets. Library applications can supply an `XMLLimits` budget through
 the parser's `NewReaderLimited`, `NewChannelLimited`, `NewURILimited` and
-`NewFileLimited` constructors. `make limits` runs 45 adversarial checks with
-process time and memory ceilings. Broader security testing remains unfinished;
+`NewFileLimited` constructors, and `XMLBasicParser.ParseLimited` supports the
+same budget. Built-in validation, namespace and output builders share it.
+`make limits` runs 53 adversarial checks with process time and memory ceilings;
+`make fuzz` adds 2,655 reproducible truncation and mutation checks.
+Broader security testing remains unfinished;
 use trusted XML.
 The [input policy and security review](doc/Security.md) records the external-read
 guard, resource-budget API, regression coverage and remaining resource work.
@@ -148,7 +152,7 @@ Oberon-2 build directory directly. For a sibling VOC checkout:
 
 ```sh
 make -C ../compiler/src/ports/ooc test
-make BUILD=../compiler/build/ports/ooc/2 test conformance limits
+make BUILD=../compiler/build/ports/ooc/2 test conformance limits fuzz
 ```
 
 The shared build directory contains the matching `.sym`, `.h` and `.o`

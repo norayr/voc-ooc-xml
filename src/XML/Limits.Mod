@@ -12,6 +12,7 @@ CONST
   work* = 5;
   attributeUnits* = 6;
   modelParticles* = 7;
+  outputBytes* = 8;
 
 TYPE
   Budget* = POINTER TO BudgetDesc;
@@ -19,13 +20,18 @@ TYPE
     (**Per-parse resource counters. Set maxima before constructing the parser;
        a negative maximum disables that limit. An exhausted budget stays failed. *)
     maxInputBytes*, maxNesting*, maxEntityExpansions*, maxExpandedUnits*,
-      maxWork*, maxAttributeUnits*, maxModelParticles*: LONGINT;
-    bytesRead-, depth-, expansions-, units-, steps-: LONGINT;
+      maxWork*, maxAttributeUnits*, maxModelParticles*, maxOutputBytes*: LONGINT;
+    bytesRead-, bytesWritten-, depth-, expansions-, units-, steps-: LONGINT;
     error-: Msg.Msg;
   END;
   Reader = POINTER TO ReaderDesc;
   ReaderDesc = RECORD (Channel.ReaderDesc)
     inner: Channel.Reader;
+    budget: Budget;
+  END;
+  Writer = POINTER TO WriterDesc;
+  WriterDesc = RECORD (Channel.WriterDesc)
+    inner: Channel.Writer;
     budget: Budget;
   END;
   Context = POINTER TO ContextDesc;
@@ -44,6 +50,7 @@ BEGIN
   | work: text := "XML processing work limit exceeded"
   | attributeUnits: text := "XML attribute value code-unit limit exceeded"
   | modelParticles: text := "XML content-model particle limit exceeded"
+  | outputBytes: text := "XML output byte limit exceeded"
   ELSE text := "XML resource limit exceeded"
   END;
   LongStrings.Long(text, template)
@@ -71,6 +78,7 @@ BEGIN
   | entityExpansions: RETURN Take(budget, kind, n, budget.maxEntityExpansions, budget.expansions)
   | expandedUnits: RETURN Take(budget, kind, n, budget.maxExpandedUnits, budget.units)
   | work: RETURN Take(budget, kind, n, budget.maxWork, budget.steps)
+  | outputBytes: RETURN Take(budget, kind, n, budget.maxOutputBytes, budget.bytesWritten)
   ELSE RETURN FALSE
   END;
   RETURN FALSE
@@ -90,6 +98,8 @@ BEGIN
   budget.maxEntityExpansions := 10000; budget.maxExpandedUnits := 16*1024*1024;
   budget.maxWork := 100000; budget.maxAttributeUnits := 1024*1024;
   budget.maxModelParticles := 256;
+  budget.maxOutputBytes := 16*1024*1024;
+  budget.bytesWritten := 0;
   budget.bytesRead := 0; budget.depth := 0; budget.expansions := 0;
   budget.units := 0; budget.steps := 0; budget.error := NIL;
   RETURN budget
@@ -158,6 +168,48 @@ BEGIN
   limited.inner := reader; limited.budget := budget;
   RETURN limited
 END Wrap;
+
+PROCEDURE (writer: Writer) WriteBytes(VAR bytes: ARRAY OF SYSTEM.BYTE; start, n: LONGINT);
+  VAR available: LONGINT; accepted: BOOLEAN;
+BEGIN
+  ASSERT((start >= 0) & (start <= LEN(bytes)) & (n >= 0) & (n <= LEN(bytes)-start));
+  writer.bytesWritten := 0;
+  IF writer.res # NIL THEN RETURN END;
+  IF writer.budget.error # NIL THEN writer.res := writer.budget.error; RETURN END;
+  IF n = 0 THEN RETURN END;
+  available := n;
+  IF writer.budget.maxOutputBytes >= 0 THEN
+    available := writer.budget.maxOutputBytes-writer.budget.bytesWritten;
+    IF available < 0 THEN available := 0 END;
+    IF available > n THEN available := n END
+  END;
+  IF available = 0 THEN
+    writer.budget.Fail(outputBytes); writer.res := writer.budget.error; RETURN
+  END;
+  writer.inner.WriteBytes(bytes, start, available);
+  ASSERT((writer.inner.bytesWritten >= 0) & (writer.inner.bytesWritten <= available));
+  accepted := writer.budget.Charge(outputBytes, writer.inner.bytesWritten);
+  IF accepted THEN writer.bytesWritten := writer.inner.bytesWritten; writer.res := writer.inner.res
+  ELSE writer.res := writer.budget.error
+  END
+END WriteBytes;
+
+PROCEDURE (writer: Writer) WriteByte(byte: SYSTEM.BYTE);
+  VAR bytes: ARRAY 1 OF SYSTEM.BYTE;
+BEGIN bytes[0] := byte; writer.WriteBytes(bytes, 0, 1) END WriteByte;
+
+PROCEDURE (writer: Writer) Pos(): LONGINT;
+BEGIN RETURN writer.inner.Pos() END Pos;
+
+PROCEDURE WrapWriter* (writer: Channel.Writer; budget: Budget): Channel.Writer;
+  VAR limited: Writer;
+BEGIN
+  IF budget = NIL THEN RETURN writer END;
+  NEW(limited); limited.base := writer.base; limited.res := writer.res;
+  limited.bytesWritten := 0; limited.positionable := FALSE;
+  limited.inner := writer; limited.budget := budget;
+  RETURN limited
+END WrapWriter;
 
 BEGIN
   NEW(context); Msg.InitContext(context, "XMLLimits")

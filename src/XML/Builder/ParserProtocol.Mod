@@ -20,7 +20,7 @@ MODULE XMLBuilderParserProtocol;
 
 
 IMPORT
-  Channel, IntStr, LongStrings, URI, File := URISchemeFile,
+  Channel, IntStr, LongStrings, URI, File := URISchemeFile, Limits := XMLLimits,
   Codec := XMLUnicodeCodec, DTD := XMLDTD, B := XMLBuilder,
   Writer := XMLWriter, Locator := XMLLocator;
 
@@ -35,6 +35,9 @@ TYPE
     locator-: Locator.Locator;
   END;
 
+
+PROCEDURE (b: Builder) SetLimits* (limits: Limits.Budget);
+  BEGIN b. SetLimits^ (limits); b. w. SetLimits (limits) END SetLimits;
 
 PROCEDURE String (w: Writer.Writer; name: ARRAY OF CHAR; string: DTD.String);
   BEGIN

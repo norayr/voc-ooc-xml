@@ -20,7 +20,7 @@ MODULE XMLBuilderCanonical;
 
 
 IMPORT
-  LongStrings, Channel, URI, Ascii,
+  LongStrings, Channel, URI, Ascii, Limits := XMLLimits,
   Codec := XMLUnicodeCodec, DTD := XMLDTD, B := XMLBuilder,
   UnicodeBuffer := XMLUnicodeBuffer;
 
@@ -71,6 +71,7 @@ PROCEDURE WriteQuoted (out: UnicodeBuffer.Output; VAR str: DTD.StringVar;
     ASSERT ((0 <= start) & (start <= end) & (end <= LEN (str)));
     i := start;
     WHILE (i # end) DO
+      IF out. writer. res # NIL THEN RETURN END;
       LOOP
         CASE str[i] OF
         | 38,60,62,34,00H..1FH:
@@ -125,6 +126,7 @@ PROCEDURE WriteDTD (b: Builder; root: DTD.String);
       best := b. notationList;
       ptr := b. notationList. next;
       WHILE (ptr # NIL) DO
+        IF ~b. Charge (1) THEN RETURN NIL END;
         IF (LongStrings.Compare (ptr. notation. name^, best. notation. name^) = LongStrings.less) THEN
           best := ptr
         END;
@@ -134,11 +136,16 @@ PROCEDURE WriteDTD (b: Builder; root: DTD.String);
     END GetNext;
   
   PROCEDURE Remove (VAR list: Node; ptr: Node);
+    VAR prev: Node;
     BEGIN
-      IF (ptr = list) THEN
-        list := list. next
+      IF ptr = list THEN list := list. next
       ELSE
-        Remove (list. next, ptr)
+        prev := list;
+        WHILE prev. next # ptr DO
+          IF ~b. Charge (1) THEN RETURN END;
+          prev := prev. next
+        END;
+        prev. next := ptr. next
       END
     END Remove;
   
@@ -148,7 +155,9 @@ PROCEDURE WriteDTD (b: Builder; root: DTD.String);
     b. out. Write8 (" ["); b. out. Write8 (Ascii.lf);
     WHILE (b. notationList # NIL) DO
       node := GetNext();
+      IF node = NIL THEN RETURN END;
       Remove (b. notationList, node);
+      IF ~b. Charge (1) THEN RETURN END;
       b. out. Write8 ("<!NOTATION ");
       b. out. Write16 (node. notation. name^);
       IF (node. notation. public # NIL) THEN
@@ -169,6 +178,9 @@ PROCEDURE WriteDTD (b: Builder; root: DTD.String);
 
 
 
+PROCEDURE (b: Builder) SetLimits* (limits: Limits.Budget);
+  BEGIN b. SetLimits^ (limits); b. out. SetLimits (limits) END SetLimits;
+
 PROCEDURE (b: Builder) StartDocument* (documentEntity: DTD.ExternalEntity);
   BEGIN
   END StartDocument;
@@ -181,6 +193,7 @@ PROCEDURE (b: Builder) EndDocument*;
 PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
                                       localName: DTD.String);
   BEGIN
+    IF ~b. Charge (1) THEN RETURN END;
     ASSERT (namespaceDecl = NIL);
     IF (b. notationList # NIL) & (b. format # firstCanonicalForm) THEN
       WriteDTD (b, localName)
@@ -200,6 +213,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
     newList: AttributeList;
     i: LONGINT;
   BEGIN
+    IF ~b. Charge (1) THEN RETURN END;
     ASSERT (namespaceDecl = NIL);
     IF (b. lenAttrList = LEN (b. attrList^)) THEN
       NEW (newList, LEN (b. attrList^)+incrAttrList);
@@ -225,6 +239,7 @@ PROCEDURE (b: Builder) AttributesDone*;
     BEGIN
       min := start;
       FOR i := start+1 TO b. lenAttrList-1 DO
+        IF ~b. Charge (1) THEN RETURN min END;
         IF (LongStrings.Compare (b. attrList[i]. name^, b. attrList[min]. name^) = LongStrings.less) THEN
           min := i
         END
@@ -235,6 +250,7 @@ PROCEDURE (b: Builder) AttributesDone*;
   BEGIN
     FOR i := 0 TO b. lenAttrList-1 DO
       j := GetMin (i);
+      IF ~b. Charge (1) THEN RETURN END;
       b. out. Write8 (" ");
       b. out. Write16 (b. attrList[j]. name^);
       b. out. Write8 ('="');
@@ -265,6 +281,7 @@ PROCEDURE (b: Builder) Notation* (notation: DTD.Notation);
   VAR
     node: Node;
   BEGIN
+    IF ~b. Charge (1) THEN RETURN END;
     NEW (node);
     node. next := b. notationList;
     node. notation := notation;

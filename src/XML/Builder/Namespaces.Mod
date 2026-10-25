@@ -20,7 +20,7 @@ MODULE XMLBuilderNamespaces;
 
 
 IMPORT
-  Msg, LongStrings, URI, URIParser, String := URIString,
+  Msg, LongStrings, URI, URIParser, String := URIString, Limits := XMLLimits,
   Unparsed := URIFragmentUnparsed,
   Error := XMLError, DTD := XMLDTD, Locator := XMLLocator,
   B := XMLBuilder, EntityResolver := XMLEntityResolver;
@@ -109,6 +109,9 @@ PROCEDURE (b: Builder) SetErrorListener* (el: Locator.ErrorListener);
     b. delegateBuilder. SetErrorListener (el)
   END SetErrorListener;
 
+PROCEDURE (b: Builder) SetLimits* (limits: Limits.Budget);
+  BEGIN b. SetLimits^ (limits); b. delegateBuilder. SetLimits (limits) END SetLimits;
+
 
 PROCEDURE (b: Builder) StartDocument* (documentEntity: DTD.ExternalEntity);
   BEGIN
@@ -139,6 +142,7 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
     new: Stack;
     i: LONGINT;
   BEGIN
+    IF ~b. Charge (1) THEN RETURN END;
     ASSERT (namespaceDecl = NIL);
     INC (b. currLevel);
     IF (b. currLevel = LEN (b. stack^)) THEN
@@ -163,6 +167,7 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
 PROCEDURE (b: Builder) EndElement* (namespaceDecl: DTD.NamespaceDeclaration; 
                                     localName: DTD.String);
   BEGIN
+    IF ~b. Charge (1) THEN RETURN END;
     ASSERT (namespaceDecl = NIL);
     b. delegateBuilder. EndElement (b. stack[b. currLevel]. namespaceDecl,
                                     b. stack[b. currLevel]. localName);
@@ -238,6 +243,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
     END AddDecl;
   
   BEGIN
+    IF ~b. Charge (1) THEN RETURN END;
     ASSERT (namespaceDecl = NIL);
     IF IsNamespaceDecl (localName^) THEN
       (* create a record for the namespace declarations local to the current
@@ -310,6 +316,7 @@ PROCEDURE (b: Builder) AttributesDone*;
       str[colon] := 0;
       i := b. lenNamespaceList-1;
       WHILE (i >= 0) DO
+        IF ~b. Charge (1) THEN str[colon] := ORD (":"); RETURN NIL END;
         IF (b. namespaceList[i]. prefix # NIL) &
            LongStrings.Equal (b. namespaceList[i]. prefix^, str) THEN
           str[colon] := ORD (":");
@@ -330,6 +337,7 @@ PROCEDURE (b: Builder) AttributesDone*;
     END RestoreLocator;
   
   BEGIN
+    IF ~b. Charge (1) THEN RETURN END;
     b. delegateBuilder. SetLocator (b. namespaceLocator);
     
     (* emit start element *)
@@ -342,7 +350,7 @@ PROCEDURE (b: Builder) AttributesDone*;
     ELSE
       namespaceDecl := b. stack[b. currLevel]. default
     END;
-    IF b. failed THEN RestoreLocator; RETURN END;
+    IF b. failed OR ~b. Charge (0) THEN RestoreLocator; RETURN END;
     b. stack[b. currLevel]. namespaceDecl := namespaceDecl;
     b. stack[b. currLevel]. localName := localName;
     b. delegateBuilder. StartElement (namespaceDecl, localName);
@@ -350,6 +358,7 @@ PROCEDURE (b: Builder) AttributesDone*;
     (* emit namespace declarations *)
     i := b. stack[b. currLevel]. startLocal;
     WHILE (i # b. lenNamespaceList) DO
+      IF ~b. Charge (1) THEN RestoreLocator; RETURN END;
       b. delegateBuilder. NamespaceDeclaration (b. namespaceList[i]);
       INC (i)
     END;
@@ -357,6 +366,7 @@ PROCEDURE (b: Builder) AttributesDone*;
     (* emit all other atttributes *)
     i := 0;
     WHILE (i # b. attrList. len) DO
+      IF ~b. Charge (1) THEN RestoreLocator; RETURN END;
       attr := b. attrList. attr[i];
       b. namespaceLocator^ := attr. pos;
       
@@ -370,6 +380,7 @@ PROCEDURE (b: Builder) AttributesDone*;
            and namespace URI *)
         j := 0;
         WHILE (j # i) DO
+          IF ~b. Charge (1) THEN RestoreLocator; RETURN END;
           IF (namespaceDecl # NIL) & (namespaceDecl. uri # NIL) &
              LongStrings.Equal (b. attrList. attr[j]. localName^, localName^) &
              (b. attrList. attr[j]. namespaceDecl # NIL) &
@@ -386,7 +397,7 @@ PROCEDURE (b: Builder) AttributesDone*;
       END;
       attr. namespaceDecl := namespaceDecl;
       attr. localName := localName;
-      IF b. failed THEN RestoreLocator; RETURN END;
+      IF b. failed OR ~b. Charge (0) THEN RestoreLocator; RETURN END;
       
       b. delegateBuilder. Attribute (namespaceDecl,
                                      localName,
@@ -396,7 +407,7 @@ PROCEDURE (b: Builder) AttributesDone*;
       INC (i)
     END;
     RestoreLocator;
-    b. delegateBuilder. AttributesDone
+    IF b. Charge (0) THEN b. delegateBuilder. AttributesDone END
   END AttributesDone;
 
 

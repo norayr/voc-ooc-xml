@@ -20,7 +20,7 @@ MODULE XMLBuilderValidation;
 
 
 IMPORT
-  Ascii, Msg, LongStrings, URI, 
+  Ascii, Msg, LongStrings, URI, Limits := XMLLimits,
   Error := XMLError, DTD := XMLDTD, Locator := XMLLocator,
   Parser := XMLParser, Regexp := XMLRegexp, B := XMLBuilder;
 
@@ -121,6 +121,13 @@ PROCEDURE (b: Builder) SetLocator* (locator: Locator.Locator);
     b. parserLocator := locator;
     b. delegateBuilder. SetLocator (locator)
   END SetLocator;
+
+PROCEDURE (b: Builder) SetLimits* (limits: Limits.Budget);
+  BEGIN
+    b. SetLimits^ (limits);
+    b. notationNamespace. SetLimits (limits); b. idNamespace. SetLimits (limits);
+    b. idrefNamespace. SetLimits (limits); b. delegateBuilder. SetLimits (limits)
+  END SetLimits;
 
 PROCEDURE (b: Builder) SetErrorListener* (el: Locator.ErrorListener);
   BEGIN
@@ -335,6 +342,7 @@ PROCEDURE (b: Builder) EndDocument*;
     (* check that all IDREF attributes have a matching ID counterpart *)
     ptr := b. idrefNamespace. declList;
     WHILE (ptr # NIL) DO
+      IF ~b. Charge (1) THEN b. delegateBuilder. EndDocument; RETURN END;
       IF (b. idNamespace. Get (ptr. name) = NIL) THEN
         ErrString (b, invalidIDREF, "name", ptr. name)
       END;
@@ -371,8 +379,10 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
       BEGIN
         ptr1 := list;
         WHILE (ptr1 # NIL) DO
+          IF ~b. Charge (1) THEN RETURN NIL END;
           ptr2 := ptr1. next;
           WHILE (ptr2 # NIL) DO
+            IF ~b. Charge (1) THEN RETURN NIL END;
             IF LongStrings.Equal (ptr1. name^, ptr2. name^) THEN
               RETURN ptr1. name
             END;
@@ -386,6 +396,7 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
     BEGIN
       decl := list;
       WHILE (decl # NIL) DO
+        IF ~b. Charge (1) THEN RETURN END;
         attrDecl := decl(DTD.AttrDecl);
         
         IF (attrDecl. default >= DTD.attrDefault) THEN
@@ -428,6 +439,7 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
         IF (attrDecl. type = DTD.attrNOTATION) THEN
           nameNode := attrDecl. enumeration. nameList;
           WHILE (nameNode # NIL) DO
+            IF ~b. Charge (1) THEN RETURN END;
             IF (b. notationNamespace. Get (nameNode. name) = NIL) THEN
               ErrString3 (b, noSuchNotation, 
                           "name", nameNode. name,
@@ -455,6 +467,7 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
   PROCEDURE InList (name: DTD.String; list: DTD.CP): BOOLEAN;
     BEGIN
       WHILE (list # NIL) & ~LongStrings.Equal (list(DTD.NameCP). name^, name^) DO
+        IF ~b. Charge (1) THEN RETURN FALSE END;
         list := list. next
       END;
       RETURN (list # NIL)
@@ -466,6 +479,7 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
     
     decl := b. dtd. elementNamespace. declList;
     WHILE (decl # NIL) DO
+      IF ~b. Charge (1) THEN RETURN END;
       elemDecl := decl(DTD.ElementDecl);
       
       IF elemDecl. multipleDecl THEN
@@ -489,7 +503,8 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
       
       IF (elemDecl. contentType = DTD.contentChildren) THEN
         (* create regular expression for `children' content *)
-        elemDecl. SetRegexp (Regexp.New (elemDecl. contentModel));
+        elemDecl. SetRegexp (Regexp.NewLimited (elemDecl. contentModel, b. limits));
+        IF ~b. Charge (0) THEN RETURN END;
         IF ~elemDecl. regexp(Regexp.Regexp). IsDeterministic() THEN
           ErrString (b, nondeterministicContent, "element", elemDecl. name)
         END
@@ -497,6 +512,7 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
         (* check that every child entry in a Mixed type is unique *)
         cp := elemDecl. contentModel(DTD.ChoiceCP). list;
         WHILE (cp # NIL) DO
+          IF ~b. Charge (1) THEN RETURN END;
           IF InList (cp(DTD.NameCP). name, cp. next) THEN
             ErrString2 (b, mixedTypeDuplicate,
                         "element", elemDecl. name,
@@ -514,6 +530,7 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
     
     decl := b. dtd. geNamespace. declList;
     WHILE (decl # NIL) DO
+      IF ~b. Charge (1) THEN RETURN END;
       IF (decl(DTD.Entity). type = DTD.entityUnparsed) &
          (b. notationNamespace. Get (decl(DTD.ExternalEntity). ndata) = NIL) THEN
         ErrString2 (b, unknownUnparsedEntityNotation,
@@ -547,6 +564,7 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
   PROCEDURE InCPList (name: DTD.String; list: DTD.CP): BOOLEAN;
     BEGIN
       WHILE (list # NIL) & ~LongStrings.Equal (list(DTD.NameCP). name^, name^) DO
+        IF ~b. Charge (1) THEN RETURN FALSE END;
         list := list. next
       END;
       RETURN (list # NIL)
@@ -562,6 +580,7 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
       len := 0;
       
       WHILE (list # NIL) DO
+        IF ~b. Charge (1) THEN RETURN str END;
         i := LongStrings.Length (list(DTD.NameCP). name^);
         IF (len+i+1 >= LEN (str^)) THEN
           NEW (str2, len+i+2);
@@ -578,6 +597,7 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
     END ListMixedElements;
 
   BEGIN
+    IF ~b. Charge (1) THEN RETURN END;
     CheckEmpty (b);
     IF (b. currLevel = -1) THEN          (* this is the root element *)
       IF (b. dtd = NIL) THEN
@@ -615,11 +635,12 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
     
     (* check that the element type is declared *)
     elemDecl := b. dtd. elementNamespace. Get (localName);
+    IF ~b. Charge (0) THEN RETURN END;
     IF (elemDecl = NIL) THEN
       ErrString (b, noSuchElementType, "name", localName)
     END;
     PushElement (b, elemDecl);
-
+    IF ~b. Charge (0) THEN RETURN END;
     b. delegateBuilder. StartElement (namespaceDecl, localName)
   END StartElement;
 
@@ -628,6 +649,7 @@ PROCEDURE (b: Builder) EndElement* (namespaceDecl: DTD.NamespaceDeclaration;
   VAR
     expected: DTD.String;
   BEGIN
+    IF ~b. Charge (1) THEN RETURN END;
     (* did we reach the end of the regular expression of the `children'
        content model? *)
     IF (b. stack[b. currLevel]. matcher # NIL) &
@@ -641,6 +663,7 @@ PROCEDURE (b: Builder) EndElement* (namespaceDecl: DTD.NamespaceDeclaration;
       END
     END;
     
+    IF ~b. Charge (0) THEN RETURN END;
     b. delegateBuilder. EndElement (namespaceDecl, localName);
     PopElement (b)
   END EndElement;
@@ -666,6 +689,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
       IF attValue = NIL THEN RETURN NIL END;
       fragment := attValue. fragmentList;
       WHILE (ref = NIL) & (fragment # NIL) DO
+        IF ~b. Charge (1) THEN RETURN NIL END;
         IF (fragment IS DTD.EntityRef) &
            (fragment(DTD.EntityRef). entity # NIL) THEN
           IF fragment(DTD.EntityRef). entity. externalMarkupDecl THEN
@@ -681,6 +705,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
     END ExternalReference;
   
   BEGIN
+    IF ~b. Charge (1) THEN RETURN END;
     IF (attrDecl = NIL) THEN
       Err (b, attributeNotDeclared)
     ELSE
@@ -707,6 +732,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
         ELSE
           i := 0;
           LOOP
+            IF ~b. Charge (1) THEN RETURN END;
             start := i;
             WHILE (string[i] > ORD (Ascii.sp)) DO
               INC (i)
@@ -771,6 +797,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
         ELSE
           i := 0;
           LOOP
+            IF ~b. Charge (1) THEN RETURN END;
             start := i;
             WHILE (string[i] > ORD (Ascii.sp)) DO
               INC (i)
@@ -826,6 +853,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
       END
     END;
     
+    IF ~b. Charge (0) THEN RETURN END;
     b. delegateBuilder. Attribute (namespaceDecl, localName, attrDecl,
                                    value, specified)
   END Attribute;
@@ -854,6 +882,7 @@ PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
   VAR
     elemDecl: DTD.ElementDecl;
   BEGIN
+    IF ~b. Charge (1) THEN RETURN END;
     CheckEmpty (b);
     IF b. stack[b. currLevel]. elem. IsElementContent() THEN
       elemDecl := b. stack[b. currLevel]. elem;
@@ -867,6 +896,7 @@ PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
       END
     END;
     
+    IF ~b. Charge (0) THEN RETURN END;
     b. delegateBuilder. Characters (chars, charsStart, charsEnd,
                                     elementWhitespace)
   END Characters;

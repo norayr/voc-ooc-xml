@@ -4,14 +4,14 @@ BUILD ?= build/voc
 ROOT := $(CURDIR)
 MODULES := XMLUnicodeCodec XMLUnicodeCodecUTF8 XMLUnicodeCodecUTF16 \
 	XMLUnicodeCodecASCII XMLUnicodeCodecLatin1 XMLUnicodeCodecImportAll \
-	XMLInputBuffer XMLUnicodeBuffer XMLLimits XMLDTD XMLEntityResolver \
+	XMLLimits XMLInputBuffer XMLUnicodeBuffer XMLDTD XMLEntityResolver \
 	XMLError XMLLocator XMLBuilder XMLParser XMLBuilderNamespaces \
 	XMLRegexp XMLBuilderValidation XMLWriter XMLBuilderCanonical XMLBuilderParserProtocol \
 	XMLBasicElement XMLBasicParser XMLBasicDataType XMLCheck \
-	TestUnicodeCodecs TestUnicodeMessages TestMemoryBuffers TestDTDResolver TestParser \
+	TestUnicodeCodecs TestCodecVectors TestUnicodeMessages TestMemoryBuffers TestDTDResolver TestParser \
 	TestNamespaces TestValidation TestWriter TestBasic TestProtocol TestEntityPolicy TestLimits
 
-.PHONY: all codecs buffers resolver parser namespaces validation writer basic xmlcheck conformance limits test clean
+.PHONY: all codecs codec-vectors buffers resolver parser namespaces validation writer basic xmlcheck conformance limits fuzz test clean
 all: basic
 
 $(BUILD):
@@ -29,12 +29,15 @@ codecs: | $(BUILD)
 
 buffers: codecs
 	cd "$(BUILD)" && $(VOC) $(OFLAGS) \
+		"$(ROOT)/src/XML/Limits.Mod" \
 		"$(ROOT)/src/XML/InputBuffer.Mod" \
 		"$(ROOT)/src/XML/UnicodeBuffer.Mod"
 
+codec-vectors: codecs
+	python3 tests/voc/check-codecs.py --build "$(BUILD)" --voc "$(VOC)" --flags "$(OFLAGS)"
+
 resolver: buffers
 	cd "$(BUILD)" && $(VOC) $(OFLAGS) \
-		"$(ROOT)/src/XML/Limits.Mod" \
 		"$(ROOT)/src/XML/DTD.Mod" \
 		"$(ROOT)/src/XML/EntityResolver.Mod"
 
@@ -65,7 +68,7 @@ basic: writer
 		"$(ROOT)/src/XML/Basic/DataType.Mod" \
 		"$(ROOT)/src/XML/Basic/Parser.Mod"
 
-test: basic
+test: basic codec-vectors
 	cd "$(BUILD)" && $(VOC) $(OFLAGS) -m "$(ROOT)/tests/voc/TestUnicodeCodecs.Mod"
 	"$(BUILD)/TestUnicodeCodecs"
 	cd "$(BUILD)" && $(VOC) $(OFLAGS) -m "$(ROOT)/tests/voc/TestUnicodeMessages.Mod"
@@ -104,9 +107,12 @@ conformance: xmlcheck
 limits: xmlcheck
 	python3 tests/voc/check-limits.py "$(BUILD)/XMLCheck" --work "$(BUILD)/limits"
 
+fuzz: xmlcheck
+	python3 tests/voc/check-fuzz.py "$(BUILD)/XMLCheck" --work "$(BUILD)/fuzz"
+
 clean:
 	rm -f $(foreach module,$(MODULES),$(foreach ext,c h o sym,"$(BUILD)/$(module).$(ext)")) \
-		"$(BUILD)/TestUnicodeCodecs" "$(BUILD)/TestUnicodeMessages" \
+		"$(BUILD)/TestUnicodeCodecs" "$(BUILD)/TestCodecVectors" "$(BUILD)/TestUnicodeMessages" \
 		"$(BUILD)/TestMemoryBuffers" "$(BUILD)/TestDTDResolver" "$(BUILD)/TestParser" \
 		"$(BUILD)/TestNamespaces" "$(BUILD)/TestValidation" "$(BUILD)/TestWriter" \
 		"$(BUILD)/TestBasic" "$(BUILD)/TestProtocol" "$(BUILD)/TestEntityPolicy" "$(BUILD)/TestLimits" \

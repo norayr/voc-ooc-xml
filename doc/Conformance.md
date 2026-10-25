@@ -91,8 +91,8 @@ XML/protocol output is compared byte-for-byte.
 | Original driver or suite | VOC coverage and follow-up |
 | --- | --- |
 | `src/TestParser.Mod` | `tools/XMLCheck.Mod` supplies well-formedness, DTD validation, namespaces, first/second canonical forms and protocol modes. All archived and local XML fixture groups now run in `make conformance`. |
-| `src/TestCodecs.Mod`, `tests/codecs` | `TestUnicodeCodecs` and `TestMemoryBuffers` cover codecs and streaming; replaying every original hex-vector case remains a follow-up. |
-| `src/TestURI.Mod`, `tests/uri` | URI support and its confidence tests live in VOC's ooc package. Review the original URI fixture groups there, including their optional HTTP-specific coverage. |
+| `src/TestCodecs.Mod`, `tests/codecs` | `make test` replays all 114 original hex-vector cases with full and bounded output buffers, checking exact bytes/code units and error counts. `TestUnicodeCodecs` and `TestMemoryBuffers` add Unicode/range/streaming regressions. |
+| `src/TestURI.Mod`, `tests/uri` | VOC's ooc package replays all 77 original parsing, malformed-reference and relative-conversion fixtures, including HTTP authority/query parsing through a test prototype. Its runner documents query-only and escaped-dot historical output corrections. |
 | `src/TestGet.Mod`, `src/TestServer.Mod` | Optional HTTP/socket examples depend on the preserved network support modules. Review these with that dependency package. |
 | `src/libxml.Mod` | Upstream oo2c library manifest. The VOC `makefile` lists and builds the XML modules against the shared ooc package. |
 

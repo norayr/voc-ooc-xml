@@ -22,7 +22,7 @@ integer widths, record extensions and method signatures must agree.
 | `XMLDTD` | Ported data model; tests cover internal subsets, parameter entities, default attributes and validity constraints. |
 | `XMLEntityResolver` | Ported Unicode system-identifier normalization and relative URI resolution; tested with supplementary characters, malformed UTF-16 and long identifiers. |
 | `XMLInputBuffer`, `XMLUnicodeBuffer` | Ported and tested with short reads, BOMs, growth, compaction, repeated flushes and partial-write retries. |
-| `XMLLimits` | Shared per-parse input, recursion, expansion, value-size, content-model and work budgets; limited constructors apply them before prefetch. |
+| `XMLLimits` | Shared per-parse input/output, recursion, expansion, value-size, content-model and work budgets; limited constructors apply them before prefetch and built-in builders share them. |
 | `IOMemory` | Transferred to VOC's ooc package. Tests cover permissions, seeking, sparse writes, truncation, growth, overlapping copies, bounds and fingerprints. |
 | Unicode codec registry, ASCII, Latin-1, UTF-8, UTF-16 | Adapted to `-O2`; new Oberon tests pass with GCC/C23, Clang/C23 and TCC. |
 | `oocUnicode`, `LongStrings` | Supplied by VOC's ooc package, using the shared `LONGCHAR` alias for code units and `LONGINT` for positions and lengths. |
@@ -100,6 +100,11 @@ will not be part of the VOC port's implementation.
 - URI unit tests in VOC cover RFC 2396 relative-resolution examples, escaped
   dot segments, malformed escapes, cloning, 40,000-byte URIs and file/memory
   channels. Byte classification uses explicit ASCII ranges.
+- All 77 original URI fixtures run in VOC's ooc package, including component
+  traces and serialization, with two documented historical corrections.
+- All 114 original codec hex vectors run in `make test`, checking full and
+  bounded output buffers. UTF-8 invalid-continuation grouping preserves the
+  original output while respecting the caller's logical input end.
 - File URI construction escapes file names; channel opening rejects remote
   authorities and overlong paths. `%00` is rejected because decoded URI
   components use zero-terminated strings.
@@ -236,17 +241,23 @@ will not be part of the VOC port's implementation.
   references and malformed internalized input without accessing host files.
 - [Input policy and resource review](Security.md) explains the tested controls
   and resource-budget API. Cutoff tests cover early failure and shared external
-  byte budgets. The `limits` target runs 45 hostile-input cases under process
-  time and memory ceilings, in plain, namespace and validation modes.
+   byte budgets. The `limits` target runs 53 hostile-input cases under process
+   time and memory ceilings, including namespace, validation and output modes.
 - Input and retained-token buffers grow geometrically. DTD namespace insertion
   is iterative, and lookup/insertion and attribute comparisons charge the
   budget. Value graphs are checked before recursive flattening. Continue using
-  trusted documents while broader builder/validation accounting and randomized
-  malformed-input testing remain incomplete.
+   trusted documents while broader adversarial review remains incomplete.
+- Built-in validation, regular-expression, namespace and canonical/protocol
+  builders share the parser budget, including aggregate validation costs and
+  encoded output bytes. Basic parsing has an additive `ParseLimited` entry
+  point. Direct DTD value/namespace APIs can opt into a budget.
+- The `fuzz` target runs 2,655 deterministic truncation/mutation checks across
+  five parser/output modes under per-process limits.
 
 ## Verification
 
-The twelve XML test programs and seven ooc regression programs pass with
+The thirteen XML test programs, seven shared ooc regression programs and the
+77-case shared URI fixture driver pass with
 GCC/C23, Clang/C23 and TCC under `-O2`. The shared ooc package is rebuilt
 before each XML test run. An additional Clang build instruments the shared
 package, ported XML modules and tests with AddressSanitizer and
@@ -262,7 +273,7 @@ env CC=clang \
   CFLAGS='-std=c23 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer' \
   ASAN_OPTIONS=detect_leaks=0:detect_stack_use_after_return=0 \
   UBSAN_OPTIONS=halt_on_error=1 \
-  make BUILD=build/sanitize test conformance limits
+  make BUILD=build/sanitize test conformance limits fuzz
 ```
 
 ASan's alternate stack frames must be disabled so VOC's conservative garbage
@@ -291,13 +302,8 @@ and adversarial targets pass with GCC/C23, Clang/C23, TCC and the sanitizer buil
 
 ## Next stages
 
-1. Extend resource accounting to validation/builders and add the broader
-   adversarial tests listed in [Security.md](Security.md) before accepting
-   untrusted input.
-2. Review the remaining upstream drivers and XML/namespace/encoding suites.
-   Separate external fixture
-   availability from genuine parser failures.
-3. Only then add an XML port manifest for the XML-specific modules in a
-   separate VOC port directory, with reusable dependencies in the existing
-   ooc package. Test both packages together. Optional HTTP/socket support can
-   be handled independently.
+1. Add the tested XML-specific modules and regression targets to VOC's ports
+   tree, with reusable dependencies in its existing ooc package, then rebuild
+   and test both packages together.
+2. Continue the adversarial review described in [Security.md](Security.md)
+   before accepting untrusted input.

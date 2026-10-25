@@ -19,7 +19,7 @@ MODULE XMLBuilder;
 *)
 
 IMPORT
-  URI, DTD := XMLDTD, Locator := XMLLocator;
+  URI, Limits := XMLLimits, DTD := XMLDTD, Locator := XMLLocator;
 
 
 TYPE
@@ -58,6 +58,7 @@ TYPE
      entity, then the locator position of @oproc{Builder.StartElement} is the
      position of the entity reference, instead of the position of the markup
      text.  *)
+    limits-: Limits.Budget;
   END;
 
 
@@ -94,6 +95,14 @@ TYPE
        The array pointer can change when the list is modified.  *)
   END;
 
+
+PROCEDURE (b: Builder) SetLimits* (limits: Limits.Budget);
+(**Installs an optional shared parser budget. Delegating builders forward it
+   to their delegate before document callbacks begin. *)
+  BEGIN b. limits := limits END SetLimits;
+
+PROCEDURE (b: Builder) Charge* (steps: LONGINT): BOOLEAN;
+  BEGIN RETURN (b. limits = NIL) OR b. limits. Charge (Limits.work, steps) END Charge;
 
 PROCEDURE (b: Builder) SetLocator* (locator: Locator.Locator);
 (**Indicates which locator object the parser uses to communicate positional
@@ -348,6 +357,7 @@ PROCEDURE (b: Builder) Comment* (VAR chars: DTD.StringVar;
 
 PROCEDURE Init* (b: Builder);
   BEGIN
+    b. limits := NIL
   END Init;
 
 PROCEDURE New*(): Builder;

@@ -2311,7 +2311,7 @@ PROCEDURE (p: Parser) ParseDocument*;
     BEGIN
       IF p. aborted THEN RETURN END;
       LOOP
-        IF p. aborted THEN EXIT END;
+        IF ~Charge (Limits.work, 0) THEN EXIT END;
         CASE DispatchChar (chars[cpos]) OF
         | caseEOD:
           EXIT
@@ -2444,7 +2444,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         IF ~Charge (Limits.work, 0) THEN Leave; RETURN END;
         p. builder. StartElement (NIL, startName); (* callback *)
         LOOP
-          IF p. aborted THEN Stop; EXIT END;
+          IF ~Charge (Limits.work, 0) THEN EXIT END;
           IF (chars[cpos] = Buffer.markerEOD) THEN
             EXIT
           ELSIF (chars[cpos] # 62) & (chars[cpos] # 47) THEN
@@ -3245,6 +3245,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         
         StorePosition (p. l^);
         p. builder. StartDTD (p. dtd);   (* callback *)
+        IF ~Charge (Limits.work, 0) THEN RETURN END;
         
         INC (cpos, 9);                   (* skip over "<!DOCTYPE" *)
         S;
@@ -3344,6 +3345,7 @@ PROCEDURE (p: Parser) ParseDocument*;
     IF (p. limits # NIL) & (p. limits. error # NIL) THEN Stop END;
     
     prolog;
+    IF (p. limits # NIL) & (p. limits. error # NIL) THEN Stop END;
     p. inDocumentElement := TRUE;
     element;
     IF p. aborted THEN
@@ -3358,6 +3360,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       Err (junkAfterDocument)
     END;
     CheckInvalidChars (p. in, p. fileEntity);
+    IF (p. limits # NIL) & (p. limits. error # NIL) THEN Stop END;
     
     StorePosition (p. l^);
     p. initialBuilder. EndDocument;      (* callback *)
@@ -3394,6 +3397,7 @@ PROCEDURE Init (p: Parser; new: BOOLEAN;
     p. documentEntity. SetCodecFactory (p. in. codecFactory);
     p. builder := builder;
     p. initialBuilder := builder;
+    builder. SetLimits (limits);
     IF (entityResolver = NIL) THEN
       entityResolver := EntityResolver.New()
     END;
