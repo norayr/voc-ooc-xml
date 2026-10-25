@@ -1,5 +1,5 @@
 (*      $Id: Validation.Mod,v 1.10 2001/03/24 01:11:35 mva Exp $   *)
-MODULE XML:Builder:Validation;
+MODULE XMLBuilderValidation;
 (*  Adds validation services to the XML:Parser.
     Copyright (C) 2001  Michael van Acken
 
@@ -21,7 +21,8 @@ MODULE XML:Builder:Validation;
 
 IMPORT
   Ascii, Msg, LongStrings, URI, 
-  XML:Error, XML:DTD, XML:Locator, XML:Parser, XML:Regexp, B := XML:Builder;
+  Error := XMLError, DTD := XMLDTD, Locator := XMLLocator,
+  Parser := XMLParser, Regexp := XMLRegexp, B := XMLBuilder;
 
 
 TYPE
@@ -40,7 +41,7 @@ TYPE
      following commands create a validating parser:
 
      @example
-     builder := Validator.New (builder);
+      builder := Validation.New (builder);
      p := Parser.NewFile (filePath, NIL, NIL, NIL, builder, res);
      p. validating := TRUE;
      @end example  *)
@@ -107,10 +108,12 @@ CONST  (* error codes *)
   multipleElemDecl = 33;
   invalidElementContentCDATA = 34;
   duplicateToken = 35;
+  nondeterministicContent = 36;
   
 VAR
   validationContext: Error.Context;
   dummyElement: DTD.ElementDecl;
+  dummyName: ARRAY 32 OF DTD.Char;
   
 
 PROCEDURE (b: Builder) SetLocator* (locator: Locator.Locator);
@@ -178,8 +181,8 @@ PROCEDURE IncErrorPos (b: Builder; delta: LONGINT);
 
 PROCEDURE IsS (ch: DTD.Char): BOOLEAN;
   BEGIN
-    RETURN (ch = Ascii.sp) OR (ch = Ascii.ht) OR
-           (ch = Ascii.cr) OR (ch = Ascii.lf)
+    RETURN (ch = ORD (Ascii.sp)) OR (ch = ORD (Ascii.ht)) OR
+           (ch = ORD (Ascii.cr)) OR (ch = ORD (Ascii.lf))
   END IsS;
 
 PROCEDURE IsName (VAR string: ARRAY OF DTD.Char): BOOLEAN;
@@ -190,7 +193,7 @@ PROCEDURE IsName (VAR string: ARRAY OF DTD.Char): BOOLEAN;
       RETURN FALSE
     ELSE
       i := 1;
-      WHILE (string[i] # 0X) DO
+      WHILE (string[i] # 0) DO
         IF ~Parser.IsNameChar (string[i]) THEN
           RETURN FALSE
         END;
@@ -210,9 +213,9 @@ PROCEDURE IsNames (VAR string: ARRAY OF DTD.Char): BOOLEAN;
         REPEAT
           INC (i)
         UNTIL ~Parser.IsNameChar (string[i]);
-        IF (string[i] = 0X) THEN       (* end of string *)
+        IF (string[i] = 0) THEN       (* end of string *)
           RETURN TRUE
-        ELSIF IsS (string[i]) THEN
+        ELSIF (string[i] = ORD (Ascii.sp)) THEN
           INC (i)
         ELSE                           (* name includes invalid char *)
           EXIT
@@ -232,7 +235,7 @@ PROCEDURE IsNmtoken (VAR string: ARRAY OF DTD.Char): BOOLEAN;
       RETURN FALSE
     ELSE
       i := 1;
-      WHILE (string[i] # 0X) DO
+      WHILE (string[i] # 0) DO
         IF ~Parser.IsNameChar (string[i]) THEN
           RETURN FALSE
         END;
@@ -252,9 +255,9 @@ PROCEDURE IsNmtokens (VAR string: ARRAY OF DTD.Char): BOOLEAN;
         REPEAT
           INC (i)
         UNTIL ~Parser.IsNameChar (string[i]);
-        IF (string[i] = 0X) THEN       (* end of string *)
+        IF (string[i] = 0) THEN       (* end of string *)
           RETURN TRUE
-        ELSIF IsS (string[i]) THEN
+        ELSIF (string[i] = ORD (Ascii.sp)) THEN
           INC (i)
         ELSE                           (* name includes invalid char *)
           EXIT
@@ -287,7 +290,7 @@ PROCEDURE PushElement (b: Builder; elemDecl: DTD.Declaration);
     i: LONGINT;
     new: Stack;
   BEGIN
-    IF (b. currLevel = LEN (b. stack^)) THEN
+    IF (b. currLevel+1 = LEN (b. stack^)) THEN
       NEW (new, LEN (b. stack^)*2);
       FOR i := 0 TO LEN (b. stack^)-1 DO
         new[i] := b. stack[i]
@@ -370,7 +373,7 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
         WHILE (ptr1 # NIL) DO
           ptr2 := ptr1. next;
           WHILE (ptr2 # NIL) DO
-            IF (ptr1. name^ = ptr2. name^) THEN
+            IF LongStrings.Equal (ptr1. name^, ptr2. name^) THEN
               RETURN ptr1. name
             END;
             ptr2 := ptr2. next
@@ -451,7 +454,7 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
   
   PROCEDURE InList (name: DTD.String; list: DTD.CP): BOOLEAN;
     BEGIN
-      WHILE (list # NIL) & (list(DTD.NameCP). name^ # name^) DO
+      WHILE (list # NIL) & ~LongStrings.Equal (list(DTD.NameCP). name^, name^) DO
         list := list. next
       END;
       RETURN (list # NIL)
@@ -479,14 +482,17 @@ PROCEDURE (b: Builder) EndDTD* (externalDTD: DTD.ExternalEntity;
         (* an element may have at most one NOTATION attribute *)
         ErrString (b, multipleNOTATIONAttr, "element", elemDecl. name)
       ELSIF (elemDecl. notationAttr # NIL) & elemDecl. IsEmpty() THEN
-(*        ErrString2 (b, emptyElemWithNOTATION,
-                    "element", elemDecl. name,
-                    "attribute", elemDecl. notationAttr. name) ... *)
+        ErrString2 (b, emptyElemWithNOTATION,
+                     "element", elemDecl. name,
+                     "attribute", elemDecl. notationAttr. name)
       END;
       
       IF (elemDecl. contentType = DTD.contentChildren) THEN
         (* create regular expression for `children' content *)
-        elemDecl. SetRegexp (Regexp.New (elemDecl. contentModel))
+        elemDecl. SetRegexp (Regexp.New (elemDecl. contentModel));
+        IF ~elemDecl. regexp(Regexp.Regexp). IsDeterministic() THEN
+          ErrString (b, nondeterministicContent, "element", elemDecl. name)
+        END
       ELSIF (elemDecl. contentType = DTD.contentMixed) THEN
         (* check that every child entry in a Mixed type is unique *)
         cp := elemDecl. contentModel(DTD.ChoiceCP). list;
@@ -540,7 +546,7 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
   
   PROCEDURE InCPList (name: DTD.String; list: DTD.CP): BOOLEAN;
     BEGIN
-      WHILE (list # NIL) & (list(DTD.NameCP). name^ # name^) DO
+      WHILE (list # NIL) & ~LongStrings.Equal (list(DTD.NameCP). name^, name^) DO
         list := list. next
       END;
       RETURN (list # NIL)
@@ -552,17 +558,18 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
       len, i: LONGINT;
     BEGIN
       NEW (str, 64);
-      str[0] := 0X;
+      str[0] := 0;
       len := 0;
       
       WHILE (list # NIL) DO
         i := LongStrings.Length (list(DTD.NameCP). name^);
         IF (len+i+1 >= LEN (str^)) THEN
-          NEW (str2, LEN (str^)*2);
-          COPY (str^, str2^)
+          NEW (str2, len+i+2);
+          LongStrings.Assign (str^, str2^);
+          str := str2
         END;
-        str[len] := " ";
-        str[len+1] := 0X;
+        str[len] := ORD (" ");
+        str[len+1] := 0;
         LongStrings.Append (list(DTD.NameCP). name^, str^);
         INC (len, i+1);
         list := list. next
@@ -576,7 +583,7 @@ PROCEDURE (b: Builder) StartElement* (namespaceDecl: DTD.NamespaceDeclaration;
       IF (b. dtd = NIL) THEN
         (* document has no DTD, e.g. because it's completely broken *)
         b. dtd := DTD.New()
-      ELSIF (b. dtd. rootName^ # localName^) THEN
+      ELSIF ~LongStrings.Equal (b. dtd. rootName^, localName^) THEN
         ErrString (b, rootMismatch, "name", b. dtd. rootName)
       END
       
@@ -656,6 +663,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
       ref: DTD.Entity;
     BEGIN
       ref := NIL;
+      IF attValue = NIL THEN RETURN NIL END;
       fragment := attValue. fragmentList;
       WHILE (ref = NIL) & (fragment # NIL) DO
         IF (fragment IS DTD.EntityRef) &
@@ -700,12 +708,12 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
           i := 0;
           LOOP
             start := i;
-            WHILE (string[i] > Ascii.sp) DO
+            WHILE (string[i] > ORD (Ascii.sp)) DO
               INC (i)
             END;
             
             NEW (substr, i-start+1);
-            LongStrings.Extract (string^, SHORT (start), SHORT (i-start), substr^);
+            LongStrings.Extract (string^, start, i-start, substr^);
             decl := b. dtd. geNamespace. Get (substr);
             IF (decl = NIL) THEN
               ErrString (b, noSuchGeneralEntity, "name", substr)
@@ -713,7 +721,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
               ErrString (b, notAnUnparsedEntity, "name", substr)
             END;
             
-            IF (string[i] = 0X) THEN
+            IF (string[i] = 0) THEN
               EXIT
             ELSE
               INC (i)
@@ -764,15 +772,15 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
           i := 0;
           LOOP
             start := i;
-            WHILE (string[i] > Ascii.sp) DO
+            WHILE (string[i] > ORD (Ascii.sp)) DO
               INC (i)
             END;
             
             NEW (substr, i-start+1);
-            LongStrings.Extract (string^, SHORT (start), SHORT (i-start), substr^);
+            LongStrings.Extract (string^, start, i-start, substr^);
             dummy := ~b. idrefNamespace. Add (NewIDDecl (substr));
             
-            IF (string[i] = 0X) THEN
+            IF (string[i] = 0) THEN
               EXIT
             ELSE
               INC (i)
@@ -788,7 +796,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
       IF (attrDecl. default = DTD.attrFixed) THEN
         default := attrDecl. defaultValue. Flatten (attrDecl);
         string := value. Flatten (attrDecl);
-        IF (string^ # default^) THEN
+        IF ~LongStrings.Equal (string^, default^) THEN
           Err (b, fixedDefaultMismatch)
         END
       END;
@@ -824,7 +832,7 @@ PROCEDURE (b: Builder) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
   
 PROCEDURE (b: Builder) NamespaceDeclaration* (namespaceDecl: DTD.NamespaceDeclaration);
   BEGIN
-    ASSERT (FALSE)
+    HALT (127)
   END NamespaceDeclaration;
 
 PROCEDURE (b: Builder) AttributesDone*;
@@ -870,8 +878,7 @@ PROCEDURE (b: Builder) StartCDATA*;
     
     (* an element with element content cannot include non-whitespace character
        data; a CDATA section does not match S and is therefore forbidden *)
-    IF IsStandalone (b) &
-       b. stack[b. currLevel]. elem. IsElementContent() THEN
+    IF b. stack[b. currLevel]. elem. IsElementContent() THEN
       ErrString (b, invalidCharacterContent,
                  "element", b. stack[b. currLevel]. elem. name)
     END;
@@ -953,10 +960,10 @@ PROCEDURE Init* (b: Builder; delegateBuilder: B.Builder);
   END Init;
 
 PROCEDURE New* (delegateBuilder: B.Builder): Builder;
-(**Creates a new builder that performs namespaces transformations on the
-   parser callbacks.  Except for splitting qualified names into namespace URI
-   and local name, all callbacks are passed on to @oparam{delegateBuilder}
-   unchanged.  *)
+(**Creates a builder that checks DTD validity and forwards callbacks to the
+   application. Set the parser's validating field to TRUE and enable external
+   references to check the complete DTD. Place this builder before the
+   namespace builder so declarations are matched against qualified names. *)
   VAR
     b: Builder;
   BEGIN
@@ -1043,6 +1050,8 @@ PROCEDURE SetErrorMessages;
         t := "Element `${element}' is restricted to element content"
       | duplicateToken:
         t := "Duplicate token `${name}' in enumerated attribute type `${element}/@${attribute}'"
+      | nondeterministicContent:
+        t := "Element `${element}' has a non-deterministic content model"
       ELSE
         t := ""
       END;
@@ -1056,6 +1065,7 @@ BEGIN
   validationContext := Error.NewContext ("XML:Builder:Validation");
   SetErrorMessages;
   NEW (dummyElement);
-  DTD.InitElementDecl (dummyElement, DTD.GetStringValue ("&validation-dummy"),
+  LongStrings.Long ("&validation-dummy", dummyName);
+  DTD.InitElementDecl (dummyElement, DTD.GetStringValue (dummyName),
                        NIL, NIL, FALSE);
-END XML:Builder:Validation.
+END XMLBuilderValidation.

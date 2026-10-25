@@ -1,5 +1,5 @@
 (*      $Id: Regexp.Mod,v 1.2 2001/03/20 22:16:32 mva Exp $   *)
-MODULE XML:Regexp;
+MODULE XMLRegexp;
 (*  Creates regular expression data structure from `children' content model.
     Copyright (C) 2001  Michael van Acken
 
@@ -20,7 +20,7 @@ MODULE XML:Regexp;
 
 
 IMPORT
-  Out, LongStrings, XML:DTD;
+  Out, LongStrings, DTD := XMLDTD;
 
 
 TYPE
@@ -62,10 +62,10 @@ PROCEDURE DumpRegexp (regexp: Regexp);
     i: LONGINT;
   BEGIN
     Out.String ("initial state: ");
-    Out.LongInt (regexp. initialState, 0);
+    Out.Int (regexp. initialState, 0);
     Out.Ln;
     FOR i := 0 TO regexp. size-1 DO
-      Out.LongInt (i, 0);
+      Out.Int (i, 0);
       Out.String (": name=");
       IF (regexp. states[i]. elem = NIL) THEN
         Out.String ("*EMPTY*")
@@ -74,9 +74,9 @@ PROCEDURE DumpRegexp (regexp: Regexp);
         Out.String (str)
       END;
       Out.String (", next1=");
-      Out.LongInt (regexp. states[i]. next1, 0);
+      Out.Int (regexp. states[i]. next1, 0);
       Out.String (", next2=");
-      Out.LongInt (regexp. states[i]. next2, 0);
+      Out.Int (regexp. states[i]. next2, 0);
       Out.Ln
     END
   END DumpRegexp;
@@ -244,6 +244,50 @@ PROCEDURE IsMember (set: Set; element: State): BOOLEAN;
     RETURN (i # set. size)
   END IsMember;
 
+PROCEDURE Expand (states: States; set: Set);
+(* Adds epsilon-reachable states, visiting each state at most once. *)
+  VAR i: LONGINT; s: State;
+  BEGIN
+    i := 0;
+    WHILE i < set. size DO
+      s := set. members[i];
+      IF (s # endOfRegexp) & (states[s]. elem = NIL) THEN
+        Include (set, states[s]. next1);
+        Include (set, states[s]. next2)
+      END;
+      INC (i)
+    END
+  END Expand;
+
+PROCEDURE (regexp: Regexp) IsDeterministic* (): BOOLEAN;
+(**Checks that each input name identifies one content-particle occurrence,
+   both at the start and after each named particle. *)
+  VAR closure: Set; i, j, k: LONGINT; s, t: State;
+  BEGIN
+    FOR i := -1 TO regexp. size-1 DO
+      IF (i = -1) OR (regexp. states[i]. elem # NIL) THEN
+        closure := NewSet();
+        IF i = -1 THEN Include (closure, regexp. initialState)
+        ELSE Include (closure, regexp. states[i]. next1)
+        END;
+        Expand (regexp. states, closure);
+        FOR j := 0 TO closure. size-1 DO
+          s := closure. members[j];
+          IF (s # endOfRegexp) & (regexp. states[s]. elem # NIL) THEN
+            FOR k := j+1 TO closure. size-1 DO
+              t := closure. members[k];
+              IF (t # endOfRegexp) & (regexp. states[t]. elem # NIL) &
+                 LongStrings.Equal (regexp. states[s]. elem^, regexp. states[t]. elem^) THEN
+                RETURN FALSE
+              END
+            END
+          END
+        END
+      END
+    END;
+    RETURN TRUE
+  END IsDeterministic;
+
 
 
 PROCEDURE NewMatcher* (regexp: Regexp): Matcher;
@@ -279,7 +323,7 @@ PROCEDURE (m: Matcher) Matches* (name: DTD.String): BOOLEAN;
           IF (m. states[s]. next1 # m. states[s]. next2) THEN
             Include (m. current, m. states[s]. next2)
           END
-        ELSIF (m. states[s]. elem^ = name^) THEN
+        ELSIF LongStrings.Equal (m. states[s]. elem^, name^) THEN
           Include (newSet, m. states[s]. next1)
         END;
         INC (i)
@@ -338,14 +382,14 @@ PROCEDURE (m: Matcher) ExpectedTags* (currentElement: DTD.String): DTD.String;
       END;
       
       NEW (str, len+1);
-      COPY ("", str^);
+      str[0] := 0;
       i := 0;
       WHILE (i # m. current. size) DO
         IF (m. current. members[i] = endOfRegexp) THEN
-          LongStrings.Append (" /", str^);
+          LongStrings.Append8 (" /", str^);
           LongStrings.Append (currentElement^, str^)
         ELSIF (m. states[m. current. members[i]]. elem # NIL) THEN
-          LongStrings.Append (" ", str^);
+          LongStrings.Append8 (" ", str^);
           LongStrings.Append (m. states[m. current. members[i]]. elem^, str^)
         END;
         INC (i)
@@ -354,4 +398,4 @@ PROCEDURE (m: Matcher) ExpectedTags* (currentElement: DTD.String): DTD.String;
     END
   END ExpectedTags;
 
-END XML:Regexp.
+END XMLRegexp.

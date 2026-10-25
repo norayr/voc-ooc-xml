@@ -4,11 +4,13 @@ ROOT := $(CURDIR)
 MODULES := XMLUnicodeCodec XMLUnicodeCodecUTF8 XMLUnicodeCodecUTF16 \
 	XMLUnicodeCodecASCII XMLUnicodeCodecLatin1 XMLUnicodeCodecImportAll \
 	XMLInputBuffer XMLUnicodeBuffer XMLDTD XMLEntityResolver \
-	XMLError XMLLocator XMLBuilder XMLParser XMLBuilderNamespaces XMLCheck \
-	TestUnicodeCodecs TestUnicodeMessages TestMemoryBuffers TestDTDResolver TestParser TestNamespaces
+	XMLError XMLLocator XMLBuilder XMLParser XMLBuilderNamespaces \
+	XMLRegexp XMLBuilderValidation XMLCheck \
+	TestUnicodeCodecs TestUnicodeMessages TestMemoryBuffers TestDTDResolver TestParser \
+	TestNamespaces TestValidation
 
-.PHONY: all codecs buffers resolver parser namespaces xmlcheck conformance test clean
-all: namespaces
+.PHONY: all codecs buffers resolver parser namespaces validation xmlcheck conformance test clean
+all: validation
 
 $(BUILD):
 	mkdir -p "$(BUILD)"
@@ -43,7 +45,12 @@ parser: resolver
 namespaces: parser
 	cd "$(BUILD)" && $(VOC) -O2 -s "$(ROOT)/src/XML/Builder/Namespaces.Mod"
 
-test: namespaces
+validation: namespaces
+	cd "$(BUILD)" && $(VOC) -O2 -s \
+		"$(ROOT)/src/XML/Regexp.Mod" \
+		"$(ROOT)/src/XML/Builder/Validation.Mod"
+
+test: validation
 	cd "$(BUILD)" && $(VOC) -O2 -s -m "$(ROOT)/tests/voc/TestUnicodeCodecs.Mod"
 	"$(BUILD)/TestUnicodeCodecs"
 	cd "$(BUILD)" && $(VOC) -O2 -s -m "$(ROOT)/tests/voc/TestUnicodeMessages.Mod"
@@ -56,16 +63,19 @@ test: namespaces
 	"$(BUILD)/TestParser"
 	cd "$(BUILD)" && $(VOC) -O2 -s -m "$(ROOT)/tests/voc/TestNamespaces.Mod"
 	"$(BUILD)/TestNamespaces"
+	cd "$(BUILD)" && $(VOC) -O2 -s -m "$(ROOT)/tests/voc/TestValidation.Mod"
+	"$(BUILD)/TestValidation"
 
-xmlcheck: namespaces
+xmlcheck: validation
 	cd "$(BUILD)" && $(VOC) -O2 -s -m "$(ROOT)/tools/XMLCheck.Mod"
 
 conformance: xmlcheck
 	python3 tests/voc/check-xmltest.py "$(BUILD)/XMLCheck" --work "$(BUILD)/conformance"
+	python3 tests/voc/check-validation.py "$(BUILD)/XMLCheck" --work "$(BUILD)/conformance"
 
 clean:
 	rm -f $(foreach module,$(MODULES),$(foreach ext,c h o sym,"$(BUILD)/$(module).$(ext)")) \
 		"$(BUILD)/TestUnicodeCodecs" "$(BUILD)/TestUnicodeMessages" \
 		"$(BUILD)/TestMemoryBuffers" "$(BUILD)/TestDTDResolver" "$(BUILD)/TestParser" \
-		"$(BUILD)/TestNamespaces" \
+		"$(BUILD)/TestNamespaces" "$(BUILD)/TestValidation" \
 		"$(BUILD)/XMLCheck"

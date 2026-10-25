@@ -21,7 +21,7 @@ must not be stored in `LONGINT`.
 ### Working so far
 
 The Unicode codecs, XML buffers, DTD data model, entity resolver, XML
-parser and namespace builder build with VOC:
+parser, namespace builder and DTD validator build with VOC:
 
 ```sh
 make test
@@ -40,6 +40,9 @@ package.
 `XMLBuilder`. Applications extend that builder to consume the events.
 Wrap an application builder with `XMLBuilderNamespaces.New(builder)` and set
 `parser.enforceQNames := TRUE` to receive namespace URIs and local names.
+For DTD validation, wrap the resulting builder with
+`XMLBuilderValidation.New(builder)` and set `parser.validating := TRUE`.
+Enable external references when the document uses an external DTD.
 `XMLUnicodeCodecImportAll` registers the bundled ASCII, Latin-1,
 UTF-8 and UTF-16 encodings at startup. The codec source paths are unchanged so
 the changes remain easy to compare with CVS.
@@ -73,7 +76,9 @@ Parser tests cover callbacks, internal and parameter entities, default
 attributes, Unicode names, character references, malformed documents and
 70,000-unit text streamed through short reads. Namespace tests cover scope,
 default declarations, implicit `xml` bindings, Unicode, DTD defaults,
-duplicate expanded attribute names and reserved bindings. The six integration
+duplicate expanded attribute names and reserved bindings. Validation tests
+cover content models, required/fixed attributes, IDs and references, notations,
+64 nested elements and long Unicode attribute lists. The seven integration
 programs pass with GCC and Clang in C23 mode, TCC and Clang ASan/UBSan.
 
 The bundled James Clark XML test archive supplies the first well-formedness
@@ -86,18 +91,23 @@ make BUILD=../compiler/build/ports/ooc/2 conformance
 All 360 included XML cases and 24 original namespace fixtures pass, also under
 ASan/UBSan. The runner records the upstream exclusion of `valid/sa/065.xml`,
 whose entity replacement is malformed.
-This checks acceptance and rejection; canonical output and DTD validation
-remain later stages.
+The same target checks 1,808 DTD-validation cases from the bundled James Clark,
+IBM, Sun and OASIS archives. Historical fixture exclusions and corrected
+expectations are recorded explicitly; see [conformance coverage](doc/Conformance.md).
+Canonical-output comparisons remain a later stage.
 
 `make xmlcheck` builds `XMLCheck`, a file well-formedness checker. Use
 `XMLCheck --namespaces file.xml` to enable namespace checks. Its default
 disables external references; `XMLCheck --external file.xml` enables them for
 trusted local fixtures. Exit codes are 0 for successful parsing, 1 for XML
 diagnostics and 2 for usage or opening errors.
+`XMLCheck --validate file.xml` enables DTD validation and external references;
+combine it with `--namespaces` to check namespace constraints too. Use trusted
+input while external-entity controls and resource limits are under review.
 
 VOC's ooc package supplies URI parsing, relative resolution and file/memory
 channels. XML's `XMLEntityResolver` converts Unicode system identifiers to
-these URI objects. The validation builder, writer and remaining original
+these URI objects. The writer and remaining original
 regression suites are the next adaptation stages.
 External-entity controls and resource limits still need review
 before the parser can accept untrusted documents.

@@ -2,8 +2,8 @@
 
 `make test` builds and tests the Unicode codecs, XML byte/Unicode buffers,
 DTD data model, entity resolver, diagnostics, locator, builder interface and
-parser and namespace builder against VOC's shared ooc support under the
-Oberon-2 model. The validation builder and XML writer are the next adaptation stages.
+parser, namespace builder and DTD validator against VOC's shared ooc support
+under the Oberon-2 model. The XML writer is the next adaptation stage.
 
 ## Dependencies
 
@@ -14,8 +14,9 @@ integer widths, record extensions and method signatures must agree.
 | --- | --- |
 | `XMLParser`, `XMLBuilder`, `XMLLocator`, `XMLError` | Ported and tested with in-memory and file inputs, UTF-16 callbacks and UTF-8 diagnostics. |
 | `XMLBuilderNamespaces` | Ported with scoped declarations, implicit `xml` bindings, duplicate expanded-name checks and Unicode coverage. |
-| Validation builder and writer | Included in the CVS import; still need adapting to VOC. |
-| `XMLDTD` | Ported data model; parser tests cover internal subsets, parameter entities and default attributes. Full validation awaits its builder. |
+| `XMLBuilderValidation`, `XMLRegexp` | Ported DTD validation and content-model matching; tested with internal/external DTDs and Unicode attributes. |
+| Writer | Included in the CVS import; still needs adapting to VOC. |
+| `XMLDTD` | Ported data model; tests cover internal subsets, parameter entities, default attributes and validity constraints. |
 | `XMLEntityResolver` | Ported Unicode system-identifier normalization and relative URI resolution; tested with supplementary characters, malformed UTF-16 and long identifiers. |
 | `XMLInputBuffer`, `XMLUnicodeBuffer` | Ported and tested with short reads, BOMs, growth, compaction, repeated flushes and partial-write retries. |
 | `IOMemory` | Transferred to VOC's ooc package. Tests cover permissions, seeking, sparse writes, truncation, growth, overlapping copies, bounds and fingerprints. |
@@ -127,7 +128,7 @@ will not be part of the VOC port's implementation.
   upstream exclusion of `valid/sa/065.xml` is recorded in the result file.
   All 24 original namespace fixtures also pass with `XMLCheck --namespaces`.
   Timeouts, traps and opening errors are failures, even for negative fixtures.
-  Canonical-output and validity comparisons remain pending.
+  Canonical-output comparisons remain pending.
 - `XMLCheck` disables external references by default. The library retains its
   upstream `followExternalRef = TRUE` default; applications must set it
   explicitly. Expansion, recursion and input-size limits remain pending, so
@@ -149,9 +150,29 @@ will not be part of the VOC port's implementation.
   list growth. DTD default values and explicit-value normalization also work
   for elements without `<!ELEMENT>` declarations.
 
+## DTD validation
+
+- `XMLBuilderValidation` checks element content, attribute syntax and
+  declarations, ID uniqueness and references, notations and standalone
+  constraints. `XMLRegexp` matches sequence/choice/repetition models and checks
+  that each possible next name identifies one content-particle occurrence.
+- Put validation before namespace processing in the callback chain. DTDs name
+  qualified elements and attributes. Set `parser.validating := TRUE` and
+  enable external references to read the complete DTD.
+- Stack growth is checked before incrementing the nesting level. Mixed-content
+  error lists grow to fit long names. Attribute-list token offsets use
+  `LONGINT`; tests include 20,000 Unicode ID references and 64 nested elements.
+- Character content is checked in element-only models for all documents,
+  independently of the standalone declaration. `NOTATION` attributes on
+  `EMPTY` elements and ambiguous content models produce diagnostics.
+- `make conformance` checks 1,808 DTD-validation fixtures in addition to the
+  XML and namespace well-formedness cases, also under ASan/UBSan.
+  [Conformance coverage](Conformance.md) explains the four upstream exclusions
+  and historical expectation corrections. Fixture sources remain unchanged.
+
 ## Verification
 
-The six XML test programs and seven ooc regression programs pass with
+The seven XML test programs and seven ooc regression programs pass with
 GCC/C23, Clang/C23 and TCC under `-O2`. The shared ooc package is rebuilt
 before each XML test run. An additional Clang build instruments the shared
 package, ported XML modules and tests with AddressSanitizer and
@@ -193,7 +214,7 @@ source-build example in the README.
 
 ## Next stages
 
-1. Adapt and test DTD validation and the writer.
+1. Adapt and test the writer and canonical-output builder.
 2. Adapt the remaining upstream test drivers. Review entity expansion,
    recursion and external-entity controls before accepting untrusted input.
 3. Run the remaining XML/namespace/encoding suites. Separate external fixture
