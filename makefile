@@ -8,7 +8,7 @@ MODULES := XMLUnicodeCodec XMLUnicodeCodecUTF8 XMLUnicodeCodecUTF16 \
 	XMLRegexp XMLBuilderValidation XMLWriter XMLBuilderCanonical XMLBuilderParserProtocol \
 	XMLBasicElement XMLBasicParser XMLBasicDataType XMLCheck \
 	TestUnicodeCodecs TestUnicodeMessages TestMemoryBuffers TestDTDResolver TestParser \
-	TestNamespaces TestValidation TestWriter TestBasic TestProtocol
+	TestNamespaces TestValidation TestWriter TestBasic TestProtocol TestEntityPolicy
 
 .PHONY: all codecs buffers resolver parser namespaces validation writer basic xmlcheck conformance test clean
 all: basic
@@ -84,6 +84,8 @@ test: basic
 	"$(BUILD)/TestBasic"
 	cd "$(BUILD)" && $(VOC) -O2 -s -m "$(ROOT)/tests/voc/TestProtocol.Mod"
 	"$(BUILD)/TestProtocol"
+	cd "$(BUILD)" && $(VOC) -O2 -s -m "$(ROOT)/tests/voc/TestEntityPolicy.Mod"
+	"$(BUILD)/TestEntityPolicy"
 
 xmlcheck: writer
 	cd "$(BUILD)" && $(VOC) -O2 -s -m "$(ROOT)/tools/XMLCheck.Mod"
@@ -99,5 +101,5 @@ clean:
 		"$(BUILD)/TestUnicodeCodecs" "$(BUILD)/TestUnicodeMessages" \
 		"$(BUILD)/TestMemoryBuffers" "$(BUILD)/TestDTDResolver" "$(BUILD)/TestParser" \
 		"$(BUILD)/TestNamespaces" "$(BUILD)/TestValidation" "$(BUILD)/TestWriter" \
-		"$(BUILD)/TestBasic" "$(BUILD)/TestProtocol" \
+		"$(BUILD)/TestBasic" "$(BUILD)/TestProtocol" "$(BUILD)/TestEntityPolicy" \
 		"$(BUILD)/XMLCheck"

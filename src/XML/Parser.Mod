@@ -86,9 +86,9 @@ TYPE
        is never @code{NIL} *)
        
     followExternalRef*: BOOLEAN;
-    (**If @code{TRUE}, then the parser should try to follow external references
-       (references to the external DTD subset or to an external parameter
-       entity).  It is an error if the external entity cannot be read.  The
+    (**If @code{TRUE}, then the parser should try to follow references to the
+       external DTD subset, external general entities and external parameter
+       entities. It is an error if the external entity cannot be read. The
        default value is @code{TRUE}.  *)
     enforceQNames*: BOOLEAN;
     (**If @code{TRUE}, then the parser checks that element and attribute names
@@ -253,6 +253,8 @@ CONST  (* error codes *)
   referenceToUnparsed = 304;
   externalRefInAtttribute = 305;
   nestingViolation = 306;
+  externalAccessDisabled = 307;
+  recursiveParameterEntity = 308;
   
 VAR
   parserContext: Error.Context;
@@ -767,7 +769,10 @@ PROCEDURE (p: Parser) ParseDocument*;
       in: Buffer.Input;
       str: ARRAY 2*1024 OF CHAR;
     BEGIN
-      IF (entity. baseURI = NIL) THEN
+      IF ~p. followExternalRef THEN
+        Err (externalAccessDisabled);
+        RETURN NIL
+      ELSIF (entity. baseURI = NIL) THEN
         RETURN NIL
       ELSE
         ch := entity. baseURI. GetChannel (URI.channelOld, res);
@@ -785,19 +790,19 @@ PROCEDURE (p: Parser) ParseDocument*;
       END
     END GetBuffer;
   
-  PROCEDURE CheckInvalidChars;
+  PROCEDURE CheckInvalidChars (input: Buffer.Input; entity: DTD.ExternalEntity);
     VAR
       str: ARRAY 2*1024 OF CHAR;
     BEGIN
-      IF (p. in. codec. invalidChars # 0) THEN
+      IF (input # NIL) & (input. codec. invalidChars # 0) THEN
         Err (invalidCharacterEncodings);
-        IF p. fileEntity. baseURI # NIL THEN
-          p. fileEntity. baseURI. GetString (str)
+        IF entity. baseURI # NIL THEN
+          entity. baseURI. GetString (str)
         ELSE
           str := "<input>"
         END;
         p. lastError. SetStringAttrib ("uri", Msg.GetStringPtr (str));
-        p. lastError. SetIntAttrib ("encodings", p. in. codec. invalidChars)
+        p. lastError. SetIntAttrib ("encodings", input. codec. invalidChars)
       END
     END CheckInvalidChars;
   
@@ -832,7 +837,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         FOR i := 0 TO len-1 DO
           str[i] := in. chars[i]
         END;
-        CheckInvalidChars;
+        CheckInvalidChars (in, entity);
         in. Close
       ELSE
         NEW (str, 2);
@@ -937,7 +942,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       
       DEC (p. lenPEStack);
       IF (p. in # NIL) & (p. in # p. peStack[p. lenPEStack]. in) THEN
-        CheckInvalidChars;
+        CheckInvalidChars (p. in, p. fileEntity);
         p. in. Close                     (* close external entity buffer *)
       END;
       chars := p. peStack[p. lenPEStack]. oldChars;
@@ -1243,6 +1248,11 @@ PROCEDURE (p: Parser) ParseDocument*;
         END
       ELSE
         entity := decl(DTD.Entity);
+        IF entity. expanding THEN
+          Err (recursiveParameterEntity);
+          p. lastError. SetLStringAttrib ("name", Msg.GetLStringPtr (name^));
+          RETURN
+        END;
         IF declSep THEN
           (* this parameter reference is part of the rule DeclSep: if possible,
              parse the replacement text as a sequence of declarations *)
@@ -3164,7 +3174,7 @@ PROCEDURE (p: Parser) ParseDocument*;
     IF (chars[cpos] # Buffer.markerEOD) THEN
       Err (junkAfterDocument)
     END;
-    CheckInvalidChars;
+    CheckInvalidChars (p. in, p. fileEntity);
     
     StorePosition (p. l^);
     p. initialBuilder. EndDocument       (* callback *)
@@ -3472,6 +3482,10 @@ PROCEDURE SetErrorMessages;
         t := "Attribute value contains reference to external entity `${name}'"
       | nestingViolation:
         t := "Nesting violation: Opening and closing parenthesis not in same entity"
+      | externalAccessDisabled:
+        t := "External entity access is disabled"
+      | recursiveParameterEntity:
+        t := "Parameter entity `${name}' is defined recursively"
       ELSE
         t := ""
       END;

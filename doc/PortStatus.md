@@ -215,9 +215,24 @@ will not be part of the VOC port's implementation.
   All five original successful snapshots match byte-for-byte, including their
   locator positions. Long-text tests exercise buffered trace output.
 
+## Input policy review
+
+- A shared external-buffer guard enforces `followExternalRef = FALSE` even
+  while recovering from malformed parameter-entity references. The review
+  reproduced and fixed an external read through that path.
+- Parameter-entity cycles now produce diagnostics before re-entering an
+  expanding entity. Internalized external entities are checked using their own
+  decoder, so malformed UTF-8 is reported correctly.
+- An instrumented in-memory resource tests external DTDs, general/parameter
+  entities, invalid attribute references, unused unparsed entities, recursive
+  references and malformed internalized input without accessing host files.
+- [Input policy and resource review](Security.md) explains the tested controls
+  and remaining input, expansion, allocation and native-stack limits. Continue
+  using trusted documents until that work is complete.
+
 ## Verification
 
-The ten XML test programs and seven ooc regression programs pass with
+The eleven XML test programs and seven ooc regression programs pass with
 GCC/C23, Clang/C23 and TCC under `-O2`. The shared ooc package is rebuilt
 before each XML test run. An additional Clang build instruments the shared
 package, ported XML modules and tests with AddressSanitizer and
@@ -262,8 +277,8 @@ targets pass with GCC/C23, Clang/C23, TCC and the sanitizer build.
 
 ## Next stages
 
-1. Review entity expansion,
-   recursion and external-entity controls before accepting untrusted input.
+1. Finish the resource limits and adversarial tests listed in [Security.md](Security.md)
+   before accepting untrusted input.
 2. Review the remaining upstream drivers and XML/namespace/encoding suites.
    Separate external fixture
    availability from genuine parser failures.

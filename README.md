@@ -90,7 +90,7 @@ UTF-8/UTF-16 round trips, escaping, long names/URIs, indentation and partial
 channel writes. Basic-element tests cover factory lookup, typed values,
 application checks, locators, stack growth and long Unicode buffers. Protocol
 tests reparse callback traces, including malformed input and namespace events.
-The ten integration programs pass with GCC and Clang in
+The eleven integration programs pass with GCC and Clang in
 C23 mode, TCC and Clang ASan/UBSan.
 
 The bundled James Clark XML test archive supplies the first well-formedness
@@ -128,8 +128,9 @@ VOC's ooc package supplies URI parsing, relative resolution and file/memory
 channels. XML's `XMLEntityResolver` converts Unicode system identifiers to
 these URI objects. The ported library modules have integration coverage;
 remaining original regression drivers are still being reviewed.
-External-entity controls and resource limits still need review
-before the parser can accept untrusted documents.
+Resource limits and broader security testing remain unfinished; use trusted XML.
+The [input policy and security review](doc/Security.md) records the external-read
+guard, recursive-entity checks, regression coverage and remaining resource work.
 
 ### Testing with a VOC source build
 
