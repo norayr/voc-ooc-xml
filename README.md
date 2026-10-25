@@ -1,6 +1,6 @@
 # ooc XML for VOC
 
-This is a port in progress of Michael van Acken's **ooc-libxml**, the native
+This is a VOC port of Michael van Acken's **ooc-libxml**, the native
 Oberon XML library for oo2c 1.x.
 
 The original CVS history is the ancestry of this repository. The unmodified
@@ -18,7 +18,7 @@ The target is VOC's **Oberon-2 (`-O2`)** type model. In particular, Unicode
 characters must not be narrowed to its 8-bit `CHAR`, and native addresses
 must not be stored in `LONGINT`.
 
-### Working so far
+### Building and using the library
 
 The Unicode codecs, XML buffers, DTD data model, entity resolver, XML
 parser, namespace builder, DTD validator, XML writer, canonical-output builder,
@@ -162,11 +162,22 @@ rebuilt modules. A normal `make test` uses the installed shared VOC library.
 [Port status and dependencies](doc/PortStatus.md) lists what is present and
 what still needs adapting.
 
-The XML port is in progress. Its VOC ports-tree integration will follow
-completion of the standalone port and its tests. The shared support modules have
-been transferred into VOC's existing ooc package. The upstream `configure`
-and `Makefile.in` describe the original oo2c build.
+The tested XML modules and regression suites are integrated into VOC's
+[`src/ports/xml/`, commit 1ef83249](https://github.com/vishapoberon/compiler/tree/1ef8324993beddb547a5b9d164519bb8d8341bb1/src/ports/xml).
+VOC's conventional and modular model-2 library manifests include all 24 XML
+modules. The integrated package passes the same four-compiler/sanitizer matrix;
+its modular tests also pass all 222 bundled ABI/load checks and XML consumer
+programs. Reusable support remains in VOC's existing ooc package.
+From the VOC repository root, run:
+
+```sh
+make -C src/ports/xml test conformance limits fuzz
+```
+
+The standalone repository retains the CVS history and original source layout.
+The upstream `configure` and `Makefile.in` describe the original oo2c build.
 
 Original copyright and per-file licence notices apply. Most parser modules
-are LGPL-2.0-or-later. Test data and bundled third-party test archives retain
+are LGPL-2.0-or-later; [COPYING](COPYING) supplies the GNU LGPL 2.1 text.
+Test data and bundled third-party test archives retain
 their own notices.

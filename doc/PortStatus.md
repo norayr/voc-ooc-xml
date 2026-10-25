@@ -43,9 +43,16 @@ support modules need the same recorded provenance and unmodified baseline.
 
 ## VOC integration boundary
 
-VOC's XML port will contain the XML-specific modules. Reusable dependencies,
+VOC's XML port contains the XML-specific modules. Reusable dependencies,
 including strings, diagnostics, channels, memory files and URI support, belong
 in VOC's `src/ports/ooc/` package.
+
+VOC commit `1ef8324993beddb547a5b9d164519bb8d8341bb1` integrates all 24
+implementation files from standalone commit `ff8ab3d` unchanged into
+`src/ports/xml/`, with flattened paths and a provenance manifest. It includes
+the XML regression programs, original fixtures, archives and process-bounded
+resource/mutation runners. Test attributes preserve fixture bytes and line
+endings. Conventional, modular and Windows model-2 build manifests include XML.
 
 VOC's `Msg` and `Channel` have been replaced by the tested implementations.
 `LongStrings`, `IOMemory` and the shared `oocUnicode.LONGCHAR` alias also live
@@ -284,6 +291,15 @@ source-build example in the README.
 The isolated ooc build forces local symbol files, so rebuilt objects are linked
 even when installed modules export identical interfaces. All conformance
 and adversarial targets pass with GCC/C23, Clang/C23, TCC and the sanitizer build.
+The integrated VOC package passes the same matrix. A fresh model-2 modular
+build with networking disabled passes all 222 bundled ABI/load checks and
+the XML parser, validation, writer and Basic consumer tests.
+
+The existing conventional compiler binary in the development checkout still
+rejects the unchanged ooc `LowReal.Mod` constant at line 87 with `err 203`,
+before `make xml` reaches XML. The isolated build uses the installed compiler;
+the successful modular build creates a fresh compiler. Conventional compiler
+image and native-Windows validation remain VOC release tasks.
 
 ## Representation rules
 
@@ -302,8 +318,7 @@ and adversarial targets pass with GCC/C23, Clang/C23, TCC and the sanitizer buil
 
 ## Next stages
 
-1. Add the tested XML-specific modules and regression targets to VOC's ports
-   tree, with reusable dependencies in its existing ooc package, then rebuild
-   and test both packages together.
+1. Complete VOC compiler-image and platform release validation using the
+   integrated package and its shared ooc dependencies.
 2. Continue the adversarial review described in [Security.md](Security.md)
    before accepting untrusted input.

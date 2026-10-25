@@ -50,10 +50,15 @@ returns the root and sets the error-list result to `NIL`. On failure it returns
 `NIL` and supplies diagnostics. Application callbacks stop after the first
 application error. The caller retains ownership of the input channel.
 
-External references are followed when a base URI is supplied or validation is
-enabled. Use trusted documents while external-entity policy and general
-resource limits remain under review. The Basic nesting limit covers element
-objects, not entity expansion or total input size.
+`XMLBasicParser.ParseLimited` accepts the same arguments with an `XMLLimits`
+budget after `flags` and before the error-list result. It applies shared
+input, entity, nesting and work limits before input prefetch. `Parse` retains
+its unlimited resource behavior. The separate Basic nesting-depth argument
+covers application element objects.
+
+Both entry points follow external references when a base URI is supplied or
+validation is enabled. Use trusted documents and bound application callback
+work; see [input policy and resource review](Security.md).
 
 ## Typed attributes
 
