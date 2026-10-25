@@ -1,5 +1,5 @@
 (*      $Id: Canonical.Mod,v 1.8 2000/11/08 14:15:07 mva Exp $   *)
-MODULE XML:Builder:Canonical [OOC_EXTENSIONS];
+MODULE XMLBuilderCanonical;
 (*  Translates XML document to canonical XML.
     Copyright (C) 2000, 2001  Michael van Acken
 
@@ -21,7 +21,8 @@ MODULE XML:Builder:Canonical [OOC_EXTENSIONS];
 
 IMPORT
   LongStrings, Channel, URI, Ascii,
-  Codec := XML:UnicodeCodec, XML:DTD, B := XML:Builder, XML:UnicodeBuffer;
+  Codec := XMLUnicodeCodec, DTD := XMLDTD, B := XMLBuilder,
+  UnicodeBuffer := XMLUnicodeBuffer;
 
 CONST
   firstCanonicalForm* = 1;
@@ -62,16 +63,17 @@ CONST
   incrAttrList = 8;
 
 
-PROCEDURE WriteQuoted (out: UnicodeBuffer.Output; str[NO_COPY]: DTD.StringVar;
+PROCEDURE WriteQuoted (out: UnicodeBuffer.Output; VAR str: DTD.StringVar;
                        start, end: DTD.CharPos);
   VAR
     i: LONGINT;
   BEGIN
+    ASSERT ((0 <= start) & (start <= end) & (end <= LEN (str)));
     i := start;
     WHILE (i # end) DO
       LOOP
         CASE str[i] OF
-        | "&","<",">",'"',00X..1FX:
+        | 38,60,62,34,00H..1FH:
           (* only the control characters 09X,0AX,0DX can appear here *)
           EXIT
         ELSE
@@ -85,19 +87,32 @@ PROCEDURE WriteQuoted (out: UnicodeBuffer.Output; str[NO_COPY]: DTD.StringVar;
       
       IF (i # end) THEN
         CASE str[i] OF
-        | "&": out. Write8 ("&amp;")
-        | "<": out. Write8 ("&lt;")
-        | ">": out. Write8 ("&gt;")
-        | '"': out. Write8 ("&quot;")
-        | 09X: out. Write8 ("&#9;")
-        | 0AX: out. Write8 ("&#10;")
-        | 0DX: out. Write8 ("&#13;")
+        | 38: out. Write8 ("&amp;")
+        | 60: out. Write8 ("&lt;")
+        | 62: out. Write8 ("&gt;")
+        | 34: out. Write8 ("&quot;")
+        | 09H: out. Write8 ("&#9;")
+        | 0AH: out. Write8 ("&#10;")
+        | 0DH: out. Write8 ("&#13;")
         END;
         INC (i)
       END;
       start := i
     END
   END WriteQuoted;
+
+PROCEDURE WriteLiteral (out: UnicodeBuffer.Output; VAR str: DTD.StringVar);
+  VAR i: LONGINT; apostrophe: BOOLEAN;
+  BEGIN
+    i := 0; apostrophe := FALSE;
+    WHILE str[i] # 0 DO
+      IF str[i] = 39 THEN apostrophe := TRUE END;
+      INC (i)
+    END;
+    IF apostrophe THEN out. Write8 ('"') ELSE out. Write8 ("'") END;
+    out. Write16 (str);
+    IF apostrophe THEN out. Write8 ('"') ELSE out. Write8 ("'") END
+  END WriteLiteral;
 
 PROCEDURE WriteDTD (b: Builder; root: DTD.String);
   VAR
@@ -110,7 +125,7 @@ PROCEDURE WriteDTD (b: Builder; root: DTD.String);
       best := b. notationList;
       ptr := b. notationList. next;
       WHILE (ptr # NIL) DO
-        IF (ptr. notation. name^ < best. notation. name^) THEN
+        IF (LongStrings.Compare (ptr. notation. name^, best. notation. name^) = LongStrings.less) THEN
           best := ptr
         END;
         ptr := ptr. next
@@ -130,34 +145,32 @@ PROCEDURE WriteDTD (b: Builder; root: DTD.String);
   BEGIN
     b. out. Write8 ("<!DOCTYPE ");
     b. out. Write16 (root^);
-    b. out. Write8 (" ["+Ascii.lf);
+    b. out. Write8 (" ["); b. out. Write8 (Ascii.lf);
     WHILE (b. notationList # NIL) DO
       node := GetNext();
       Remove (b. notationList, node);
       b. out. Write8 ("<!NOTATION ");
       b. out. Write16 (node. notation. name^);
       IF (node. notation. public # NIL) THEN
-        b. out. Write8 (" PUBLIC '");
-        b. out. Write16 (node. notation. public^);
-        b. out. Write8 ("'");
+        b. out. Write8 (" PUBLIC ");
+        WriteLiteral (b. out, node. notation. public^);
         IF (node. notation. system # NIL) THEN
-          b. out. Write8 (" '");
-          b. out. Write16 (node. notation. system^);
-          b. out. Write8 ("'")
+          b. out. Write8 (" ");
+          WriteLiteral (b. out, node. notation. system^)
         END
       ELSE
-        b. out. Write8 (" SYSTEM '");
-        b. out. Write16 (node. notation. system^);
-        b. out. Write8 ("'")
+        b. out. Write8 (" SYSTEM ");
+        WriteLiteral (b. out, node. notation. system^)
       END;
-      b. out. Write8 (">"+Ascii.lf)
+      b. out. Write8 (">"); b. out. Write8 (Ascii.lf)
     END;
-    b. out. Write8 ("]>"+Ascii.lf)
+    b. out. Write8 ("]>"); b. out. Write8 (Ascii.lf)
   END WriteDTD;
 
 
 
 PROCEDURE (b: Builder) StartDocument* (documentEntity: DTD.ExternalEntity);
+  BEGIN
   END StartDocument;
 
 PROCEDURE (b: Builder) EndDocument*;
@@ -212,7 +225,7 @@ PROCEDURE (b: Builder) AttributesDone*;
     BEGIN
       min := start;
       FOR i := start+1 TO b. lenAttrList-1 DO
-        IF (b. attrList[i]. name^ < b. attrList[min]. name^) THEN
+        IF (LongStrings.Compare (b. attrList[i]. name^, b. attrList[min]. name^) = LongStrings.less) THEN
           min := i
         END
       END;
@@ -230,6 +243,12 @@ PROCEDURE (b: Builder) AttributesDone*;
       b. out. Write8 ('"');
       b. attrList[j] := b. attrList[i]
     END;
+    FOR i := 0 TO b. lenAttrList-1 DO
+      b. attrList[i]. name := NIL;
+      b. attrList[i]. decl := NIL;
+      b. attrList[i]. value := NIL
+    END;
+    b. lenAttrList := 0;
     b. out. Write8 (">")
   END AttributesDone;
 
@@ -275,12 +294,13 @@ PROCEDURE (b: Builder) Characters* (VAR chars: DTD.StringVar;
 PROCEDURE New* (outputChannel: Channel.Channel;
                 codecFactory: Codec.Factory;
                 format: SHORTINT): Builder;
-(**Creates a new writer.  The output is directory to @oparam{outputChannel},
+(**Creates a new writer.  The output is directed to @oparam{outputChannel},
    using the encoding specified with @oparam{codecFactory}.  @oparam{format}
    selects between the different canonical forms.  *)
   VAR
     b: Builder;
   BEGIN
+    ASSERT ((format = firstCanonicalForm) OR (format = secondCanonicalForm));
     NEW (b);
     B.Init (b);
     b. out := UnicodeBuffer.NewOutput (outputChannel. NewWriter(),
@@ -294,4 +314,4 @@ PROCEDURE New* (outputChannel: Channel.Channel;
     RETURN b
   END New;
 
-END XML:Builder:Canonical.
+END XMLBuilderCanonical.

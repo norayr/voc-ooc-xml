@@ -19,10 +19,14 @@ diagnostics (exit 1); opening errors, traps and sanitizer errors fail the test.
 | IBM DTD validation | 932 |
 | Sun DTD validation | 171 |
 | OASIS DTD validation | 346 |
+| James Clark canonical output | 163 |
+| IBM canonical output | 148 |
+| Sun canonical output | 28 |
 
-All included checks pass, also under Clang ASan/UBSan. The DTD total is 1,808.
-These checks compare acceptance and rejection. Canonical output is a separate
-adaptation stage.
+All included checks pass, also under Clang ASan/UBSan. The DTD total is 1,808;
+339 cases additionally compare canonical output byte-for-byte. James Clark
+uses the first canonical form; IBM and Sun use the second form, which includes
+sorted notation declarations.
 
 ## Upstream exclusions
 
@@ -51,6 +55,9 @@ directory globs, which would also run copies of the catalogs as XML documents.
 - Sun `valid/sa02.xml` and `valid/not-sa02.xml` contain character-reference
   CR/LF in NMTOKENS. These remain after attribute normalization; token
   separators must be spaces, as clarified by Second Edition erratum E20.
+  Their reference outputs incorrectly collapse these references. The output
+  runner expects `&#13;&#10;` at that attribute position and records the exact
+  correction. All other reference bytes must match unchanged.
 - Sun `invalid/attr11.xml` and `invalid/attr12.xml` use valid explicit ENTITY
   attributes while leaving semantically invalid defaults unused. Erratum E9
   requires only syntactic correctness for unused defaults.

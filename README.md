@@ -21,7 +21,8 @@ must not be stored in `LONGINT`.
 ### Working so far
 
 The Unicode codecs, XML buffers, DTD data model, entity resolver, XML
-parser, namespace builder and DTD validator build with VOC:
+parser, namespace builder, DTD validator, XML writer and canonical-output
+builder build with VOC:
 
 ```sh
 make test
@@ -43,6 +44,8 @@ Wrap an application builder with `XMLBuilderNamespaces.New(builder)` and set
 For DTD validation, wrap the resulting builder with
 `XMLBuilderValidation.New(builder)` and set `parser.validating := TRUE`.
 Enable external references when the document uses an external DTD.
+`XMLWriter` generates XML with optional indentation and encoding declarations.
+See [writing XML](doc/WritingXML.md) for its interfaces and output checks.
 `XMLUnicodeCodecImportAll` registers the bundled ASCII, Latin-1,
 UTF-8 and UTF-16 encodings at startup. The codec source paths are unchanged so
 the changes remain easy to compare with CVS.
@@ -78,8 +81,10 @@ attributes, Unicode names, character references, malformed documents and
 default declarations, implicit `xml` bindings, Unicode, DTD defaults,
 duplicate expanded attribute names and reserved bindings. Validation tests
 cover content models, required/fixed attributes, IDs and references, notations,
-64 nested elements and long Unicode attribute lists. The seven integration
-programs pass with GCC and Clang in C23 mode, TCC and Clang ASan/UBSan.
+64 nested elements and long Unicode attribute lists. Writer tests cover
+UTF-8/UTF-16 round trips, escaping, long names/URIs, indentation and partial
+channel writes. The eight integration programs pass with GCC and Clang in
+C23 mode, TCC and Clang ASan/UBSan.
 
 The bundled James Clark XML test archive supplies the first well-formedness
 corpus. The fixture runner requires Python 3.12 or newer. Run it with:
@@ -94,7 +99,8 @@ whose entity replacement is malformed.
 The same target checks 1,808 DTD-validation cases from the bundled James Clark,
 IBM, Sun and OASIS archives. Historical fixture exclusions and corrected
 expectations are recorded explicitly; see [conformance coverage](doc/Conformance.md).
-Canonical-output comparisons remain a later stage.
+The target also compares 339 canonical outputs byte-for-byte with the
+reference files, including two explicitly recorded Sun output corrections.
 
 `make xmlcheck` builds `XMLCheck`, a file well-formedness checker. Use
 `XMLCheck --namespaces file.xml` to enable namespace checks. Its default
@@ -104,11 +110,14 @@ diagnostics and 2 for usage or opening errors.
 `XMLCheck --validate file.xml` enables DTD validation and external references;
 combine it with `--namespaces` to check namespace constraints too. Use trusted
 input while external-entity controls and resource limits are under review.
+`XMLCheck --canonical --external file.xml` writes the first canonical form
+to standard output. `--second` selects the form that includes sorted notation
+declarations. These output modes consume qualified names directly.
 
 VOC's ooc package supplies URI parsing, relative resolution and file/memory
 channels. XML's `XMLEntityResolver` converts Unicode system identifiers to
-these URI objects. The writer and remaining original
-regression suites are the next adaptation stages.
+these URI objects. The basic element-object interfaces, parser-protocol
+diagnostics and remaining original regression drivers are the next stages.
 External-entity controls and resource limits still need review
 before the parser can accept untrusted documents.
 

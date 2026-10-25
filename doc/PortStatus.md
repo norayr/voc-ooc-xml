@@ -2,8 +2,9 @@
 
 `make test` builds and tests the Unicode codecs, XML byte/Unicode buffers,
 DTD data model, entity resolver, diagnostics, locator, builder interface and
-parser, namespace builder and DTD validator against VOC's shared ooc support
-under the Oberon-2 model. The XML writer is the next adaptation stage.
+parser, namespace builder, DTD validator, writer and canonical-output builder
+against VOC's shared ooc support under the Oberon-2 model. The basic element
+interfaces and parser-protocol output remain to be adapted.
 
 ## Dependencies
 
@@ -15,7 +16,8 @@ integer widths, record extensions and method signatures must agree.
 | `XMLParser`, `XMLBuilder`, `XMLLocator`, `XMLError` | Ported and tested with in-memory and file inputs, UTF-16 callbacks and UTF-8 diagnostics. |
 | `XMLBuilderNamespaces` | Ported with scoped declarations, implicit `xml` bindings, duplicate expanded-name checks and Unicode coverage. |
 | `XMLBuilderValidation`, `XMLRegexp` | Ported DTD validation and content-model matching; tested with internal/external DTDs and Unicode attributes. |
-| Writer | Included in the CVS import; still needs adapting to VOC. |
+| `XMLWriter`, `XMLBuilderCanonical` | Ported XML generation and canonical forms; round-trip and reference-output tests cover Unicode, escaping, attribute sorting and notations. |
+| Basic element interfaces, parser-protocol builder | Included in the CVS import; still need adapting to VOC. |
 | `XMLDTD` | Ported data model; tests cover internal subsets, parameter entities, default attributes and validity constraints. |
 | `XMLEntityResolver` | Ported Unicode system-identifier normalization and relative URI resolution; tested with supplementary characters, malformed UTF-16 and long identifiers. |
 | `XMLInputBuffer`, `XMLUnicodeBuffer` | Ported and tested with short reads, BOMs, growth, compaction, repeated flushes and partial-write retries. |
@@ -128,7 +130,7 @@ will not be part of the VOC port's implementation.
   upstream exclusion of `valid/sa/065.xml` is recorded in the result file.
   All 24 original namespace fixtures also pass with `XMLCheck --namespaces`.
   Timeouts, traps and opening errors are failures, even for negative fixtures.
-  Canonical-output comparisons remain pending.
+  Canonical-output comparisons also run in this target; see below.
 - `XMLCheck` disables external references by default. The library retains its
   upstream `followExternalRef = TRUE` default; applications must set it
   explicitly. Expansion, recursion and input-size limits remain pending, so
@@ -170,9 +172,29 @@ will not be part of the VOC port's implementation.
   [Conformance coverage](Conformance.md) explains the four upstream exclusions
   and historical expectation corrections. Fixture sources remain unchanged.
 
+## XML output
+
+- `XMLWriter` accepts wide strings through `VAR` array parameters, treated as
+  read-only. Latin-1 methods widen bytes explicitly. The shared Unicode
+  code-unit type is used throughout the writer and element-name stack.
+- Text CR and attribute TAB/LF/CR use character references to preserve values
+  when parsed again. Latin-1 tag names and URI strings use dynamic storage
+  instead of fixed 1,024-character buffers. Region methods check their bounds.
+- Integration tests round-trip Armenian and supplementary characters through
+  UTF-8 and UTF-16, including split surrogates, 70,000-unit text, 40,000-byte
+  names and URIs, stack growth, numeric attributes, mixed content and indentation.
+  Partial channel writes and a recoverable flush failure retain pending bytes.
+- `XMLBuilderCanonical` sorts names using wide-string comparisons, quotes
+  notation literals with a delimiter absent from their contents and releases
+  buffered attributes after each start tag. The fixture runner compares 339
+  outputs byte-for-byte, also under ASan/UBSan. It records two historical Sun
+  normalization corrections without changing the archived reference files.
+- [Writing XML](WritingXML.md) describes the output API and required error
+  checks. Applications supply valid names and balanced tag operations.
+
 ## Verification
 
-The seven XML test programs and seven ooc regression programs pass with
+The eight XML test programs and seven ooc regression programs pass with
 GCC/C23, Clang/C23 and TCC under `-O2`. The shared ooc package is rebuilt
 before each XML test run. An additional Clang build instruments the shared
 package, ported XML modules and tests with AddressSanitizer and
@@ -214,7 +236,7 @@ source-build example in the README.
 
 ## Next stages
 
-1. Adapt and test the writer and canonical-output builder.
+1. Adapt and test the basic element interfaces and parser-protocol builder.
 2. Adapt the remaining upstream test drivers. Review entity expansion,
    recursion and external-entity controls before accepting untrusted input.
 3. Run the remaining XML/namespace/encoding suites. Separate external fixture

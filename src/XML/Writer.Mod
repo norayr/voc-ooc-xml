@@ -1,5 +1,5 @@
 (*      $Id: Writer.Mod,v 1.14 2002/03/10 12:44:03 mva Exp $   *)
-MODULE XML:Writer [OOC_EXTENSIONS];
+MODULE XMLWriter;
 (*  Support for generating XML documents.
     Copyright (C) 2000-2002  Michael van Acken
 
@@ -32,13 +32,14 @@ MODULE XML:Writer [OOC_EXTENSIONS];
    @end itemize  *)
 
 IMPORT
-  Ascii, Channel, Strings, LongStrings, IntStr, RealStr, URI,
-  Codec := XML:UnicodeCodec, XML:UnicodeBuffer;
+  Ascii, Channel, LongStrings, IntStr, RealStr, URI,
+  Unicode := oocUnicode, Codec := XMLUnicodeCodec, UnicodeBuffer := XMLUnicodeBuffer;
 
 
 TYPE
-  Char* = LONGCHAR;
+  Char* = Unicode.LONGCHAR;
   String = POINTER TO ARRAY OF Char;
+  Bytes = POINTER TO ARRAY OF CHAR;
   Elements = POINTER TO ARRAY OF
                RECORD
                  name: String;
@@ -77,7 +78,7 @@ PROCEDURE Init* (w: Writer;
     w. indent := 0;
     w. emptyElementHTML := FALSE;
     w. baseURI := NIL;
-    w. newLine := Ascii.lf;
+    w. newLine[0] := Ascii.lf; w. newLine[1] := 0X;
     w. lenNewLine := 1;
     
     w. lenElementStack := 0;
@@ -167,39 +168,42 @@ PROCEDURE (w: Writer) CloseStartTag*;
   END CloseStartTag;
 
 
-PROCEDURE (w: Writer) WriteI* (str[NO_COPY]: ARRAY OF Char; s, e: LONGINT);
+PROCEDURE (w: Writer) WriteI* (VAR str: ARRAY OF Char; s, e: LONGINT);
   VAR
     last: LONGINT;
   BEGIN
+    ASSERT ((0 <= s) & (s <= e) & (e <= LEN (str)));
     IF w. openStartTag THEN w. CloseStartTag END;
     WHILE (s # e) DO
       last := s;
       WHILE (s # e) &
-            (str[s] # "&") & (str[s] # "<") & (str[s] # ">") DO
+            (str[s] # 38) & (str[s] # 60) & (str[s] # 62) & (str[s] # 13) DO
         INC (s)
       END;
       w. Write16I (str, last, s);
       IF (s # e) THEN
         CASE str[s] OF
-        | "&": w. Write8 ("&amp;")
-        | "<": w. Write8 ("&lt;")
-        | ">": w. Write8 ("&gt;")
+        | 38: w. Write8 ("&amp;")
+        | 60: w. Write8 ("&lt;")
+        | 62: w. Write8 ("&gt;")
+        | 13: w. Write8 ("&#13;")
         END;
         INC (s)
       END
     END
   END WriteI;
 
-PROCEDURE (w: Writer) WriteLatin1I* (str[NO_COPY]: ARRAY OF CHAR;
+PROCEDURE (w: Writer) WriteLatin1I* (VAR str: ARRAY OF CHAR;
                                      s, e: LONGINT);
   VAR
     last: LONGINT;
   BEGIN
+    ASSERT ((0 <= s) & (s <= e) & (e <= LEN (str)));
     IF w. openStartTag THEN w. CloseStartTag END;
     WHILE (s # e) DO
       last := s;
       WHILE (s # e) &
-            (str[s] # "&") & (str[s] # "<") & (str[s] # ">") DO
+            (str[s] # "&") & (str[s] # "<") & (str[s] # ">") & (str[s] # Ascii.cr) DO
         INC (s)
       END;
       w. Write8I (str, last, s);
@@ -208,31 +212,45 @@ PROCEDURE (w: Writer) WriteLatin1I* (str[NO_COPY]: ARRAY OF CHAR;
         | "&": w. Write8 ("&amp;")
         | "<": w. Write8 ("&lt;")
         | ">": w. Write8 ("&gt;")
+        | Ascii.cr: w. Write8 ("&#13;")
         END;
         INC (s)
       END
     END
   END WriteLatin1I;
 
-PROCEDURE (w: Writer) Write* (str[NO_COPY]: ARRAY OF Char);
+PROCEDURE (w: Writer) Write* (VAR str: ARRAY OF Char);
   BEGIN
     w. WriteI (str, 0, LongStrings.Length (str))
   END Write;
 
-PROCEDURE (w: Writer) WriteLatin1* (str[NO_COPY]: ARRAY OF CHAR);
+PROCEDURE (w: Writer) WriteLatin1* (str: ARRAY OF CHAR);
   BEGIN
-    w. WriteLatin1I (str, 0, Strings.Length (str))
+    w. WriteLatin1I (str, 0, LongStrings.Length8 (str))
   END WriteLatin1;
 
-PROCEDURE (w: Writer) WriteURI* (uri: URI.URI; absolute: BOOLEAN);
-  VAR
-    str: ARRAY 1024 OF CHAR;
+PROCEDURE URIText (w: Writer; uri: URI.URI; absolute: BOOLEAN): Bytes;
+  VAR str: Bytes; capacity: LONGINT;
   BEGIN
+    ASSERT (uri # NIL);
     IF ~absolute THEN
       uri := uri. MakeRelative (w. baseURI)
     END;
-    uri. GetString (str);
-    w. WriteLatin1 (str)
+    capacity := 128;
+    LOOP
+      NEW (str, capacity);
+      uri. GetString (str^);
+      IF LongStrings.Length8 (str^) < capacity-1 THEN RETURN str END;
+      ASSERT (capacity <= MAX (LONGINT) DIV 2);
+      INC (capacity, capacity)
+    END
+  END URIText;
+
+PROCEDURE (w: Writer) WriteURI* (uri: URI.URI; absolute: BOOLEAN);
+  VAR str: Bytes;
+  BEGIN
+    str := URIText (w, uri, absolute);
+    w. WriteLatin1 (str^)
   END WriteURI;
 
 PROCEDURE (w: Writer) WriteLInt* (value: LONGINT);
@@ -247,6 +265,7 @@ PROCEDURE (w: Writer) WriteRealFix* (real: REAL; k: LONGINT);
   VAR
     val: ARRAY 128 OF CHAR;
   BEGIN
+    ASSERT ((MIN (INTEGER) <= k) & (k < MAX (INTEGER)));
     RealStr.RealToFixed(real, SHORT(k), val);
     w. WriteLatin1 (val)
   END WriteRealFix;
@@ -256,11 +275,11 @@ PROCEDURE GetString (VAR str: ARRAY OF Char): String;
     s: String;
   BEGIN
     NEW (s, LongStrings.Length (str)+1);
-    COPY (str, s^);
+    LongStrings.Assign (str, s^);
     RETURN s
   END GetString;
 
-PROCEDURE (w: Writer) StartTag* (name[NO_COPY]: ARRAY OF Char;
+PROCEDURE (w: Writer) StartTag* (VAR name: ARRAY OF Char;
                                  mixedContent: BOOLEAN);
   VAR
     new: Elements;
@@ -289,16 +308,17 @@ PROCEDURE (w: Writer) StartTag* (name[NO_COPY]: ARRAY OF Char;
     END
   END StartTag;
 
-PROCEDURE (w: Writer) StartTagLatin1* (name[NO_COPY]: ARRAY OF CHAR;
+PROCEDURE (w: Writer) StartTagLatin1* (name: ARRAY OF CHAR;
                                        mixedContent: BOOLEAN);
   VAR
-    name16: ARRAY 1024 OF Char;
+    name16: String;
   BEGIN
-    COPY (name, name16);
-    w. StartTag (name16, mixedContent)
+    NEW (name16, LongStrings.Length8 (name)+1);
+    LongStrings.Long (name, name16^);
+    w. StartTag (name16^, mixedContent)
   END StartTagLatin1;
 
-PROCEDURE (w: Writer) EmptyTag* (name[NO_COPY]: ARRAY OF Char);
+PROCEDURE (w: Writer) EmptyTag* (VAR name: ARRAY OF Char);
   BEGIN
     IF w. openStartTag THEN w. CloseStartTag END;
     w. NewLine;
@@ -310,16 +330,17 @@ PROCEDURE (w: Writer) EmptyTag* (name[NO_COPY]: ARRAY OF Char);
     w. openEmptyTag := TRUE
   END EmptyTag;
 
-PROCEDURE (w: Writer) EmptyTagLatin1* (name[NO_COPY]: ARRAY OF Char);
+PROCEDURE (w: Writer) EmptyTagLatin1* (name: ARRAY OF CHAR);
   VAR
-    name16: ARRAY 1024 OF Char;
+    name16: String;
   BEGIN
-    COPY (name, name16);
-    w. EmptyTag (name16)
+    NEW (name16, LongStrings.Length8 (name)+1);
+    LongStrings.Long (name, name16^);
+    w. EmptyTag (name16^)
   END EmptyTagLatin1;
 
 
-PROCEDURE (w: Writer) AttrString* (name[NO_COPY], value[NO_COPY]: ARRAY OF Char);
+PROCEDURE (w: Writer) AttrString* (VAR name, value: ARRAY OF Char);
   VAR
     s, e, last: LONGINT;
   BEGIN
@@ -331,17 +352,21 @@ PROCEDURE (w: Writer) AttrString* (name[NO_COPY], value[NO_COPY]: ARRAY OF Char)
     s := 0; e := LongStrings.Length (value);
     WHILE (s # e) DO
       last := s;
-      WHILE (s # e) & (value[s] # "'") &
-            (value[s] # "&") & (value[s] # "<") & (value[s] # ">") DO
+      WHILE (s # e) & (value[s] # 39) &
+            (value[s] # 38) & (value[s] # 60) & (value[s] # 62) &
+            (value[s] # 9) & (value[s] # 10) & (value[s] # 13) DO
         INC (s)
       END;
       w. Write16I (value, last, s);
       IF (s # e) THEN
         CASE value[s] OF
-        | "&": w. Write8 ("&amp;")
-        | "<": w. Write8 ("&lt;")
-        | ">": w. Write8 ("&gt;")
-        | "'": w. Write8 ("&apos;")
+        | 38: w. Write8 ("&amp;")
+        | 60: w. Write8 ("&lt;")
+        | 62: w. Write8 ("&gt;")
+        | 39: w. Write8 ("&apos;")
+        | 9: w. Write8 ("&#9;")
+        | 10: w. Write8 ("&#10;")
+        | 13: w. Write8 ("&#13;")
         END;
         INC (s)
       END
@@ -350,8 +375,8 @@ PROCEDURE (w: Writer) AttrString* (name[NO_COPY], value[NO_COPY]: ARRAY OF Char)
     w. Write8 ("'")
   END AttrString;
 
-PROCEDURE (w: Writer) AttrStringLatin1* (name[NO_COPY]: ARRAY OF Char;
-                                         value[NO_COPY]: ARRAY OF CHAR);
+PROCEDURE (w: Writer) AttrStringLatin1* (VAR name: ARRAY OF Char;
+                                          value: ARRAY OF CHAR);
   VAR
     s, e, last: LONGINT;
   BEGIN
@@ -360,11 +385,12 @@ PROCEDURE (w: Writer) AttrStringLatin1* (name[NO_COPY]: ARRAY OF Char;
     w. Write16 (name);
     w. Write8 ("='");
     
-    s := 0; e := Strings.Length (value);
+    s := 0; e := LongStrings.Length8 (value);
     WHILE (s # e) DO
       last := s;
       WHILE (s # e) & (value[s] # "'") &
-            (value[s] # "&") & (value[s] # "<") & (value[s] # ">") DO
+            (value[s] # "&") & (value[s] # "<") & (value[s] # ">") &
+            (value[s] # Ascii.ht) & (value[s] # Ascii.lf) & (value[s] # Ascii.cr) DO
         INC (s)
       END;
       w. Write8I (value, last, s);
@@ -374,6 +400,9 @@ PROCEDURE (w: Writer) AttrStringLatin1* (name[NO_COPY]: ARRAY OF Char;
         | "<": w. Write8 ("&lt;")
         | ">": w. Write8 ("&gt;")
         | "'": w. Write8 ("&apos;")
+        | Ascii.ht: w. Write8 ("&#9;")
+        | Ascii.lf: w. Write8 ("&#10;")
+        | Ascii.cr: w. Write8 ("&#13;")
         END;
         INC (s)
       END
@@ -382,7 +411,7 @@ PROCEDURE (w: Writer) AttrStringLatin1* (name[NO_COPY]: ARRAY OF Char;
     w. Write8 ("'")
   END AttrStringLatin1;
 
-PROCEDURE (w: Writer) AttrInt* (name[NO_COPY]: ARRAY OF Char; value: LONGINT);
+PROCEDURE (w: Writer) AttrInt* (VAR name: ARRAY OF Char; value: LONGINT);
   VAR
     val: ARRAY 32 OF CHAR;
   BEGIN
@@ -390,7 +419,7 @@ PROCEDURE (w: Writer) AttrInt* (name[NO_COPY]: ARRAY OF Char; value: LONGINT);
     w. AttrStringLatin1 (name, val)
   END AttrInt;
 
-PROCEDURE (w: Writer) AttrBool* (name[NO_COPY]: ARRAY OF Char; value: BOOLEAN);
+PROCEDURE (w: Writer) AttrBool* (VAR name: ARRAY OF Char; value: BOOLEAN);
   BEGIN
     IF value THEN
       w. AttrStringLatin1 (name, "yes")
@@ -399,24 +428,21 @@ PROCEDURE (w: Writer) AttrBool* (name[NO_COPY]: ARRAY OF Char; value: BOOLEAN);
     END
   END AttrBool;
 
-PROCEDURE (w: Writer) AttrURI* (name[NO_COPY]: ARRAY OF Char; uri: URI.URI;
+PROCEDURE (w: Writer) AttrURI* (VAR name: ARRAY OF Char; uri: URI.URI;
                                 absolute: BOOLEAN);
   VAR
-    str: ARRAY 1024 OF CHAR;
+    str: Bytes;
   BEGIN
     ASSERT (w. openStartTag);
-    IF ~absolute THEN
-      uri := uri. MakeRelative (w. baseURI)
-    END;
-    uri. GetString (str);
-    w. AttrStringLatin1 (name, str)
+    str := URIText (w, uri, absolute);
+    w. AttrStringLatin1 (name, str^)
   END AttrURI;
 
 
 PROCEDURE (w: Writer) EndTag*;
   BEGIN
     IF (w. lenElementStack <= 0) THEN
-      w. Flush; ASSERT (FALSE)
+      w. Flush; HALT (127)
     END;
     
     IF w. doIndent THEN
@@ -460,4 +486,4 @@ PROCEDURE (w: Writer) EndOfText*;
     ASSERT (w. lenElementStack = 0);
   END EndOfText;
   
-END XML:Writer.
+END XMLWriter.
