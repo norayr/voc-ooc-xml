@@ -25,7 +25,8 @@ MODULE XMLDTD;
    information.  *)
 
 IMPORT
-  LongStrings, URI, UnicodeCodec := XMLUnicodeCodec, UnicodeBuffer := XMLUnicodeBuffer;
+  LongStrings, URI, Limits := XMLLimits,
+  UnicodeCodec := XMLUnicodeCodec, UnicodeBuffer := XMLUnicodeBuffer;
 
 
 TYPE
@@ -57,6 +58,7 @@ TYPE
   Declaration* = POINTER TO DeclarationDesc;
   Builder* = POINTER TO BuilderDesc;
   BuilderDesc* = RECORD
+    limits-: Limits.Budget;
     rootName-: String;
     (**Name of the root name, as given in the DTD.  *)
     
@@ -88,6 +90,7 @@ TYPE
 
 TYPE
   NamespaceDesc = RECORD
+    limits: Limits.Budget;
     declList-: Declaration;
     (**Refers to the first element of the list of declarations.  The other
        declarations can be reached through @ofield{Declaration.next}.  *)
@@ -452,7 +455,7 @@ PROCEDURE InitDeclaration* (decl: Declaration; name: String);
 
 PROCEDURE InitNamespace (ns: Namespace);
   BEGIN
-    ns. declList := NIL
+    ns. declList := NIL; ns. limits := NIL
   END InitNamespace;
 
 PROCEDURE NewNamespace*(): Namespace;
@@ -470,21 +473,17 @@ PROCEDURE (ns: Namespace) Add* (decl: Declaration): BOOLEAN;
    this case, the value @code{FALSE} is returned.  If the declaration was
    added to the namespace, then the result is @code{TRUE}.  *)
    
-  PROCEDURE RecAdd (VAR list: Declaration): BOOLEAN;
-    BEGIN
-      IF (list = NIL) THEN
-        list := decl;
-        RETURN TRUE
-      ELSIF ~LongStrings.Equal (list. name^, decl. name^) THEN
-        RETURN RecAdd (list. next)
-      ELSE
-        RETURN FALSE
-      END
-    END RecAdd;
-  
+  VAR ptr, last: Declaration;
   BEGIN
     decl. next := NIL;
-    RETURN RecAdd (ns. declList)
+    ptr := ns. declList; last := NIL;
+    WHILE ptr # NIL DO
+      IF (ns. limits # NIL) & ~ns. limits. Charge (Limits.work, 1) THEN RETURN FALSE END;
+      IF LongStrings.Equal (ptr. name^, decl. name^) THEN RETURN FALSE END;
+      last := ptr; ptr := ptr. next
+    END;
+    IF last = NIL THEN ns. declList := decl ELSE last. next := decl END;
+    RETURN TRUE
   END Add;
 
 PROCEDURE (ns: Namespace) Get* (name: String): Declaration;
@@ -492,7 +491,9 @@ PROCEDURE (ns: Namespace) Get* (name: String): Declaration;
     ptr: Declaration;
   BEGIN
     ptr := ns. declList;
-    WHILE (ptr # NIL) & ~LongStrings.Equal (ptr. name^, name^) DO
+    WHILE (ptr # NIL) DO
+      IF (ns. limits # NIL) & ~ns. limits. Charge (Limits.work, 1) THEN RETURN NIL END;
+      IF LongStrings.Equal (ptr. name^, name^) THEN RETURN ptr END;
       ptr := ptr. next
     END;
     RETURN ptr
@@ -810,6 +811,7 @@ PROCEDURE (b: Builder) AttachAttributes*;
     b. attributeTail := NIL;
     
     WHILE (ptr # NIL) DO
+      IF (b. limits # NIL) & ~b. limits. Charge (Limits.work, 1) THEN RETURN END;
       attrDecl := ptr(AttrDecl);
       ptr := attrDecl. next;
       
@@ -1113,6 +1115,7 @@ PROCEDURE (b: Builder) NewElementDecl* (name: String; contentModel: CP; external
   BEGIN
     NEW (elemDecl);
     InitElementDecl (elemDecl, name, contentModel, NewNamespace(), externalMarkupDecl);
+    elemDecl. attrNamespace. limits := b. limits;
     RETURN elemDecl
   END NewElementDecl;
 
@@ -1200,6 +1203,15 @@ PROCEDURE GetStringURI* (VAR string: ARRAY OF CHAR; start, end: LONGINT): String
     RETURN s
   END GetStringURI;
 
+PROCEDURE (b: Builder) SetLimits* (limits: Limits.Budget);
+(**Shares the parser's budget with DTD declaration lookup and insertion.
+   Set this before adding application declarations. *)
+  BEGIN
+    b. limits := limits;
+    b. geNamespace. limits := limits; b. peNamespace. limits := limits;
+    b. elementNamespace. limits := limits
+  END SetLimits;
+
 PROCEDURE Init* (b: Builder);
 (**Initializes the DTD builder.  Also registers the predefined general entities
    @samp{lt}, @samp{gt}, @samp{amp}, @samp{apos}, and @samp{quot}.  *)
@@ -1221,6 +1233,7 @@ PROCEDURE Init* (b: Builder);
     END PredefEntity;
   
   BEGIN
+    b. limits := NIL;
     b. rootName := NIL;
     b. geNamespace := NewNamespace();
     b. peNamespace := NewNamespace();

@@ -1,8 +1,8 @@
 # XML input policy and resource review
 
-The port currently requires **trusted XML**. External access has explicit
-controls and regression tests, but general limits on input size, expansion,
-nesting and processing time remain unfinished.
+The port currently requires **trusted XML**. External access controls and
+parser resource budgets have regression coverage. Broader adversarial testing
+and accounting in validation and application builders remain unfinished.
 
 ## External resources
 
@@ -56,29 +56,102 @@ The review fixed three issues:
 3. `Internalize` checked the caller's decoder instead of the external entity's
    decoder. It now reports malformed encodings from the buffer actually read.
 
+## Parser resource budgets
+
+`XMLLimits.New()` creates a budget for one parse. Set its maxima before passing
+it to `XMLParser.NewReaderLimited`, `NewChannelLimited`, `NewURILimited` or
+`NewFileLimited`. These constructors have the corresponding original
+constructor's arguments, with the budget after the builder and before any
+result argument. For example:
+
+```oberon
+budget := XMLLimits.New();
+budget.maxInputBytes := 1024*1024;
+parser := XMLParser.NewReaderLimited(reader, baseURI, NIL, NIL, builder, budget);
+parser.followExternalRef := FALSE;
+parser.ParseDocument;
+(* Inspect parser.errList before using the result. *)
+```
+
+The original constructors retain their unlimited behavior. `XMLCheck` uses a
+fresh default budget for every invocation, including namespace, validation,
+canonical and protocol modes. The Basic parser's convenience `Parse` interface
+continues to use the original constructors.
+
+| Budget maximum | Default | Accounted resources |
+| --- | ---: | --- |
+| `maxInputBytes` | 16 MiB | Accepted bytes across the document and all opened external entities. |
+| `maxNesting` | 128 | Combined active element, entity, content-model, conditional-section and attribute-graph traversal levels. |
+| `maxEntityExpansions` | 10,000 | Entity entries, including the external DTD and eager checking of internal declarations. |
+| `maxExpandedUnits` | 16,777,216 | UTF-16 code units copied for entity insertion/internalization and visited while checking attribute/entity values. |
+| `maxWork` | 100,000 | Name/string construction, character fragments, graph visits, parser diagnostics and declaration/attribute comparisons. |
+| `maxAttributeUnits` | 1,048,576 | Code units in one flattened attribute or entity value. |
+| `maxModelParticles` | 256 | Groups and named particles in one DTD content model. |
+
+Zero is a real limit; a negative maximum disables that particular limit.
+Counters are cumulative and a failed budget remains failed. Keep the budget
+exclusive to its parse and leave the maxima unchanged during parsing.
+Expansion accounting is conservative: checking a reused value can charge its
+units again. `maxWork` bounds allocation-producing parser operations, rather
+than measuring allocated bytes or elapsed time.
+
+The byte budget wraps the reader before constructor prefetch and is shared
+with every subsequent external reader. At an exact byte boundary a one-byte
+probe distinguishes EOF from an overrun; at most one extra byte is consumed
+and none of it is delivered to the parser. Expansion and nesting reservations
+precede opening or internalizing an entity. Opening the primary URI and running
+application resolver code still have their own side effects.
+
+On exhaustion the parser records a resource diagnostic, sets `parser.aborted`,
+suppresses further content callbacks and unwinds its grammar/entity stacks.
+The original builder still receives `EndDocument` once. Its result may be
+incomplete and must be discarded. `budget.error` identifies the diagnostic;
+its code is `XMLLimits.codeBase` plus the relevant limit constant. `XMLCheck`
+returns 1 for a resource diagnostic, just as for other XML errors.
+
+Attribute graphs are checked for nesting, work and expanded length before
+recursive length calculation or flattening. This also covers default values
+and unused entity declarations. DTD namespace insertion is iterative and both
+lookup and insertion charge comparisons. Retained-token byte and Unicode
+buffers grow geometrically, keeping long-token copying linear in total size.
+
+## Adversarial checks
+
+`TestLimits` tests exact boundaries and independently exhausts every limit.
+It varies byte, work, expansion, value-length, nesting and content-model
+cutoffs throughout a document containing declarations, attributes, entities,
+comments, instructions and CDATA. It checks diagnostics, stack unwinding,
+content callback suppression and final notification.
+
+`TestEntityPolicy` also cuts the shared byte allowance at every position across
+external DTDs, repeated streamed entities and external-parameter internalization.
+It checks that expansion exhaustion prevents a further external open.
+
+```sh
+make BUILD=../compiler/build/ports/ooc/2 test conformance limits
+```
+
+The `limits` target runs 45 hostile-input checks: deep elements, content models
+and conditional sections, wide models, unused entity amplification, long entity
+chains, parameter expansion, large attributes/input/names, many attributes and
+siblings, malformed-control/reference floods and external internalization.
+Each runs in plain, namespace and validation modes and must return a resource
+diagnostic with exit code 1. The runner applies a 10-second CPU allowance,
+a wall-clock timeout and a 512 MiB address-space ceiling on Linux. Under ASan
+the address-space ceiling is disabled to accommodate shadow memory; CPU and
+wall-clock limits remain active. Logs and results go under `BUILD/limits`.
+
 ## Remaining resource work
 
-Disabling external access does not bound internal-entity expansion or the
-document itself. In particular:
+Continue using trusted documents while completing:
 
-- The parser recursively enters elements, general entities, DTD content models
-  and conditional sections. The Basic parser's maximum depth limits object
-  construction, not the core parser's native-stack use.
-- Internal general entities are checked eagerly at the end of the DTD, even
-  when unused by the document. Acyclic repeated references can amplify work.
-- Attribute values retain entity-reference graphs. `XMLDTD` computes lengths
-  and flattens those graphs recursively; parser-only expansion counters would
-  miss some of that work and resulting allocation.
-- Input buffers can grow to retain a complete token. External parameter entities
-  may be internalized in full. Declarations, attribute lists, namespace tables
-  and regular-expression states also allocate without configurable budgets.
-- Fatal diagnostics suppress application callbacks, but the parser continues
-  checking input. A builder-level error is therefore insufficient to enforce a
-  parser work or recursion budget.
+- work/allocation accounting inside validation, regular-expression processing
+  and namespace/output/application builders, including aggregate costs across
+  many content models;
+- broader malformed-input and randomized testing, resolver/channel stalls and
+  recovery from underlying allocation failures;
+- budget support in the Basic parser convenience interface and direct DTD APIs.
 
-Before accepting untrusted XML, add parser-wide, safely aborting limits for
-input bytes, nesting, entity expansions, expanded code units and allocated
-structures. Apply input budgets before constructor prefetch and share them
-across external resources. Charge attribute-graph traversal before computing
-lengths or flattening. Add bounded adversarial tests with process timeouts and
-memory limits, and re-run the full compiler/sanitizer matrix.
+Applications must bound their own resolver, channel and builder behavior.
+Directly constructed DTD value graphs bypass the parser's graph checks. Retain
+process-level time and memory limits when exercising hostile inputs.

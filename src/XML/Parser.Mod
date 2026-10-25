@@ -23,6 +23,7 @@ IMPORT
   Out, Ascii, Channel, Msg, LongStrings, URI, File := URISchemeFile,
   Codec := XMLUnicodeCodec, UTF8 := XMLUnicodeCodecUTF8, UTF16 := XMLUnicodeCodecUTF16,
   Locator := XMLLocator, EntityResolver := XMLEntityResolver,
+  Limits := XMLLimits,
   Buffer := XMLUnicodeBuffer, Error := XMLError, DTD := XMLDTD, Builder := XMLBuilder;
   (* warning: the modules UTF8 and UTF16 are not used in this module, but
      they must be imported to guarantee that these codecs are available to
@@ -59,6 +60,8 @@ TYPE
     errList-: Error.List;
     (**Holds all error messages related to the currently parsed XML document.
        After an error occured, @samp{errList.msgCount} is no longer zero.  *)
+    limits-: Limits.Budget;
+    aborted-: BOOLEAN;
     
     l: Locator.Locator;
     (* This object keeps track of file position (character index, line and
@@ -555,6 +558,9 @@ PROCEDURE (el: ErrorListener) Error* (context: Error.Context; code: Error.Code;
     p: Parser;
   BEGIN
     p := el. p;
+    IF (p. limits # NIL) & ~p. limits. Charge (Limits.work, 1) THEN
+      p. builder := Builder.New(); RETURN p. limits. error
+    END;
     err := Error.New (context, code);
     err. SetIntAttrib ("char", pos. charIndex+Error.errMsgCharPosBase);
     err. SetIntAttrib ("line", pos. line+Error.errMsgLineBase);
@@ -674,10 +680,16 @@ PROCEDURE (p: Parser) ParseDocument*;
     END SetFileEntity;
   
   
+  PROCEDURE ^Stop;
+
   PROCEDURE ErrPosNF (code: Error.Code; VAR pos: Locator.Position);
     VAR
       i: LONGINT;
     BEGIN
+      IF p. aborted THEN RETURN END;
+      IF (p. limits # NIL) & ~p. limits. Charge (Limits.work, 1) THEN
+        Stop; RETURN
+      END;
       p. lastError := Error.New (parserContext, code);
       p. lastError. SetIntAttrib ("char", pos. charIndex+Error.errMsgCharPosBase);
       p. lastError. SetIntAttrib ("line", pos. line+Error.errMsgLineBase);
@@ -732,6 +744,83 @@ PROCEDURE (p: Parser) ParseDocument*;
         p. builder := Builder.New()
       END
     END Err;
+
+  PROCEDURE Stop;
+  (* Propagate a resource failure through normal grammar returns. Entity pops
+     restore this end marker in the parent input, so parsing cannot resume. *)
+    VAR msg: Msg.Msg;
+    BEGIN
+      IF ~p. aborted THEN
+        p. aborted := TRUE;
+        p. lastError := p. limits. error;
+        p. builder := Builder.New();
+        msg := p. errList. msgList;
+        WHILE (msg # NIL) & (msg # p. limits. error) DO msg := msg. nextMsg END;
+        IF msg = NIL THEN p. errList. Append (p. limits. error) END
+      END;
+      IF (0 <= cpos) & (cpos < LEN (chars^)) THEN chars[cpos] := Buffer.markerEOD END
+    END Stop;
+
+  PROCEDURE Charge (kind: SHORTINT; n: LONGINT): BOOLEAN;
+    BEGIN
+      IF p. aborted THEN RETURN FALSE END;
+      IF (p. limits = NIL) OR p. limits. Charge (kind, n) THEN RETURN TRUE END;
+      Stop; RETURN FALSE
+    END Charge;
+
+  PROCEDURE Enter (): BOOLEAN;
+    BEGIN
+      IF p. aborted THEN RETURN FALSE END;
+      IF (p. limits = NIL) OR p. limits. Enter() THEN RETURN TRUE END;
+      Stop; RETURN FALSE
+    END Enter;
+
+  PROCEDURE Leave;
+    BEGIN IF p. limits # NIL THEN p. limits. Leave END END Leave;
+
+  PROCEDURE AppendCharacters (value: DTD.AttValue; source: DTD.String;
+                             start, end: DTD.CharPos; copy: BOOLEAN);
+    BEGIN
+      IF ~Charge (Limits.work, 1) THEN RETURN END;
+      value. Append (dtd. NewCharacters (source, start, end, copy))
+    END AppendCharacters;
+
+  PROCEDURE CheckValue (value: DTD.AttValue): BOOLEAN;
+    VAR length: LONGINT;
+
+    PROCEDURE Visit (value: DTD.AttValue): BOOLEAN;
+      VAR fragment: DTD.Fragment; n, maximum: LONGINT; ok: BOOLEAN;
+      BEGIN
+        IF ~Enter() THEN RETURN FALSE END;
+        ok := TRUE; fragment := value. fragmentList;
+        WHILE (fragment # NIL) & ok DO
+          ok := Charge (Limits.work, 1);
+          IF ok THEN
+            WITH fragment: DTD.Characters DO
+              n := fragment. sourceEnd-fragment. sourceStart
+            | fragment: DTD.EntityRef DO
+              IF (fragment. entity # NIL) & (fragment. entity. attValue # NIL) THEN
+                ok := Visit (fragment. entity. attValue); n := 0
+              ELSE n := LongStrings.Length (fragment. name^)+2
+              END
+            END;
+            maximum := p. limits. maxAttributeUnits;
+            IF maximum < 0 THEN maximum := MAX (LONGINT)-2 END;
+            IF (n > MAX (LONGINT)-2-length) OR (length > maximum) OR (n > maximum-length) THEN
+              p. limits. Fail (Limits.attributeUnits); Stop; ok := FALSE
+            ELSIF ok THEN
+              INC (length, n); ok := Charge (Limits.expandedUnits, n)
+            END
+          END;
+          fragment := fragment. next
+        END;
+        Leave; RETURN ok
+      END Visit;
+
+    BEGIN
+      IF p. limits = NIL THEN RETURN TRUE END;
+      length := 0; RETURN Visit (value)
+    END CheckValue;
   
   (* ---------------------------------------------------------------------- *)
   
@@ -752,6 +841,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       string: DTD.String;
       i: DTD.CharPos;
     BEGIN
+      IF ~Charge (Limits.work, 1) THEN RETURN noName END;
       NEW (string, end-start+1);
       i := 0;
       WHILE (start # end) DO
@@ -769,7 +859,8 @@ PROCEDURE (p: Parser) ParseDocument*;
       in: Buffer.Input;
       str: ARRAY 2*1024 OF CHAR;
     BEGIN
-      IF ~p. followExternalRef THEN
+      IF p. aborted THEN RETURN NIL
+      ELSIF ~p. followExternalRef THEN
         Err (externalAccessDisabled);
         RETURN NIL
       ELSIF (entity. baseURI = NIL) THEN
@@ -783,7 +874,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           p. lastError. SetMsgAttrib ("channel_error", res);
           RETURN NIL
         ELSE
-          in := Buffer.NewInput (ch. NewReader(), NIL, p. errList);
+          in := Buffer.NewInput (Limits.Wrap (ch. NewReader(), p. limits), NIL, p. errList);
           entity. SetCodecFactory (in. codecFactory);
           RETURN in
         END
@@ -815,6 +906,10 @@ PROCEDURE (p: Parser) ParseDocument*;
       in := GetBuffer (entity);
       IF (in # NIL) THEN
         WHILE in. NextBlock() DO END;
+        IF (p. limits # NIL) & (p. limits. error # NIL) THEN Stop END;
+        IF ~Charge (Limits.expandedUnits, in. endOfBuffer) THEN
+          in. Close; NEW (str, 2); str[0] := Buffer.markerEOD; RETURN str
+        END;
 
         (* do eol replacement magic *)
         len := in. endOfBuffer;
@@ -852,7 +947,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       RETURN str
     END Internalize;
   
-  PROCEDURE PushEntity (entity: DTD.Entity; syncEntity: BOOLEAN);
+  PROCEDURE PushEntity (entity: DTD.Entity; syncEntity: BOOLEAN): BOOLEAN;
   (* `syncEntity=TRUE' means that the resolved entity is matched against
      a grammar production (extParsedPE, externalSubset) and is not
      inserted at an arbitrary place in the external subset or an entity
@@ -861,6 +956,8 @@ PROCEDURE (p: Parser) ParseDocument*;
       newList: PEInfoList;
       i: LONGINT;
     BEGIN
+      IF ~Charge (Limits.entityExpansions, 1) THEN RETURN FALSE END;
+      IF ~Enter() THEN RETURN FALSE END;
       IF (entity # NIL) THEN
         entity. expanding := TRUE
       END;
@@ -899,7 +996,11 @@ PROCEDURE (p: Parser) ParseDocument*;
         IF (entity IS DTD.ExternalEntity) & (entity. entityValue = NIL) THEN
           entity. SetEntityValue (Internalize (entity(DTD.ExternalEntity)))
         END;
-        chars := Clone (entity. entityValue);
+        IF Charge (Limits.expandedUnits, LEN (entity. entityValue^)-2) THEN
+          chars := Clone (entity. entityValue)
+        ELSE
+          NEW (chars, 2); chars[0] := Buffer.markerEOD
+        END;
         
         CASE entity. type OF
         | DTD.entityInternalGeneral, DTD.entityExternalGeneral:
@@ -927,7 +1028,9 @@ PROCEDURE (p: Parser) ParseDocument*;
           p. l. inInternalEntity := entity(DTD.InternalEntity)
         END
       END;
-      cpos := 0; cdelta := 0; cstart := 0
+      cpos := 0; cdelta := 0; cstart := 0;
+      IF (p. limits # NIL) & (p. limits. error # NIL) THEN Stop END;
+      RETURN TRUE
     END PushEntity;
   
   PROCEDURE PopEntity;
@@ -937,7 +1040,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       IF (p. currEntityValue # NIL) THEN
         (* we are parsing the entity value of an entity declaration: append
            text fragment to the value's fragment list *)
-        p. currEntityValue. Append (dtd. NewCharacters (chars, cstart, cpos-cdelta, TRUE))
+        AppendCharacters (p. currEntityValue, chars, cstart, cpos-cdelta, TRUE)
       END;
       
       DEC (p. lenPEStack);
@@ -972,7 +1075,9 @@ PROCEDURE (p: Parser) ParseDocument*;
       
       IF (p. peStack[p. lenPEStack]. entity # NIL) THEN
         p. peStack[p. lenPEStack]. entity. expanding := FALSE
-      END
+      END;
+      Leave;
+      IF p. aborted THEN Stop END
     END PopEntity;
   
   PROCEDURE NextBlock;
@@ -980,6 +1085,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       oldOffset: Buffer.CharPos;
       res: BOOLEAN;
     BEGIN
+      IF p. aborted THEN Stop; RETURN END;
       ASSERT (chars[cpos] = Buffer.markerEOB);
       IF (p. lenPEStack # 0) & (p. in. chars # chars) THEN
         (* fix up end of entity by removing the space that was added there
@@ -1000,6 +1106,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         DEC (cpos, p. in. offsetFromPos0-oldOffset);
         DEC (cstart, p. in. offsetFromPos0-oldOffset);
         DEC (p. currLinePos, p. in. offsetFromPos0-oldOffset);
+        IF (p. limits # NIL) & (p. limits. error # NIL) THEN Stop END
       END
     END NextBlock;
   
@@ -1080,11 +1187,13 @@ PROCEDURE (p: Parser) ParseDocument*;
     VAR
       i: Buffer.CharPos;
     BEGIN
+      IF p. aborted THEN RETURN FALSE END;
       i := 0;
       LOOP
         IF (chars[cpos] = Buffer.markerEOB) THEN
           IF (chars = p. in. chars) THEN
-            NextBlock
+            NextBlock;
+            IF p. aborted THEN DEC (cpos, i); Stop; RETURN FALSE END
           ELSE
             (* we are in an internal entity reference; EOB marks the end of
                the reference *)
@@ -1110,7 +1219,7 @@ PROCEDURE (p: Parser) ParseDocument*;
   
   PROCEDURE NextChar;
     BEGIN
-      IF (chars[cpos] # Buffer.markerEOD) THEN
+      IF ~p. aborted & (chars[cpos] # Buffer.markerEOD) THEN
         INC (cpos);
         IF (chars[cpos] = Buffer.markerEOB) THEN
           NextBlock
@@ -1124,6 +1233,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       string: DTD.String;
       colon: DTD.CharPos;
     BEGIN
+      IF p. aborted THEN RETURN noName END;
       IF IsNameChar (chars[cpos]) THEN
         cstart := cpos;
         IF (chars[cpos] = 58) THEN
@@ -1141,6 +1251,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         END;
         INC (cpos);
         LOOP
+          IF p. aborted THEN Stop; RETURN noName END;
           IF (chars[cpos] = Buffer.markerEOB) THEN
             IF (chars # p. in. chars) THEN (* in internal entity value *)
               string := GetString (cstart, cpos);
@@ -1194,6 +1305,7 @@ PROCEDURE (p: Parser) ParseDocument*;
     VAR
       str: ARRAY 2 OF CHAR;
     BEGIN
+      IF p. aborted THEN RETURN END;
       IF (chars[cpos] # ch) THEN
         Err (expectedChar);
         str := "X";
@@ -1238,6 +1350,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       cstart := oldCStart-p. in. offsetFromPos0;
       CheckChar (59);
       decl := dtd. peNamespace. Get (name);
+      IF ~Charge (Limits.work, 0) THEN RETURN END;
       IF (decl = NIL) THEN  (* FIXME... the WFC/VC rules are quite hairy *)
         IF p. validating OR
            (p. processDeclarations & p. followExternalRef) THEN
@@ -1259,7 +1372,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           IF p. followExternalRef OR
              (entity. type = DTD.entityInternalParameter) THEN
             inInternalSubset := ~(p. inExternalSubset OR p. inExternalEntity);
-            PushEntity (entity, inInternalSubset);
+            IF ~PushEntity (entity, inInternalSubset) THEN RETURN END;
             
             (* an external entity should being with a TextDecl *)
             oldFlag := p. inExternalEntity;
@@ -1288,9 +1401,10 @@ PROCEDURE (p: Parser) ParseDocument*;
         ELSE
           (* not in DeclSep: must be within entity value definition *)
           IF (entity IS DTD.ExternalEntity) THEN
-            entity. SetEntityValue (Internalize (entity(DTD.ExternalEntity)))
+            (* PushEntity reserves expansion and nesting before opening input. *)
+            entity. SetEntityValue (NIL)
           END;
-          PushEntity (entity, FALSE)
+          IF ~PushEntity (entity, FALSE) THEN RETURN END
         END
       END
     END PEReference;
@@ -1305,6 +1419,7 @@ PROCEDURE (p: Parser) ParseDocument*;
      set to TRUE.  *)
     BEGIN
       LOOP
+        IF p. aborted THEN Stop; EXIT END;
         CASE DispatchChar (chars[cpos]) OF
         | caseEOB:
           NextBlock
@@ -1325,8 +1440,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           Tab; INC (cpos)
         | 37:
           IF ~noPE THEN
-            PEReference (FALSE);
-            OptS (noPE)
+            PEReference (FALSE)
           ELSE
             EXIT
           END
@@ -1418,7 +1532,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       ELSE
         chars[cend] := Buffer.markerError;
         Err (invalidChar);
-        INC (cpos)
+        IF ~p. aborted THEN INC (cpos) END
       END
     END ControlChar;
   
@@ -1467,6 +1581,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         INC (cpos);
         cstart := cpos; cdelta := 0;
         LOOP
+          IF p. aborted THEN Stop; RETURN noName END;
           CASE DispatchChar (chars[cpos]) OF
           | 00H..1FH, caseEOB:
             IF (type = stringPubidLiteral) & (chars[cpos] = ORD (Ascii.ht)) THEN
@@ -1652,6 +1767,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         S;
         cstart := cpos; cdelta := 0;
         LOOP
+          IF p. aborted THEN Stop; EXIT END;
           CASE DispatchChar (chars[cpos]) OF
           | 00H..1FH, caseEOB:
             ControlChar (ORD (Ascii.lf))
@@ -1686,6 +1802,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       INC (cpos, 4);                     (* skip over "<!--" *)
       cstart := cpos; cdelta := 0;
       LOOP
+        IF p. aborted THEN Stop; EXIT END;
         CASE DispatchChar (chars[cpos]) OF
         | 00H..1FH, caseEOB:
           ControlChar (ORD (Ascii.lf))
@@ -1717,6 +1834,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       INC (cpos, 9);                     (* skip over "<![CDATA[" *)
       cstart := cpos; cdelta := 0;
       LOOP
+        IF p. aborted THEN Stop; EXIT END;
         CASE DispatchChar (chars[cpos]) OF
         | 00H..1FH, caseEOB:
           ControlChar (ORD (Ascii.lf))
@@ -1774,6 +1892,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       IF LookingAt ("&#x", followedByAny) THEN
         INC (cpos, 3); INC (cdelta, 3);
         LOOP
+          IF p. aborted THEN Stop; RETURN END;
           CASE DispatchChar (chars[cpos]) OF
           | caseEOB:
             NextBlock
@@ -1796,6 +1915,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       ELSE
         INC (cpos, 2); INC (cdelta, 2);
         LOOP
+          IF p. aborted THEN Stop; RETURN END;
           CASE DispatchChar (chars[cpos]) OF
           | caseEOB:
             NextBlock
@@ -1872,7 +1992,7 @@ PROCEDURE (p: Parser) ParseDocument*;
     PROCEDURE Flush;
       BEGIN
         IF (cpos-cdelta # cstart) THEN
-          attValue. Append (dtd. NewCharacters (chars, cstart, cpos-cdelta, isAttDecl));
+          AppendCharacters (attValue, chars, cstart, cpos-cdelta, isAttDecl)
         END
       END Flush;
     
@@ -1884,6 +2004,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         INC (cpos);
         cstart := cpos; cdelta:= 0;
         LOOP
+          IF p. aborted THEN Stop; EXIT END;
           CASE DispatchChar (chars[cpos]) OF
           | 00H..1FH, caseEOB:
             ControlChar (32)
@@ -1934,27 +2055,32 @@ PROCEDURE (p: Parser) ParseDocument*;
       VAR
         fragment: DTD.Fragment;
       BEGIN
+        IF ~Enter() THEN RETURN FALSE END;
+        IF ~Charge (Limits.work, 1) THEN Leave; RETURN FALSE END;
         IF entity. expanding THEN
-          RETURN TRUE
+          Leave; RETURN TRUE
         ELSE
           entity. expanding := TRUE;
           IF (entity. attValue = NIL) THEN
             entity. attValue := ExpandAttValue (entity)
           END;
           fragment := entity. attValue. fragmentList;
-          WHILE (fragment # NIL) DO
+          WHILE (fragment # NIL) & ~p. aborted DO
+            IF ~Charge (Limits.work, 1) THEN
+              entity. expanding := FALSE; Leave; RETURN FALSE
+            END;
             WITH fragment: DTD.EntityRef DO
               IF (fragment. entity # NIL) &
                  IsRecursive (fragment. entity) THEN
-                entity. expanding := FALSE;
-                RETURN TRUE
+                 entity. expanding := FALSE;
+                 Leave; RETURN TRUE
               END
             ELSE                           (* ignore *)
             END;
             fragment := fragment. next
           END;
           entity. expanding := FALSE;
-          RETURN FALSE
+          Leave; RETURN FALSE
         END
       END IsRecursive;
 
@@ -1965,19 +2091,20 @@ PROCEDURE (p: Parser) ParseDocument*;
       PROCEDURE Flush;
         BEGIN
           IF (cpos # cstart) THEN
-            attValue. Append (dtd. NewCharacters (chars, cstart, cpos, FALSE))
+            AppendCharacters (attValue, chars, cstart, cpos, FALSE)
           END
         END Flush;
 
       BEGIN
         IF (entity IS DTD.ExternalEntity) THEN
-          entity. SetEntityValue (Internalize (entity(DTD.ExternalEntity)))
+          entity. SetEntityValue (NIL)
         END;
 
-        PushEntity (entity, FALSE);
         attValue := dtd. NewAttValue();
+        IF ~PushEntity (entity, FALSE) THEN RETURN attValue END;
         cstart := cpos;
         LOOP
+          IF p. aborted THEN Stop; EXIT END;
           CASE DispatchChar (chars[cpos]) OF
           | caseEOD:
             Flush;
@@ -1997,7 +2124,7 @@ PROCEDURE (p: Parser) ParseDocument*;
               (* looking at character reference: replace on the spot *)
               cstart := cpos; cdelta := 0;
               CharRef();
-              attValue. Append (dtd. NewCharacters (chars, cstart, cpos-cdelta, FALSE))
+              AppendCharacters (attValue, chars, cstart, cpos-cdelta, FALSE)
             ELSE
               attValue. Append (EntityRef (TRUE, FALSE))
             END;
@@ -2011,8 +2138,9 @@ PROCEDURE (p: Parser) ParseDocument*;
       END ExpandAttValue;
 
     BEGIN
+      IF ~Enter() THEN RETURN END;
       fragment := attValue. fragmentList;
-      WHILE (fragment # NIL) DO
+      WHILE (fragment # NIL) & ~p. aborted DO
         WITH fragment: DTD.EntityRef DO
           decl := dtd. geNamespace. Get (fragment. name);
           IF (decl = NIL) THEN
@@ -2035,7 +2163,9 @@ PROCEDURE (p: Parser) ParseDocument*;
         ELSE                           (* leave characters as is *)
         END;
         fragment := fragment. next
-      END
+      END;
+      Leave;
+      IF ~CheckValue (attValue) THEN attValue. Clear END
     END Expand;
 
   PROCEDURE ^element;
@@ -2056,6 +2186,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         elementWhitespace := DTD.elementWhitespaceUnknown;
 
         LOOP  (* loop invariant: cdelta = 0 *)
+          IF p. aborted THEN Stop; EXIT END;
           (* this is a very specialized version of the loop down below; it
              covers the case where `cdelta' stays zero, which means that
              no characters must be copied *)
@@ -2135,6 +2266,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         pos: Locator.Position;
       BEGIN
         decl := dtd. geNamespace. Get (entityRef. name);
+        IF ~Charge (Limits.work, 0) THEN RETURN END;
         entity := NIL;
         IF (decl # NIL) THEN
           entity := decl(DTD.Entity)
@@ -2157,7 +2289,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           p. builder. SkippedEntity (entityRef. name, entity) (* callback *)
         ELSE
           p. builder. StartEntity (entity); (* callback *)
-          PushEntity (entity, TRUE);
+          IF ~PushEntity (entity, TRUE) THEN RETURN END;
           StorePosition (pos);
           (* recursivly enter replacement; FIXME: endless loop? *)
           IF (entity. type = DTD.entityExternalGeneral) &
@@ -2177,7 +2309,9 @@ PROCEDURE (p: Parser) ParseDocument*;
       END FollowEntityRef;
 
     BEGIN
+      IF p. aborted THEN RETURN END;
       LOOP
+        IF p. aborted THEN EXIT END;
         CASE DispatchChar (chars[cpos]) OF
         | caseEOD:
           EXIT
@@ -2236,6 +2370,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         i: LONGINT;
       BEGIN
         FOR i := 0 TO p. lenNameList-1 DO
+          IF ~Charge (Limits.work, 1) THEN RETURN FALSE END;
           IF LongStrings.Equal (name^, p. nameList[i]^) THEN
             RETURN TRUE
           END
@@ -2254,6 +2389,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         BEGIN
           i := 0;
           WHILE (i # p. lenNameList) DO
+            IF ~Charge (Limits.work, 1) THEN RETURN FALSE END;
             IF LongStrings.Equal (p. nameList[i]^, name^) THEN
               RETURN TRUE
             END;
@@ -2269,6 +2405,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           decl := dtd. attributeList
         END;
         WHILE (decl # NIL) DO
+          IF ~Charge (Limits.work, 1) THEN RETURN END;
           attrDecl := decl(DTD.AttrDecl);
           IF ((elemDecl # NIL) OR LongStrings.Equal (attrDecl. elementName^, startName^)) &
              ~AttributeDefined (attrDecl. name) THEN
@@ -2296,6 +2433,7 @@ PROCEDURE (p: Parser) ParseDocument*;
       END ErrEndTag;
     
     BEGIN
+      IF ~Enter() THEN RETURN END;
       IF (chars[cpos] = 60) THEN
         CheckChar (60);
         p. lenNameList := 0;
@@ -2303,8 +2441,10 @@ PROCEDURE (p: Parser) ParseDocument*;
         StorePosition (p. l^);
         startName := Name (FALSE);
         decl := dtd. elementNamespace. Get (startName);
+        IF ~Charge (Limits.work, 0) THEN Leave; RETURN END;
         p. builder. StartElement (NIL, startName); (* callback *)
         LOOP
+          IF p. aborted THEN Stop; EXIT END;
           IF (chars[cpos] = Buffer.markerEOD) THEN
             EXIT
           ELSIF (chars[cpos] # 62) & (chars[cpos] # 47) THEN
@@ -2335,11 +2475,13 @@ PROCEDURE (p: Parser) ParseDocument*;
           ELSE
             decl0 := dtd. attributeList;
             WHILE (decl0 # NIL) & (attrDecl = NIL) DO
-              IF LongStrings.Equal (decl0(DTD.AttrDecl). elementName^, startName^) &
-                 LongStrings.Equal (decl0. name^, attrName^) THEN
+              IF ~Charge (Limits.work, 1) THEN
+                decl0 := NIL
+              ELSIF LongStrings.Equal (decl0(DTD.AttrDecl). elementName^, startName^) &
+                    LongStrings.Equal (decl0. name^, attrName^) THEN
                 attrDecl := decl0(DTD.AttrDecl)
               END;
-              decl0 := decl0. next
+              IF decl0 # NIL THEN decl0 := decl0. next END
             END
           END;
           attrValue := AttValue (TRUE);
@@ -2376,13 +2518,15 @@ PROCEDURE (p: Parser) ParseDocument*;
         END
       ELSE
         Err (expectedElement)
-      END
+      END;
+      Leave
     END element;
   
   PROCEDURE MiscRep;
   (* post: chars[cpos] # Buffer.markerEOB *)
     BEGIN
       LOOP
+        IF p. aborted THEN Stop; EXIT END;
         CASE DispatchChar (chars[cpos]) OF
         | caseEOB:
           NextBlock
@@ -2449,7 +2593,18 @@ PROCEDURE (p: Parser) ParseDocument*;
         cp: DTD.CP;
         elementDecl: DTD.ElementDecl;
         decl: DTD.Declaration;
-        
+        particles: LONGINT;
+
+      PROCEDURE Particle (): BOOLEAN;
+        BEGIN
+          IF p. aborted THEN RETURN FALSE END;
+          IF (p. limits # NIL) & (p. limits. maxModelParticles >= 0) &
+             (particles >= p. limits. maxModelParticles) THEN
+            p. limits. Fail (Limits.modelParticles); Stop; RETURN FALSE
+          END;
+          INC (particles); RETURN Charge (Limits.work, 1)
+        END Particle;
+
       PROCEDURE contentspec(): DTD.CP;
         VAR
           currentEntity: DTD.Entity;
@@ -2460,12 +2615,14 @@ PROCEDURE (p: Parser) ParseDocument*;
             hasAlternative: BOOLEAN;
             first, last: DTD.CP;
           BEGIN
+            IF ~Particle() THEN RETURN dtd. NewNameCP (DTD.cpOnce, noName) END;
             first := dtd. NewNameCP (DTD.cpOnce, GetString (cpos, cpos+7));
             INC (cpos, 7);             (* skip over "#PCDATA" *)
             last := first;
             OptS (FALSE);
             hasAlternative := FALSE;
             WHILE (chars[cpos] = 124) DO
+              IF ~Particle() THEN RETURN dtd. NewChoiceCP (DTD.cpOnce, first) END;
               hasAlternative := TRUE;
               CheckChar (124);
               OptS (FALSE);
@@ -2518,6 +2675,7 @@ PROCEDURE (p: Parser) ParseDocument*;
                   OptS (FALSE);
                   cp := choiceseq (currentEntity)
                 ELSIF IsNameChar0 (chars[cpos]) THEN
+                  IF ~Particle() THEN RETURN dtd. NewNameCP (DTD.cpOnce, noName) END;
                   cp := dtd. NewNameCP (DTD.cpOnce, Name (FALSE))
                 ELSE
                   Err (expectedCP);
@@ -2528,6 +2686,8 @@ PROCEDURE (p: Parser) ParseDocument*;
               END cp;
 
             BEGIN
+              IF ~Particle() THEN RETURN dtd. NewNameCP (DTD.cpOnce, noName) END;
+              IF ~Enter() THEN RETURN dtd. NewNameCP (DTD.cpOnce, noName) END;
               class := 0;
               first := cp();
               OptS (FALSE);
@@ -2553,8 +2713,10 @@ PROCEDURE (p: Parser) ParseDocument*;
               CheckCurrentEntity (currentEntity);
               
               IF (class = 44) THEN
+                Leave;
                 RETURN dtd. NewSeqCP (DTD.cpOnce, first)
               ELSE
+                Leave;
                 RETURN dtd. NewChoiceCP (DTD.cpOnce, first)
               END
             END choiceseq;
@@ -2586,6 +2748,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         END contentspec;
 
       BEGIN
+        particles := 0;
         INC (cpos, 9);                 (* skip over "<!ELEMENT" *)
         S;
         elementName := Name (FALSE);
@@ -2595,6 +2758,7 @@ PROCEDURE (p: Parser) ParseDocument*;
 
         elementDecl := dtd. NewElementDecl (elementName, cp, ~currentEntity. IsDocumentEntity());
         IF ~dtd. elementNamespace. Add (elementDecl) THEN
+          IF ~Charge (Limits.work, 0) THEN RETURN END;
           decl := dtd. elementNamespace. Get (elementName);
           decl(DTD.ElementDecl). SetMultipleDecl
         END;
@@ -2622,6 +2786,7 @@ PROCEDURE (p: Parser) ParseDocument*;
             enum := dtd. NewEnumeration();
             CheckChar (40);
             LOOP
+              IF p. aborted THEN Stop; EXIT END;
               OptS (FALSE);
               CASE attrType OF
               | DTD.attrNOTATION:
@@ -2711,6 +2876,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         S;
         elementName := Name (FALSE);
         LOOP
+          IF p. aborted THEN Stop; EXIT END;
           IF (chars[cpos] # 62) THEN
             S
           END;
@@ -2777,18 +2943,19 @@ PROCEDURE (p: Parser) ParseDocument*;
             INC (cpos);
             cstart := cpos; cdelta := 0;
             LOOP
+              IF p. aborted THEN Stop; EXIT END;
               CASE DispatchChar (chars[cpos]) OF
               | 00H..1FH, caseEOB:
                 ControlChar (ORD (Ascii.lf))
               | caseEOD:
                 ErrPos (stringNotClosed, pos);
-                p. currEntityValue. Append (dtd. NewCharacters (chars, cstart, cpos-cdelta, TRUE));
+                AppendCharacters (p. currEntityValue, chars, cstart, cpos-cdelta, TRUE);
                 EXIT
               | 37:
                 IF (cstart # cpos-cdelta) THEN
                   (* append character sequence before the PE reference to
                      the fragment list *)
-                  p. currEntityValue. Append (dtd. NewCharacters (chars, cstart, cpos-cdelta, TRUE))
+                  AppendCharacters (p. currEntityValue, chars, cstart, cpos-cdelta, TRUE)
                 END;
                 PEReference (FALSE);
                 (* note: PopEntity will attach the characters from within the
@@ -2807,7 +2974,7 @@ PROCEDURE (p: Parser) ParseDocument*;
                 IF (chars[cpos] = endChar) & (p. lenPEStack = startLevel) THEN
                   (* only recognize the string end delimiter if we are not
                      expanding any entity references *)
-                  p. currEntityValue. Append (dtd. NewCharacters (chars, cstart, cpos-cdelta, TRUE));
+                  AppendCharacters (p. currEntityValue, chars, cstart, cpos-cdelta, TRUE);
                   CheckChar (endChar);
                   EXIT
                 ELSE
@@ -2815,7 +2982,9 @@ PROCEDURE (p: Parser) ParseDocument*;
                 END
               END
             END;
-            string := p. currEntityValue. Flatten (NIL);
+            IF CheckValue (p. currEntityValue) THEN
+              string := p. currEntityValue. Flatten (NIL)
+            END;
             p. currEntityValue := NIL
           ELSE
             Err (expectedEntityValue); NextChar
@@ -2935,6 +3104,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         level := 1;
         cstart := cpos; cdelta := 0;
         LOOP
+          IF p. aborted THEN Stop; EXIT END;
           CASE DispatchChar (chars[cpos]) OF
           | 00H..1FH, caseEOB:
             ControlChar (ORD (Ascii.lf))
@@ -2968,7 +3138,9 @@ PROCEDURE (p: Parser) ParseDocument*;
       END ignoreSectContents;
     
     BEGIN
+      IF ~Enter() THEN RETURN END;
       LOOP
+        IF p. aborted THEN EXIT END;
         IF (chars[cpos] = 60) THEN
           currentEntity := CurrentEntity();
           StorePosition (pos);
@@ -3007,6 +3179,7 @@ PROCEDURE (p: Parser) ParseDocument*;
           EXIT
         END
       END;
+      Leave
     END extSubsetDecl;
 
   PROCEDURE prolog;
@@ -3036,10 +3209,14 @@ PROCEDURE (p: Parser) ParseDocument*;
           
           p. builder := Builder.New();
           decl := p. dtd. geNamespace. declList;
-          WHILE (decl # NIL) DO
+          LOOP
+            IF (decl = NIL) OR p. aborted THEN EXIT END;
             IF (decl(DTD.Entity). type = DTD.entityInternalGeneral) THEN
               len := LongStrings.Length (decl. name^)+2;
-              INC (cpos, len); PushEntity (decl(DTD.Entity), TRUE);
+              INC (cpos, len);
+              IF ~PushEntity (decl(DTD.Entity), TRUE) THEN
+                DEC (cpos, len); Stop; EXIT
+              END;
               
               content;
               IF (chars[cpos] # Buffer.markerEOD) THEN
@@ -3049,6 +3226,7 @@ PROCEDURE (p: Parser) ParseDocument*;
               END;
               
               PopEntity; DEC (cpos, len);
+              IF p. aborted THEN Stop; EXIT END;
             END;
             decl := decl. next
           END;
@@ -3085,6 +3263,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         IF (chars[cpos] = 91) THEN
           CheckChar (91);
           LOOP
+            IF p. aborted THEN Stop; EXIT END;
             IF (chars[cpos] = 60) THEN
               markupdecl
             ELSIF (chars[cpos] = 37) THEN
@@ -3106,7 +3285,7 @@ PROCEDURE (p: Parser) ParseDocument*;
         IF (public # NIL) OR (system # NIL) THEN
           IF p. followExternalRef THEN
             externalSubset := dtd. NewExternalDTD (public, system, baseURI);
-            PushEntity (externalSubset, TRUE);
+            IF ~PushEntity (externalSubset, TRUE) THEN RETURN END;
             p. inExternalSubset := TRUE;
             IF LookingAt ("<?xml", followedByNonName) THEN
               XMLDecl (externalSubset)
@@ -3162,10 +3341,14 @@ PROCEDURE (p: Parser) ParseDocument*;
     p. builder. SetLocator (p. l);
     p. builder. SetErrorListener (p. errorListener);
     p. builder. StartDocument (p. documentEntity); (* callback *)
+    IF (p. limits # NIL) & (p. limits. error # NIL) THEN Stop END;
     
     prolog;
     p. inDocumentElement := TRUE;
     element;
+    IF p. aborted THEN
+      WHILE (p. lenPEStack # 0) DO PopEntity END
+    END;
     IF (p. lenPEStack # 0) THEN
       Err (unbalancedGERef)
     END;
@@ -3177,7 +3360,8 @@ PROCEDURE (p: Parser) ParseDocument*;
     CheckInvalidChars (p. in, p. fileEntity);
     
     StorePosition (p. l^);
-    p. initialBuilder. EndDocument       (* callback *)
+    p. initialBuilder. EndDocument;      (* callback *)
+    IF (p. limits # NIL) & (p. limits. error # NIL) THEN Stop END
   END ParseDocument;
 
 
@@ -3186,15 +3370,16 @@ PROCEDURE Init (p: Parser; new: BOOLEAN;
                 baseURI: URI.URI;
                 codecFactory: Codec.Factory;
                 entityResolver: EntityResolver.Resolver;
-                builder: Builder.Builder);
+                builder: Builder.Builder; limits: Limits.Budget);
   BEGIN
+    p. limits := limits; p. aborted := FALSE;
     p. errList := Error.NewList();
     IF new THEN
       NEW (p. l);
       NEW (p. errorListener);
       NEW (p. nameList, initNameList);
       NEW (p. peStack, initPEStack);
-      p. in := Buffer.NewInput (reader, codecFactory, p. errList);
+      p. in := Buffer.NewInput (Limits.Wrap (reader, limits), codecFactory, p. errList);
     ELSE
       HALT (127);
       (*p. in. Reset (reader, codecFactory, p. errList)*)
@@ -3204,6 +3389,7 @@ PROCEDURE Init (p: Parser; new: BOOLEAN;
     p. errorListener. p := p;
     
     p. dtd := DTD.New();
+    p. dtd. SetLimits (limits);
     p. documentEntity := p. dtd. NewDocumentEntity (baseURI);
     p. documentEntity. SetCodecFactory (p. in. codecFactory);
     p. builder := builder;
@@ -3272,7 +3458,7 @@ PROCEDURE NewChannel* (ch: Channel.Channel;
   BEGIN
     NEW (p);
     Init (p, TRUE, ch. NewReader(), 
-                   baseURI, codecFactory, entityResolver, builder);
+                   baseURI, codecFactory, entityResolver, builder, NIL);
     RETURN p
   END NewChannel;
 
@@ -3287,9 +3473,54 @@ PROCEDURE NewReader* (reader: Channel.Reader;
     p: Parser;
   BEGIN
     NEW (p);
-    Init (p, TRUE, reader, baseURI, codecFactory, entityResolver, builder);
+    Init (p, TRUE, reader, baseURI, codecFactory, entityResolver, builder, NIL);
     RETURN p
   END NewReader;
+
+PROCEDURE NewReaderLimited* (reader: Channel.Reader; baseURI: URI.URI;
+                            codecFactory: Codec.Factory;
+                            entityResolver: EntityResolver.Resolver;
+                            builder: Builder.Builder; limits: Limits.Budget): Parser;
+(**Creates a parser with a shared budget applied before input prefetch.
+   The same budget is used for every external entity opened during parsing. *)
+  VAR p: Parser;
+  BEGIN
+    NEW (p); Init (p, TRUE, reader, baseURI, codecFactory, entityResolver, builder, limits);
+    RETURN p
+  END NewReaderLimited;
+
+PROCEDURE NewChannelLimited* (channel: Channel.Channel; baseURI: URI.URI;
+                             codecFactory: Codec.Factory;
+                             entityResolver: EntityResolver.Resolver;
+                             builder: Builder.Builder; limits: Limits.Budget): Parser;
+(**Like @oproc{NewReaderLimited}, using a new reader on the channel. *)
+  BEGIN
+    RETURN NewReaderLimited (channel. NewReader(), baseURI, codecFactory,
+                             entityResolver, builder, limits)
+  END NewChannelLimited;
+
+PROCEDURE NewURILimited* (uri, baseURI: URI.URI; codecFactory: Codec.Factory;
+                          entityResolver: EntityResolver.Resolver;
+                          builder: Builder.Builder; limits: Limits.Budget;
+                          VAR res: Msg.Msg): Parser;
+(**Opens the primary URI and applies the budget before reading its contents. *)
+  VAR ch: Channel.Channel;
+  BEGIN
+    ch := uri. GetChannel (URI.channelOld, res);
+    IF ch = NIL THEN RETURN NIL END;
+    RETURN NewReaderLimited (ch. NewReader(), uri, codecFactory, entityResolver, builder, limits)
+  END NewURILimited;
+
+PROCEDURE NewFileLimited* (filePath: ARRAY OF CHAR; baseURI: URI.URI;
+                          codecFactory: Codec.Factory;
+                          entityResolver: EntityResolver.Resolver;
+                          builder: Builder.Builder; limits: Limits.Budget;
+                          VAR res: Msg.Msg): Parser;
+(**Like @oproc{NewURILimited}, using a file path. *)
+  BEGIN
+    RETURN NewURILimited (File.ToURI (filePath), baseURI, codecFactory,
+                          entityResolver, builder, limits, res)
+  END NewFileLimited;
 
 PROCEDURE NewURI* (uri, baseURI: URI.URI; 
                    codecFactory: Codec.Factory;

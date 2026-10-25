@@ -2,7 +2,7 @@ MODULE TestEntityPolicy;
 
 IMPORT Out, S := LongStrings, M := Msg, Mem := IOMemory, Ch := Channel,
   URI, URIParser, D := XMLDTD, B := XMLBuilder, P := XMLParser,
-  R := XMLEntityResolver, XMLUnicodeCodecImportAll;
+  R := XMLEntityResolver, L := XMLLimits, XMLUnicodeCodecImportAll;
 
 TYPE
   Resource = POINTER TO ResourceDesc;
@@ -106,6 +106,56 @@ BEGIN
   ASSERT(found, 12); input.Close
 END InternalizedEncoding;
 
+PROCEDURE BudgetedExternal(text, dtd, replacement: ARRAY OF CHAR; repeats: LONGINT);
+  VAR resolver: Resolver; input: Mem.Channel; writer: Ch.Writer; parser: P.Parser;
+    budget: L.Budget; msg: M.Msg; i, size, matches: LONGINT;
+BEGIN
+  NEW(resolver); NEW(resolver.resource); NEW(resolver.externalDTD);
+  URI.InitURI(resolver.resource, NIL); URI.InitURI(resolver.externalDTD, NIL);
+  NEW(resolver.resource.text, S.Length8(replacement)+1); COPY(replacement, resolver.resource.text^);
+  NEW(resolver.externalDTD.text, S.Length8(dtd)+1); COPY(dtd, resolver.externalDTD.text^);
+  size := S.Length8(text)+S.Length8(dtd)+repeats*S.Length8(replacement);
+  FOR i := 0 TO size+1 DO
+    input := Mem.Tmp("", {Mem.read, Mem.write}, result); ASSERT(result = NIL, 20);
+    writer := input.NewWriter(); writer.WriteBytes(text, 0, S.Length8(text));
+    budget := L.New(); budget.maxInputBytes := i;
+    parser := P.NewReaderLimited(input.NewReader(), base, NIL, resolver, B.New(), budget);
+    parser.followExternalRef := TRUE; opens := 0; parser.ParseDocument;
+    ASSERT((budget.error # NIL) = (i < size), 21);
+    ASSERT(parser.aborted = (i < size), 22); ASSERT(budget.depth = 0, 23);
+    IF budget.error # NIL THEN
+      ASSERT(budget.error.code = L.codeBase+L.inputBytes, 24);
+      matches := 0; msg := parser.errList.msgList;
+      WHILE msg # NIL DO
+        IF msg = budget.error THEN INC(matches) END;
+        msg := msg.nextMsg
+      END;
+      ASSERT(matches = 1, 25)
+    ELSE ASSERT(parser.errList.msgCount = 0, 26)
+    END;
+    input.Close
+  END
+END BudgetedExternal;
+
+PROCEDURE ExpansionBeforeOpen;
+  VAR resolver: Resolver; input: Mem.Channel; writer: Ch.Writer; parser: P.Parser;
+    budget: L.Budget; text: ARRAY 128 OF CHAR;
+BEGIN
+  NEW(resolver); NEW(resolver.resource); NEW(resolver.externalDTD);
+  URI.InitURI(resolver.resource, NIL); URI.InitURI(resolver.externalDTD, NIL);
+  NEW(resolver.resource.text, 16); COPY('external text', resolver.resource.text^);
+  NEW(resolver.externalDTD.text, 128);
+  COPY('<!ENTITY % p SYSTEM "external.ent"><!ENTITY e "%p;">', resolver.externalDTD.text^);
+  input := Mem.Tmp("", {Mem.read, Mem.write}, result); ASSERT(result = NIL, 30);
+  writer := input.NewWriter(); text := '<!DOCTYPE r SYSTEM "external.dtd"><r/>';
+  writer.WriteBytes(text, 0, S.Length8(text));
+  budget := L.New(); budget.maxEntityExpansions := 1;
+  parser := P.NewReaderLimited(input.NewReader(), base, NIL, resolver, B.New(), budget);
+  opens := 0; parser.ParseDocument;
+  ASSERT(parser.aborted & (opens = 1), 31); ASSERT(budget.depth = 0, 32);
+  ASSERT(budget.error.code = L.codeBase+L.entityExpansions, 33); input.Close
+END ExpansionBeforeOpen;
+
 PROCEDURE Checks;
   VAR capture: Capture;
 BEGIN
@@ -127,5 +177,12 @@ END Checks;
 
 BEGIN
   base := URIParser.NewURI("file:/xml-tests/document.xml", NIL, result); ASSERT(result = NIL, 9);
-  Checks; InternalizedEncoding; Out.String("XML external entity policy checks passed"); Out.Ln
+  Checks; InternalizedEncoding; ExpansionBeforeOpen;
+  BudgetedExternal('<!DOCTYPE r SYSTEM "external.dtd"><r>&e;&e;</r>',
+    '<!ENTITY e SYSTEM "external.ent">', 'external text', 2);
+  BudgetedExternal('<!DOCTYPE r SYSTEM "external.dtd"><r a="&e;">&e;</r>',
+    '<!ENTITY % p SYSTEM "external.ent"><!ENTITY e "%p;">', 'external text', 1);
+  BudgetedExternal('<!DOCTYPE r SYSTEM "external.dtd"><r/>',
+    '<![INCLUDE[<![INCLUDE[<!ELEMENT r EMPTY>]]>]]>', '', 0);
+  Out.String("XML external entity policy checks passed"); Out.Ln
 END TestEntityPolicy.

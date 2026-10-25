@@ -256,8 +256,12 @@ PROCEDURE (in: Input) NextBlock* (): BOOLEAN;
          bytes *)
       len := LEN (in. chars^);
       REPEAT
-        ASSERT (len <= MAX (LONGINT)-charsPerRead);
-        INC (len, charsPerRead)
+        IF len <= MAX (LONGINT) DIV 2 THEN
+          len := len*2
+        ELSE
+          ASSERT (len <= MAX (LONGINT)-charsPerRead);
+          INC (len, charsPerRead)
+        END
       UNTIL (len-in. endOfBuffer > charsPerRead);
       NEW (nChars, len);
       FOR i := 0 TO in. endOfBuffer DO nChars[i] := in. chars[i] END;

@@ -90,7 +90,7 @@ UTF-8/UTF-16 round trips, escaping, long names/URIs, indentation and partial
 channel writes. Basic-element tests cover factory lookup, typed values,
 application checks, locators, stack growth and long Unicode buffers. Protocol
 tests reparse callback traces, including malformed input and namespace events.
-The eleven integration programs pass with GCC and Clang in
+The twelve integration programs pass with GCC and Clang in
 C23 mode, TCC and Clang ASan/UBSan.
 
 The bundled James Clark XML test archive supplies the first well-formedness
@@ -117,7 +117,7 @@ trusted local fixtures. Exit codes are 0 for successful parsing, 1 for XML
 diagnostics and 2 for usage or opening errors.
 `XMLCheck --validate file.xml` enables DTD validation and external references;
 combine it with `--namespaces` to check namespace constraints too. Use trusted
-input while external-entity controls and resource limits are under review.
+input while the broader security review is incomplete.
 `XMLCheck --canonical --external file.xml` writes the first canonical form
 to standard output. `--second` selects the form that includes sorted notation
 declarations. These output modes consume qualified names directly.
@@ -128,9 +128,14 @@ VOC's ooc package supplies URI parsing, relative resolution and file/memory
 channels. XML's `XMLEntityResolver` converts Unicode system identifiers to
 these URI objects. The ported library modules have integration coverage;
 remaining original regression drivers are still being reviewed.
-Resource limits and broader security testing remain unfinished; use trusted XML.
+`XMLCheck` applies default input, nesting, entity-expansion, value-length and
+work budgets. Library applications can supply an `XMLLimits` budget through
+the parser's `NewReaderLimited`, `NewChannelLimited`, `NewURILimited` and
+`NewFileLimited` constructors. `make limits` runs 45 adversarial checks with
+process time and memory ceilings. Broader security testing remains unfinished;
+use trusted XML.
 The [input policy and security review](doc/Security.md) records the external-read
-guard, recursive-entity checks, regression coverage and remaining resource work.
+guard, resource-budget API, regression coverage and remaining resource work.
 
 ### Testing with a VOC source build
 
@@ -140,11 +145,12 @@ Oberon-2 build directory directly. For a sibling VOC checkout:
 
 ```sh
 make -C ../compiler/src/ports/ooc test
-make BUILD=../compiler/build/ports/ooc/2 test
+make BUILD=../compiler/build/ports/ooc/2 test conformance limits
 ```
 
 The shared build directory contains the matching `.sym`, `.h` and `.o`
-files. A normal `make test` uses the installed VOC library.
+files. The XML build forces local symbol generation so its programs link the
+rebuilt modules. A normal `make test` uses the installed shared VOC library.
 
 [Port status and dependencies](doc/PortStatus.md) lists what is present and
 what still needs adapting.

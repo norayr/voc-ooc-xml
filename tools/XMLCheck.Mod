@@ -3,7 +3,7 @@ MODULE XMLCheck;
 IMPORT Args, Out, M := Msg, Mem := IOMemory, B := XMLBuilder,
   N := XMLBuilderNamespaces, V := XMLBuilderValidation,
   Canon := XMLBuilderCanonical, C := XMLUnicodeCodec,
-  Protocol := XMLBuilderParserProtocol,
+  Protocol := XMLBuilderParserProtocol, Limits := XMLLimits,
   P := XMLParser, XMLUnicodeCodecImportAll;
 
 VAR path, text: ARRAY 4096 OF CHAR; p: P.Parser; res: M.Msg;
@@ -43,7 +43,7 @@ BEGIN
   END;
   IF namespaces THEN builder := N.New(builder) END;
   IF validating THEN builder := V.New(builder); external := TRUE END;
-  p := P.NewFile(path, NIL, NIL, NIL, builder, res);
+  p := P.NewFileLimited(path, NIL, NIL, NIL, builder, Limits.New(), res);
   IF p = NIL THEN res.GetText(text); Out.String(text); Out.Ln; HALT(2) END;
   p.followExternalRef := external; p.enforceQNames := namespaces;
   p.validating := validating; p.ParseDocument;

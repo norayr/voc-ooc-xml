@@ -98,8 +98,12 @@ PROCEDURE (b: Buffer) NextBlock* (): BOOLEAN;
            bytes *)
         len := LEN (b. chars^);
         REPEAT
-          ASSERT (len <= MAX (LONGINT)-bytesPerRead);
-          INC (len, bytesPerRead)
+          IF len <= MAX (LONGINT) DIV 2 THEN
+            len := len*2
+          ELSE
+            ASSERT (len <= MAX (LONGINT)-bytesPerRead);
+            INC (len, bytesPerRead)
+          END
         UNTIL (len-b. endOfBuffer > bytesPerRead);
         NEW (nChars, len);
         SYSTEM.MOVE (SYSTEM.ADR (b. chars^),

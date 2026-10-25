@@ -22,6 +22,7 @@ integer widths, record extensions and method signatures must agree.
 | `XMLDTD` | Ported data model; tests cover internal subsets, parameter entities, default attributes and validity constraints. |
 | `XMLEntityResolver` | Ported Unicode system-identifier normalization and relative URI resolution; tested with supplementary characters, malformed UTF-16 and long identifiers. |
 | `XMLInputBuffer`, `XMLUnicodeBuffer` | Ported and tested with short reads, BOMs, growth, compaction, repeated flushes and partial-write retries. |
+| `XMLLimits` | Shared per-parse input, recursion, expansion, value-size, content-model and work budgets; limited constructors apply them before prefetch. |
 | `IOMemory` | Transferred to VOC's ooc package. Tests cover permissions, seeking, sparse writes, truncation, growth, overlapping copies, bounds and fingerprints. |
 | Unicode codec registry, ASCII, Latin-1, UTF-8, UTF-16 | Adapted to `-O2`; new Oberon tests pass with GCC/C23, Clang/C23 and TCC. |
 | `oocUnicode`, `LongStrings` | Supplied by VOC's ooc package, using the shared `LONGCHAR` alias for code units and `LONGINT` for positions and lengths. |
@@ -134,8 +135,9 @@ will not be part of the VOC port's implementation.
   Canonical-output comparisons also run in this target; see below.
 - `XMLCheck` disables external references by default. The library retains its
   upstream `followExternalRef = TRUE` default; applications must set it
-  explicitly. Expansion, recursion and input-size limits remain pending, so
-  use trusted documents while that security review is incomplete.
+  explicitly. Limited constructors accept a shared `XMLLimits` budget before
+  prefetch; `XMLCheck` uses the default limits. Use trusted documents while the
+  broader security review is incomplete.
 
 ## Namespace checks
 
@@ -227,12 +229,18 @@ will not be part of the VOC port's implementation.
   entities, invalid attribute references, unused unparsed entities, recursive
   references and malformed internalized input without accessing host files.
 - [Input policy and resource review](Security.md) explains the tested controls
-  and remaining input, expansion, allocation and native-stack limits. Continue
-  using trusted documents until that work is complete.
+  and resource-budget API. Cutoff tests cover early failure and shared external
+  byte budgets. The `limits` target runs 45 hostile-input cases under process
+  time and memory ceilings, in plain, namespace and validation modes.
+- Input and retained-token buffers grow geometrically. DTD namespace insertion
+  is iterative, and lookup/insertion and attribute comparisons charge the
+  budget. Value graphs are checked before recursive flattening. Continue using
+  trusted documents while broader builder/validation accounting and randomized
+  malformed-input testing remain incomplete.
 
 ## Verification
 
-The eleven XML test programs and seven ooc regression programs pass with
+The twelve XML test programs and seven ooc regression programs pass with
 GCC/C23, Clang/C23 and TCC under `-O2`. The shared ooc package is rebuilt
 before each XML test run. An additional Clang build instruments the shared
 package, ported XML modules and tests with AddressSanitizer and
@@ -248,7 +256,7 @@ env CC=clang \
   CFLAGS='-std=c23 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer' \
   ASAN_OPTIONS=detect_leaks=0:detect_stack_use_after_return=0 \
   UBSAN_OPTIONS=halt_on_error=1 \
-  make BUILD=build/sanitize test
+  make BUILD=build/sanitize test conformance limits
 ```
 
 ASan's alternate stack frames must be disabled so VOC's conservative garbage
@@ -258,7 +266,7 @@ directory when testing from source without installing VOC first; see the
 source-build example in the README.
 The isolated ooc build forces local symbol files, so rebuilt objects are linked
 even when installed modules export identical interfaces. All conformance
-targets pass with GCC/C23, Clang/C23, TCC and the sanitizer build.
+and adversarial targets pass with GCC/C23, Clang/C23, TCC and the sanitizer build.
 
 ## Representation rules
 
@@ -277,8 +285,9 @@ targets pass with GCC/C23, Clang/C23, TCC and the sanitizer build.
 
 ## Next stages
 
-1. Finish the resource limits and adversarial tests listed in [Security.md](Security.md)
-   before accepting untrusted input.
+1. Extend resource accounting to validation/builders and add the broader
+   adversarial tests listed in [Security.md](Security.md) before accepting
+   untrusted input.
 2. Review the remaining upstream drivers and XML/namespace/encoding suites.
    Separate external fixture
    availability from genuine parser failures.
