@@ -1,7 +1,7 @@
-MODULE XML:Basic:Element [OOC_EXTENSIONS];
+MODULE XMLBasicElement;
 
 IMPORT
-  LongStrings, XML:DTD, XML:Locator, XML:Writer;
+  SYSTEM, LongStrings, DTD := XMLDTD, Locator := XMLLocator, Writer := XMLWriter;
 
 
 TYPE
@@ -19,7 +19,7 @@ TYPE
 
 TYPE
   Element* = POINTER TO ElementDesc;
-  ElementDesc* = RECORD [ABSTRACT]
+  ElementDesc* = RECORD
     next-: Element;
   END;
 
@@ -79,7 +79,7 @@ PROCEDURE (rf: RootFactory) AddFactory* (name: StringVar;
   BEGIN
     NEW (ef);
     NEW (ef. name, LongStrings.Length (name)+1);
-    COPY (name, ef. name^);
+    LongStrings.Assign (name, ef. name^);
     ef. gen := gen;
     ef. next := rf. list;
     rf. list := ef
@@ -92,7 +92,7 @@ PROCEDURE (rf: RootFactory) NewElement* (name: String): Element;
     ptr: ElementFactory;
   BEGIN
     ptr := rf. list;
-    WHILE (ptr # NIL) & (ptr. name^ # name^) DO
+    WHILE (ptr # NIL) & ~LongStrings.Equal (ptr. name^, name^) DO
       ptr := ptr. next
     END;
     IF (ptr = NIL) THEN
@@ -115,6 +115,7 @@ PROCEDURE (elem: Element) SetLocator* (l: Locator.Locator);
    an URI attribute value should be expanded.  This method is called after an
    element has been created, and before any attribute or content data is passed
    on to it.  *)
+  BEGIN
   END SetLocator;
 
 PROCEDURE (elem: Element) IsChildName* (localName: String): BOOLEAN;
@@ -146,7 +147,7 @@ PROCEDURE (elem: Element) AddChild* (child: Element);
 (**Adds the parsed child element @oparam{child} to @oparam{elem}.  The object
    @oparam{child} was previously created with @oproc{Element.NewChild}.  *)
   BEGIN
-    <*PUSH; Assertions:=TRUE*>ASSERT (FALSE)<*POP*>
+    HALT (127)
   END AddChild;
 
 
@@ -195,7 +196,7 @@ PROCEDURE (elem: Element) AddCharacters* (VAR chars: StringVar;
    characters are in the character interval
    @samp{@oparam{chars}[@oparam{charsStart}..@oparam{charsEnd}-1]}.  *)
   BEGIN
-    <*PUSH; Assertions:=TRUE*>ASSERT (FALSE)<*POP*>
+    HALT (127)
   END AddCharacters;
 
 PROCEDURE (elem: Element) CheckElement* (): String;
@@ -213,9 +214,10 @@ PROCEDURE (elem: Element) CheckElement* (): String;
     RETURN NIL
   END CheckElement;
 
-PROCEDURE (elem: Element) [ABSTRACT] Write* (writer: Writer.Writer);
+PROCEDURE (elem: Element) Write* (writer: Writer.Writer);
 (**Serializes the object @oparam{elem} into an XML element.  The data is
    generated with the writer @oparam{writer}.  *)
+  BEGIN HALT (127)
   END Write;
 
 (* ------------------------------------------------------------------------ *)
@@ -265,7 +267,7 @@ PROCEDURE NewString* (value: StringVar): String;
     str: String;
   BEGIN
     NEW (str, LongStrings.Length (value)+1);
-    COPY (value, str^);
+    LongStrings.Assign (value, str^);
     RETURN str
   END NewString;
 
@@ -278,23 +280,27 @@ PROCEDURE NewStringBuffer* (value: StringVar): StringBuffer;
     sb. length := LongStrings.Length (value);
     len := stringBufferMinSize;
     WHILE (len <= sb. length) DO
+      ASSERT (len <= (MAX (LONGINT)-stringBufferSlack) DIV 2);
       len := len*2+stringBufferSlack
     END;
     NEW (sb. array, len);
-    COPY (value, sb. array^);
+    LongStrings.Assign (value, sb. array^);
     RETURN sb
   END NewStringBuffer;
 
 PROCEDURE (sb: StringBuffer) AddCharacters* (VAR chars: StringVar;
                                              charsStart, charsEnd: CharPos);
    VAR
-    i, j, len: LONGINT;
+    i, len: LONGINT;
     new: String;
   BEGIN
+    ASSERT ((0 <= charsStart) & (charsStart <= charsEnd) & (charsEnd <= LEN (chars)));
+    ASSERT (charsEnd-charsStart < MAX (LONGINT)-sb. length);
     (* make sure that the new text can be stored *)
     IF (charsEnd-charsStart+sb. length >= LEN (sb. array^)) THEN
       len := LEN (sb. array^);
       REPEAT
+        ASSERT (len <= (MAX (LONGINT)-stringBufferSlack) DIV 2);
         len := len*2+stringBufferSlack
       UNTIL (charsEnd-charsStart+sb. length < len);
       NEW (new, len);
@@ -305,21 +311,21 @@ PROCEDURE (sb: StringBuffer) AddCharacters* (VAR chars: StringVar;
     END;
     
     (* copy text over *)
-    i := charsStart; j := sb. length;
-    WHILE (i # charsEnd) DO
-      sb. array[j] := chars[i];
-      INC (i); INC (j)
+    IF charsStart < charsEnd THEN
+      SYSTEM.MOVE (SYSTEM.ADR (chars[charsStart]), SYSTEM.ADR (sb. array[sb. length]),
+                   (charsEnd-charsStart)*SIZE (DTD.Char))
     END;
     INC (sb. length, charsEnd-charsStart);
-    sb. array[sb. length] := 0X
+    sb. array[sb. length] := 0
   END AddCharacters;
 
 (* ------------------------------------------------------------------------ *)
 
 PROCEDURE InitPCData* (pcdata: PCData);
+  VAR empty: ARRAY 1 OF DTD.Char;
   BEGIN
     InitElement (pcdata);
-    pcdata. chars := NewStringBuffer("")
+    empty[0] := 0; pcdata. chars := NewStringBuffer(empty)
   END InitPCData;
 
 PROCEDURE NewPCData*(): PCData;
@@ -349,27 +355,27 @@ PROCEDURE (pcdata: PCData) Normalize* (stripLeadingWS, stripTrailingWS: BOOLEAN)
   BEGIN
     i := 0; l := pcdata. chars. length; s := pcdata. chars. array;
     IF stripLeadingWS THEN
-      WHILE (i < l) & (s[i] <= " ") DO
+      WHILE (i < l) & (s[i] <= 32) DO
         INC (i)
       END
     END;
     d := i;
     WHILE (i < l) DO
-      IF (s[i] <= " ") THEN
-        s[i-d] := " ";
+      IF (s[i] <= 32) THEN
+        s[i-d] := 32;
         INC (i);
-        WHILE (i < l) & (s[i] <= " ") DO
+        WHILE (i < l) & (s[i] <= 32) DO
           INC (i); INC (d)
         END
       ELSE
         s[i-d] := s[i]; INC (i)
       END
     END;
-    IF stripTrailingWS & (i # d) & (s[i-d-1] = " ") THEN
+    IF stripTrailingWS & (i # d) & (s[i-d-1] = 32) THEN
       INC (d)
     END;
-    s[i-d] := 0X;
+    s[i-d] := 0;
     pcdata. chars. length := i-d
   END Normalize;
 
-END XML:Basic:Element.
+END XMLBasicElement.

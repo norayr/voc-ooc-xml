@@ -21,8 +21,8 @@ must not be stored in `LONGINT`.
 ### Working so far
 
 The Unicode codecs, XML buffers, DTD data model, entity resolver, XML
-parser, namespace builder, DTD validator, XML writer and canonical-output
-builder build with VOC:
+parser, namespace builder, DTD validator, XML writer, canonical-output builder,
+basic element interfaces and parser-protocol builder build with VOC:
 
 ```sh
 make test
@@ -31,6 +31,8 @@ make test
 This requires VOC with the
 [shared ooc and URI support](https://github.com/vishapoberon/compiler/commit/8e8edff2896e139e57b0f1e38ec57f2fa7d38765)
 installed, including `LongStrings.Equal8`.
+Use VOC commit `32cc3131` or later for long integer-attribute scans and the
+isolated build's local-object selection.
 These provide `oocUnicode`, `LongStrings`, Unicode-safe `Msg`, `Channel`,
 `IOMemory`, `URIParser` and the file/memory URI schemes.
 Their sources and unit tests live in VOC's `src/ports/ooc/` and confidence
@@ -46,6 +48,8 @@ For DTD validation, wrap the resulting builder with
 Enable external references when the document uses an external DTD.
 `XMLWriter` generates XML with optional indentation and encoding declarations.
 See [writing XML](doc/WritingXML.md) for its interfaces and output checks.
+The [basic element interfaces](doc/BasicElements.md) construct application
+objects through element factories and typed attribute helpers.
 `XMLUnicodeCodecImportAll` registers the bundled ASCII, Latin-1,
 UTF-8 and UTF-16 encodings at startup. The codec source paths are unchanged so
 the changes remain easy to compare with CVS.
@@ -83,7 +87,10 @@ duplicate expanded attribute names and reserved bindings. Validation tests
 cover content models, required/fixed attributes, IDs and references, notations,
 64 nested elements and long Unicode attribute lists. Writer tests cover
 UTF-8/UTF-16 round trips, escaping, long names/URIs, indentation and partial
-channel writes. The eight integration programs pass with GCC and Clang in
+channel writes. Basic-element tests cover factory lookup, typed values,
+application checks, locators, stack growth and long Unicode buffers. Protocol
+tests reparse callback traces, including malformed input and namespace events.
+The ten integration programs pass with GCC and Clang in
 C23 mode, TCC and Clang ASan/UBSan.
 
 The bundled James Clark XML test archive supplies the first well-formedness
@@ -101,6 +108,7 @@ IBM, Sun and OASIS archives. Historical fixture exclusions and corrected
 expectations are recorded explicitly; see [conformance coverage](doc/Conformance.md).
 The target also compares 339 canonical outputs byte-for-byte with the
 reference files, including two explicitly recorded Sun output corrections.
+Five original parser-protocol snapshots also match byte-for-byte.
 
 `make xmlcheck` builds `XMLCheck`, a file well-formedness checker. Use
 `XMLCheck --namespaces file.xml` to enable namespace checks. Its default
@@ -113,11 +121,13 @@ input while external-entity controls and resource limits are under review.
 `XMLCheck --canonical --external file.xml` writes the first canonical form
 to standard output. `--second` selects the form that includes sorted notation
 declarations. These output modes consume qualified names directly.
+`XMLCheck --protocol file.xml` records parser callbacks as XML, including
+locators, DTD declarations and text. It supports `--namespaces` and `--validate`.
 
 VOC's ooc package supplies URI parsing, relative resolution and file/memory
 channels. XML's `XMLEntityResolver` converts Unicode system identifiers to
-these URI objects. The basic element-object interfaces, parser-protocol
-diagnostics and remaining original regression drivers are the next stages.
+these URI objects. The ported library modules have integration coverage;
+remaining original regression drivers are still being reviewed.
 External-entity controls and resource limits still need review
 before the parser can accept untrusted documents.
 

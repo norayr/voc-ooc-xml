@@ -22,11 +22,15 @@ diagnostics (exit 1); opening errors, traps and sanitizer errors fail the test.
 | James Clark canonical output | 163 |
 | IBM canonical output | 148 |
 | Sun canonical output | 28 |
+| Original parser-protocol output | 5 |
 
 All included checks pass, also under Clang ASan/UBSan. The DTD total is 1,808;
 339 cases additionally compare canonical output byte-for-byte. James Clark
 uses the first canonical form; IBM and Sun use the second form, which includes
 sorted notation declarations.
+Parser-protocol checks compare callback traces and locator positions with the
+five original successful snapshots. Integration tests also reparse diagnostic
+traces produced for malformed input.
 
 ## Upstream exclusions
 

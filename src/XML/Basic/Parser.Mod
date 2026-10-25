@@ -1,17 +1,17 @@
-MODULE XML:Basic:Parser [OOC_EXTENSIONS];
+MODULE XMLBasicParser;
 (**This parser builds on the non-validating parser @omodule{*XML:Parser}.  It
    uses the element description facilities from @omodule{*XML:Basic:Element} to
    perform syntactical and semantical checks, as well as to construct a data
    structure from an XML document.  It is intended for small XML documents,
    like configuration files or messages.
 
-   This version of the ``basic'' parser does not support namespaces.  *)
+   The element factories consume the document's qualified names. *)
 
 IMPORT
   Ch := Channel, Msg, URI,
-  XMLError := XML:Error, XML:DTD, XML:Builder, XML:UnicodeCodec, 
-  XML:Locator, XML:Parser, XML:Builder:Validation, XML:Error,
-  XML:Basic:Element;
+   XMLError := XMLError, DTD := XMLDTD, Builder := XMLBuilder,
+   UnicodeCodec := XMLUnicodeCodec, Locator := XMLLocator, Parser := XMLParser,
+   Validation := XMLBuilderValidation, Error := XMLError, Element := XMLBasicElement;
 
 CONST
   initialNestingDepth = 4;
@@ -132,15 +132,17 @@ PROCEDURE (b: Build) StartElement* (namespaceDecl: DTD.NamespaceDeclaration; loc
     newStack: ElementStack;
     i: LONGINT;
   BEGIN
+    IF ~b. noerr THEN RETURN END;
     IF (namespaceDecl # NIL) THEN
-      b. Error (namespacesNotSupported)
+      b. Error (namespacesNotSupported); RETURN
     END;
     IF (b. nestingLevel = -1) THEN
       b. stack[0] := b. rootFactory. NewElement (localName);
       IF (b. stack[0] = NIL) THEN
         b. Error (invalidRootElement)
       ELSE
-        INC (b. nestingLevel)
+        INC (b. nestingLevel);
+        b. stack[0]. SetLocator (b. locator)
       END
     ELSIF (b. nestingLevel = -2) THEN
       b. Error (junkAfterDocument)
@@ -158,7 +160,8 @@ PROCEDURE (b: Build) StartElement* (namespaceDecl: DTD.NamespaceDeclaration; loc
           ELSE
             newStack[i] := NIL
           END
-        END
+        END;
+        b. stack := newStack
       END;
       
       b. stack[b. nestingLevel+1] :=
@@ -178,6 +181,7 @@ PROCEDURE (b: Build) Attribute* (namespaceDecl: DTD.NamespaceDeclaration;
                                  value: DTD.AttValue;
                                  specified: BOOLEAN);
   BEGIN
+    IF ~b. noerr THEN RETURN END;
     IF (namespaceDecl # NIL) THEN
       b. Error (namespacesNotSupported)
     ELSIF ~b. stack[b. nestingLevel]. IsAttributeName (localName) THEN
@@ -191,6 +195,7 @@ PROCEDURE (b: Build) AttributesDone*;
   VAR
     name: DTD.String;
   BEGIN
+    IF ~b. noerr THEN RETURN END;
     name := b. stack[b. nestingLevel]. MissingAttribute();
     IF (name # NIL) THEN
       b. ErrorName (requiredAttributeMissing, name)
@@ -205,13 +210,14 @@ PROCEDURE (b: Build) Characters* (VAR chars: DTD.StringVar;
       i: DTD.CharPos;
     BEGIN
       i := charsStart;
-      WHILE (i # charsEnd) & (chars[i] <= " ") DO
+      WHILE (i # charsEnd) & (chars[i] <= 32) DO
         INC (i)
       END;
       RETURN (i = charsEnd)
     END IsWhitespace;
   
   BEGIN
+    IF ~b. noerr THEN RETURN END;
     IF b. stack[b. nestingLevel]. HasMixedContent() THEN
       b. stack[b. nestingLevel]. AddCharacters (chars, charsStart, charsEnd)
     ELSIF ~IsWhitespace() THEN
@@ -223,14 +229,15 @@ PROCEDURE (b: Build) EndElement* (namespaceDecl: DTD.NamespaceDeclaration; local
   VAR
     name, errorMsg: DTD.String;
   BEGIN
+    IF ~b. noerr THEN RETURN END;
     name := b. stack[b. nestingLevel]. MissingChild();
     IF (name # NIL) THEN
-      b. ErrorName (requiredChildMissing, name)
+      b. ErrorName (requiredChildMissing, name); RETURN
     END;
     
     errorMsg := b. stack[b. nestingLevel]. CheckElement();
     IF (errorMsg # NIL) THEN
-      b. ErrorString (elementCheckFailed, errorMsg)
+      b. ErrorString (elementCheckFailed, errorMsg); RETURN
     END;
     
     IF (b. nestingLevel = 0) THEN
@@ -347,4 +354,4 @@ BEGIN
     "Only whitespace allowed as content of this element");
   msgParserContext. SetString (elementCheckFailed,
     "${string}");
-END XML:Basic:Parser.
+END XMLBasicParser.

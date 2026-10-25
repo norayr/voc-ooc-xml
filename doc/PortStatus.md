@@ -2,9 +2,9 @@
 
 `make test` builds and tests the Unicode codecs, XML byte/Unicode buffers,
 DTD data model, entity resolver, diagnostics, locator, builder interface and
-parser, namespace builder, DTD validator, writer and canonical-output builder
-against VOC's shared ooc support under the Oberon-2 model. The basic element
-interfaces and parser-protocol output remain to be adapted.
+parser, namespace builder, DTD validator, writer, canonical-output builder,
+basic element interfaces and parser-protocol builder against VOC's shared ooc
+support under the Oberon-2 model.
 
 ## Dependencies
 
@@ -17,7 +17,8 @@ integer widths, record extensions and method signatures must agree.
 | `XMLBuilderNamespaces` | Ported with scoped declarations, implicit `xml` bindings, duplicate expanded-name checks and Unicode coverage. |
 | `XMLBuilderValidation`, `XMLRegexp` | Ported DTD validation and content-model matching; tested with internal/external DTDs and Unicode attributes. |
 | `XMLWriter`, `XMLBuilderCanonical` | Ported XML generation and canonical forms; round-trip and reference-output tests cover Unicode, escaping, attribute sorting and notations. |
-| Basic element interfaces, parser-protocol builder | Included in the CVS import; still need adapting to VOC. |
+| `XMLBasicElement`, `XMLBasicParser`, `XMLBasicDataType` | Ported element factories, typed attributes and application-object construction. |
+| `XMLBuilderParserProtocol` | Ported callback traces with locators; original reference snapshots match byte-for-byte. |
 | `XMLDTD` | Ported data model; tests cover internal subsets, parameter entities, default attributes and validity constraints. |
 | `XMLEntityResolver` | Ported Unicode system-identifier normalization and relative URI resolution; tested with supplementary characters, malformed UTF-16 and long identifiers. |
 | `XMLInputBuffer`, `XMLUnicodeBuffer` | Ported and tested with short reads, BOMs, growth, compaction, repeated flushes and partial-write retries. |
@@ -192,9 +193,31 @@ will not be part of the VOC port's implementation.
 - [Writing XML](WritingXML.md) describes the output API and required error
   checks. Applications supply valid names and balanced tag operations.
 
+## Basic element objects and callback traces
+
+- `XMLBasicElement` provides root factories, child lists, growable Unicode
+  strings and character-data elements. `XMLBasicParser` builds application
+  objects, checks application-defined attribute/content rules and optionally
+  validates against a DTD. See [Basic element objects](BasicElements.md).
+- The parser installs a grown nesting stack and sets the root object's locator
+  before attributes arrive. It stops application callbacks after an application
+  error, including missing-child and whole-element checks. Regression tests
+  cover 64 nested objects, root-relative URI attributes, invalid input,
+  Unicode factory names and 70,000-unit character buffers.
+- Typed integer attributes retain the entire value before conversion. Latin-1
+  conversion checks representability and capacity before modifying the result;
+  URI conversion reports malformed UTF-16. Shared `IntConv` now scans with
+  `LONGINT` offsets (VOC commit `32cc3131`), with generic long-input tests in
+  VOC's confidence suite.
+- `XMLBuilderParserProtocol` writes callbacks as XML through `XMLWriter`.
+  Tests reparse traces for declarations, attributes, namespaces, CDATA,
+  comments, instructions, entities, missing base URIs and fatal parse errors.
+  All five original successful snapshots match byte-for-byte, including their
+  locator positions. Long-text tests exercise buffered trace output.
+
 ## Verification
 
-The eight XML test programs and seven ooc regression programs pass with
+The ten XML test programs and seven ooc regression programs pass with
 GCC/C23, Clang/C23 and TCC under `-O2`. The shared ooc package is rebuilt
 before each XML test run. An additional Clang build instruments the shared
 package, ported XML modules and tests with AddressSanitizer and
@@ -218,6 +241,9 @@ collector can find live pointers on the native stack. The installed VOC
 runtime is used as provided by the compiler. Set `BUILD` to a rebuilt ooc
 directory when testing from source without installing VOC first; see the
 source-build example in the README.
+The isolated ooc build forces local symbol files, so rebuilt objects are linked
+even when installed modules export identical interfaces. All conformance
+targets pass with GCC/C23, Clang/C23, TCC and the sanitizer build.
 
 ## Representation rules
 
@@ -236,12 +262,12 @@ source-build example in the README.
 
 ## Next stages
 
-1. Adapt and test the basic element interfaces and parser-protocol builder.
-2. Adapt the remaining upstream test drivers. Review entity expansion,
+1. Review entity expansion,
    recursion and external-entity controls before accepting untrusted input.
-3. Run the remaining XML/namespace/encoding suites. Separate external fixture
+2. Review the remaining upstream drivers and XML/namespace/encoding suites.
+   Separate external fixture
    availability from genuine parser failures.
-4. Only then add an XML port manifest for the XML-specific modules in a
+3. Only then add an XML port manifest for the XML-specific modules in a
    separate VOC port directory, with reusable dependencies in the existing
    ooc package. Test both packages together. Optional HTTP/socket support can
    be handled independently.
