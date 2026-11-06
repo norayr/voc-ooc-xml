@@ -35,6 +35,8 @@ Use VOC commit `32cc3131` or later for long integer-attribute scans and the
 isolated build's local-object selection.
 These provide `oocUnicode`, `LongStrings`, Unicode-safe `Msg`, `Channel`,
 `IOMemory`, `URIParser` and the file/memory URI schemes.
+The original codec test driver uses `Out.HexDigits` for fixed-width hexadecimal
+output; build it with a VOC installation providing that procedure.
 Their sources and unit tests live in VOC's `src/ports/ooc/` and confidence
 tests. Rebuild VOC and its dependent modules together when updating this
 package.
